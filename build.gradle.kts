@@ -33,6 +33,11 @@ application {
 
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_23)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+tasks.withType<JavaCompile> {
+    sourceCompatibility = "17"  // Set Java version to 17
+    targetCompatibility = "17"
 }
