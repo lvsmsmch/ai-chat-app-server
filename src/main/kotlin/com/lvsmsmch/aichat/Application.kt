@@ -1,14 +1,13 @@
 package com.lvsmsmch.aichat  // Use your package name
 
-import io.ktor.serialization.kotlinx.json.*
+import com.lvsmsmch.aichat.database_impl.mongo_db.characters.CharactersDbRepository
+import com.lvsmsmch.aichat.database_impl.mongo_db.configureMongoClient
+import com.lvsmsmch.aichat.database_impl.mongo_db.users.UsersDbRepository
+import com.lvsmsmch.aichat.other.configureJson
+import com.lvsmsmch.aichat.routing.configureRouting
 import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.response.*
-import io.ktor.server.request.*
-import io.ktor.server.routing.*
-import kotlinx.serialization.Serializable
 
 fun main() {
     embeddedServer(Netty, port = 8080) {
@@ -17,39 +16,12 @@ fun main() {
 }
 
 fun Application.module() {
-    install(ContentNegotiation) {
-        json()
-    }
+    configureJson()
 
-    routing {
-        // Basic GET request
-        get("/") {
-            call.respondText("Hello, Vlad! Katochku?")
-        }
+    val mongoClient = configureMongoClient()
 
-        // Simple GET with parameter
-        get("/hello/{name}") {
-            val name = call.parameters["name"] ?: "stranger"
-            call.respondText("Hello, $name!")
-        }
+    val charactersDbRepository = CharactersDbRepository(mongoClient.getDatabase("characters"))
+    val usersDbRepository = UsersDbRepository(mongoClient.getDatabase("users"))
 
-        // Simple JSON response
-        get("/json") {
-            call.respond(mapOf("message" to "This is a JSON response"))
-        }
-
-        // POST request to receive JSON and return modified data
-        post("/post") {
-            val request = call.receive<PostRequest>()
-            call.respond(PostResponse(message = "Hello, ${request.name}, age ${request.age}!"))
-        }
-    }
+    configureRouting(charactersDbRepository, usersDbRepository)
 }
-
-// Define a data class for handling POST requests
-@Serializable
-data class PostRequest(val name: String, val age: Int)
-
-// Define a data class for responding with JSON
-@Serializable
-data class PostResponse(val message: String)

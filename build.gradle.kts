@@ -16,6 +16,10 @@ repositories {
 }
 
 dependencies {
+    testImplementation("io.ktor:ktor-server-tests-jvm:2.3.10")
+    testImplementation("org.jetbrains.kotlin:kotlin-test:2.1.10")
+
+    implementation("io.ktor:ktor-server-status-pages:2.3.10")
     implementation("io.ktor:ktor-server-core-jvm:2.3.10")
     implementation("io.ktor:ktor-server-netty-jvm:2.3.10")
     implementation("io.ktor:ktor-server-content-negotiation:2.3.10")
@@ -23,8 +27,11 @@ dependencies {
     implementation("io.ktor:ktor-serialization:2.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
     implementation("ch.qos.logback:logback-classic:1.4.12")
-    testImplementation("io.ktor:ktor-server-tests-jvm:2.3.10")
-    testImplementation("org.jetbrains.kotlin:kotlin-test:2.1.10")
+
+//    implementation("org.mongodb:mongodb-driver-sync:4.4.3")
+    implementation("org.litote.kmongo:kmongo:4.5.0")  // KMongo (for Kotlin)
+    implementation("org.mongodb:mongo-java-driver:4.7.1")
+
 }
 
 application {
