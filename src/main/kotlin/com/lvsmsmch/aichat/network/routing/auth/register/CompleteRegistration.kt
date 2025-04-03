@@ -3,7 +3,7 @@ package com.lvsmsmch.aichat.network.routing.auth.register
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens.RegistrationCompletionTokenRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserDbo
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,7 +14,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureCompleteRegistrationRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     registrationCompletionTokensRepository: RegistrationCompletionTokenRepository,
     sessionRepository: SessionRepository,
 ) {
@@ -43,7 +43,7 @@ fun Routing.configureCompleteRegistrationRouting(
                 return@post call.respond(HttpStatusCode.Unauthorized, e.message)
             }
 
-            val user = usersRepository.findUserByEmail(tokenDbo.email)
+            val user = userRepository.findUserByEmail(tokenDbo.email)
             if (user != null) {
                 return@post call.respond(HttpStatusCode.Forbidden, "User already exists")
             }
@@ -54,7 +54,7 @@ fun Routing.configureCompleteRegistrationRouting(
                 username = request.username,
                 name = request.name,
             )
-            usersRepository.addUser(newUserDbo)
+            userRepository.addUser(newUserDbo)
             val sessionDbo = sessionRepository.createSession(newUserDbo.id, call.getUserIp())
 
             registrationCompletionTokensRepository.markAsUsedByToken(tokenDbo.token)

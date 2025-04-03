@@ -57,38 +57,38 @@ fun Application.configureRouting(database: CoroutineDatabase, repositories: Repo
 
 
         configureAddCharacterRouting(
-            charactersRepository = repositories.charactersRepository,
+            characterRepository = repositories.characterRepository,
             authTokensForSessionRepository = repositories.authTokensForSessionRepository,
         )
         configureDeleteCharacterRouting(
-            charactersRepository = repositories.charactersRepository,
+            characterRepository = repositories.characterRepository,
             authTokensForSessionRepository = repositories.authTokensForSessionRepository,
         )
         configureGetCharactersRouting(
-            charactersRepository = repositories.charactersRepository,
-            reviewsRepository = repositories.reviewsRepository,
-            usersRepository = repositories.usersRepository
+            characterRepository = repositories.characterRepository,
+            reviewsRepository = repositories.reviewRepository,
+            usersRepository = repositories.userRepository
         )
 
         configureAddReviewRouting(
-            reviewsRepository = repositories.reviewsRepository,
+            reviewRepository = repositories.reviewRepository,
             authTokensForSessionRepository = repositories.authTokensForSessionRepository,
         )
         configureDeleteReviewRouting(
-            reviewsRepository = repositories.reviewsRepository,
+            reviewRepository = repositories.reviewRepository,
             authTokensForSessionRepository = repositories.authTokensForSessionRepository,
         )
         configureGetReviewsRouting(
-            reviewsRepository = repositories.reviewsRepository,
-            usersRepository = repositories.usersRepository
+            reviewRepository = repositories.reviewRepository,
+            userRepository = repositories.userRepository
         )
         configureUpdateReviewRouting(
-            reviewsRepository = repositories.reviewsRepository,
+            reviewRepository = repositories.reviewRepository,
             authTokensForSessionRepository = repositories.authTokensForSessionRepository,
         )
 
         configureGetUserByIdRouting(
-            usersRepository = repositories.usersRepository,
+            userRepository = repositories.userRepository,
         )
     }
 }

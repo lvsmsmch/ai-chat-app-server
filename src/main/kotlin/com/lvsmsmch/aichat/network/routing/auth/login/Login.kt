@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.network.routing.auth.login
 
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.db.repositories.auth.attempts.LoginAttemptsTracker
 import com.lvsmsmch.aichat.db.repositories.auth.verification_codes.LoginCodesRepository
 import com.lvsmsmch.aichat.utils.*
@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
 fun Routing.configureLoginRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     loginAttemptsTracker: LoginAttemptsTracker,
     loginCodesRepository: LoginCodesRepository,
     emailSender: EmailSender,
@@ -42,7 +42,7 @@ fun Routing.configureLoginRouting(
             )
             if (recentAttempts > 10) return@post call.respond(HttpStatusCode.TooManyRequests)
 
-            val user = usersRepository.findUserByEmail(request.email)
+            val user = userRepository.findUserByEmail(request.email)
             if (user == null || !checkPassword(request.password, user.hashedPassword)) {
                 loginAttemptsTracker.recordAttempt(call.getUserIp(), request.email, false)
                 delay(Random.nextLong(0, 50))

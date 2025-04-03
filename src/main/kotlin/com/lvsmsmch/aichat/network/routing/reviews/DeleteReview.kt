@@ -1,8 +1,8 @@
 package com.lvsmsmch.aichat.network.routing.reviews
 
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -12,8 +12,8 @@ import io.ktor.util.logging.*
 
 fun Routing.configureDeleteReviewRouting(
     sessionRepository: SessionRepository,
-    reviewsRepository: ReviewsRepository,
-    charactersRepository: CharactersRepository,
+    reviewRepository: ReviewRepository,
+    characterRepository: CharacterRepository,
 ) {
     delete("/characters/{characterId}/reviews/{id}") {
         try {
@@ -29,10 +29,10 @@ fun Routing.configureDeleteReviewRouting(
             val reviewId = call.parameters["id"]
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, "Missing review id")
 
-            charactersRepository.getCharacter(characterId)
+            characterRepository.getCharacter(characterId)
                 ?: return@delete call.respond(HttpStatusCode.NotFound, "Character not found")
 
-            val reviewDbo = reviewsRepository.getReviewById(reviewId)
+            val reviewDbo = reviewRepository.getReviewById(reviewId)
                 ?: return@delete call.respond(HttpStatusCode.NotFound, "Review not found")
 
             if (reviewDbo.characterId != characterId) {
@@ -43,7 +43,7 @@ fun Routing.configureDeleteReviewRouting(
                 return@delete call.respond(HttpStatusCode.Forbidden, "You are not the owner")
             }
 
-            reviewsRepository.deleteReviewById(reviewId)
+            reviewRepository.deleteReviewById(reviewId)
 
             call.respond(HttpStatusCode.NoContent)
 

@@ -11,16 +11,16 @@ import com.lvsmsmch.aichat.db.repositories._trash.code_trackings.CodeTrackingDbo
 import com.lvsmsmch.aichat.db.repositories._trash.code_trackings.CodeTrackingsForRestorePasswordRepository
 import com.lvsmsmch.aichat.db.repositories._trash.code_trackings.CodeTrackingsForVerifyEmailRepository
 import com.lvsmsmch.aichat.db.repositories.content.CharacterDbo
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserDbo
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import org.litote.kmongo.coroutine.CoroutineDatabase
 
 class Repositories(
-    val usersRepository: UsersRepository,
-    val charactersRepository: CharactersRepository,
-    val reviewsRepository: ReviewsRepository,
+    val userRepository: UserRepository,
+    val characterRepository: CharacterRepository,
+    val reviewRepository: ReviewRepository,
     val authTokensForSessionRepository: AuthTokensForSessionRepository,
     val authTokensForResetPasswordRepository: AuthTokensForResetPasswordRepository,
     val authTokensForRegisterRepository: AuthTokensForRegisterRepository,
@@ -31,13 +31,13 @@ class Repositories(
 
 fun configureRepositories(database: CoroutineDatabase): Repositories {
     return Repositories(
-        usersRepository = UsersRepository(
+        userRepository = UserRepository(
             database.getCollection<UserDbo>("users")
         ),
-        charactersRepository = CharactersRepository(
+        characterRepository = CharacterRepository(
             database.getCollection<CharacterDbo>("characters")
         ),
-        reviewsRepository = ReviewsRepository(
+        reviewRepository = ReviewRepository(
             database.getCollection<CharacterDbo>("characters")
         ),
         authTokensForSessionRepository = AuthTokensForSessionRepository(

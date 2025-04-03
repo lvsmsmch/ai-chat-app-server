@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.network.routing.characters
 
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.network.dto_objects.CharacterDto
 import com.lvsmsmch.aichat.utils.toCharacterDto
 import io.ktor.http.*
@@ -11,7 +11,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureGetCharactersRouting(
-    charactersRepository: CharactersRepository,
+    characterRepository: CharacterRepository,
 ) {
 
     @Serializable
@@ -26,7 +26,7 @@ fun Routing.configureGetCharactersRouting(
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
             val skip = call.request.queryParameters["skip"]?.toIntOrNull() ?: 0
 
-            val charactersDbo = charactersRepository.getCharacters(searchQuery, filter, limit, skip)
+            val charactersDbo = characterRepository.getCharacters(searchQuery, filter, limit, skip)
 
             val charactersDto = charactersDbo.map { it.toCharacterDto() }
 

@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.auth.login
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -59,7 +59,7 @@ enum class OAuthProvider(val id: String) {
 }
 
 fun Routing.configureOauthRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     sessionRepository: SessionRepository,
 ) {
     @Serializable
@@ -96,7 +96,7 @@ fun Routing.configureOauthRouting(
             }
 
             // Get or create user
-            val user = usersRepository.getOrCreateUserByOAuthId(provider, oauthUserData)
+            val user = userRepository.getOrCreateUserByOAuthId(provider, oauthUserData)
 
             // Create session
             val sessionDbo = sessionRepository.createSession(user.id, call.getUserIp())

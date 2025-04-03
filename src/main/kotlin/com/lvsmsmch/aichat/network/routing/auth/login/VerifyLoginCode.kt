@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.network.routing.auth.login
 
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.db.repositories.auth.attempts.EnterLoginCodeAttemptsTracker
 import com.lvsmsmch.aichat.db.repositories.auth.verification_codes.LoginCodesRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
@@ -14,7 +14,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureVerifyLoginCodeRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     enterLoginCodeAttemptsTracker: EnterLoginCodeAttemptsTracker,
     loginCodesRepository: LoginCodesRepository,
     sessionRepository: SessionRepository
@@ -72,7 +72,7 @@ fun Routing.configureVerifyLoginCodeRouting(
 
 
             // Get user info
-            val user = usersRepository.findUserByEmail(request.email)
+            val user = userRepository.findUserByEmail(request.email)
                 ?: return@post call.respond(HttpStatusCode.NotFound, "User not found")
 
             // Create a new session

@@ -27,7 +27,7 @@ data class ReviewDbo(
     val editedAt: UtcTimestamp? = null
 )
 
-class ReviewsRepository(
+class ReviewRepository(
     private val collection: CoroutineCollection<ReviewDbo>
 ) {
 

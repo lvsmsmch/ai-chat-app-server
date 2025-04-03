@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.profile
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import com.lvsmsmch.aichat.utils.uploadImageOnServer
 import io.ktor.http.*
@@ -14,7 +14,7 @@ import io.ktor.util.logging.*
 import java.io.File
 
 fun Routing.configureChangeProfilePictureRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     sessionRepository: SessionRepository,
 ) {
     // Use PATCH for partial update of a resource
@@ -54,7 +54,7 @@ fun Routing.configureChangeProfilePictureRouting(
 
             // Upload image and update user profile
             val newUrl = uploadImageOnServer(pictureFile!!)
-            usersRepository.updateUserProfilePicture(
+            userRepository.updateUserProfilePicture(
                 userId = tokenDbo.userId,
                 profilePictureUrl = newUrl
             )

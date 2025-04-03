@@ -1,9 +1,9 @@
 package com.lvsmsmch.aichat.network.routing.characters
 
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.db.repositories.content.ReviewFilter
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.network.dto_objects.CharacterDetailsDto
 import com.lvsmsmch.aichat.utils.toCharacterDetailsDto
 import com.lvsmsmch.aichat.utils.toReviewDto
@@ -16,9 +16,9 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureGetCharacterDetailsRouting(
-    charactersRepository: CharactersRepository,
-    reviewsRepository: ReviewsRepository,
-    usersRepository: UsersRepository
+    characterRepository: CharacterRepository,
+    reviewRepository: ReviewRepository,
+    userRepository: UserRepository
 ) {
 
     @Serializable
@@ -31,18 +31,18 @@ fun Routing.configureGetCharacterDetailsRouting(
             val characterId = call.parameters["id"]
                 ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing character id")
 
-            val characterDbo = charactersRepository.getCharacter(characterId)
+            val characterDbo = characterRepository.getCharacter(characterId)
                 ?: return@get call.respond(HttpStatusCode.NotFound, "Character not found")
 
-            val publisherDto = usersRepository.getUserById(characterDbo.publisherId)?.toUserDto()
+            val publisherDto = userRepository.getUserById(characterDbo.publisherId)?.toUserDto()
 
-            val recentReviewsDto = reviewsRepository.getReviews(
+            val recentReviewsDto = reviewRepository.getReviews(
                 characterId = characterId,
                 filter = ReviewFilter.NEWEST.code,
                 limit = 3,
                 skip = 0
             ).map { reviewDbo ->
-                val reviewPublisherDto = usersRepository.getUserById(reviewDbo.publisherId)?.toUserDto()
+                val reviewPublisherDto = userRepository.getUserById(reviewDbo.publisherId)?.toUserDto()
                 reviewDbo.toReviewDto(reviewPublisherDto)
             }
 

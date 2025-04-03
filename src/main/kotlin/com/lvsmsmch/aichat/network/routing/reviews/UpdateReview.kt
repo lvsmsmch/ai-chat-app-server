@@ -1,8 +1,8 @@
 package com.lvsmsmch.aichat.network.routing.reviews
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,8 +14,8 @@ import kotlinx.serialization.Serializable
 
 fun Routing.configureUpdateReviewRouting(
     sessionRepository: SessionRepository,
-    charactersRepository: CharactersRepository,
-    reviewsRepository: ReviewsRepository,
+    characterRepository: CharacterRepository,
+    reviewRepository: ReviewRepository,
 ) {
 
     @Serializable
@@ -39,10 +39,10 @@ fun Routing.configureUpdateReviewRouting(
             val reviewId = call.parameters["id"]
                 ?: return@patch call.respond(HttpStatusCode.BadRequest, "Missing review id")
 
-            charactersRepository.getCharacter(characterId)
+            characterRepository.getCharacter(characterId)
                 ?: return@patch call.respond(HttpStatusCode.NotFound, "Character not found")
 
-            val reviewDbo = reviewsRepository.getReviewById(reviewId)
+            val reviewDbo = reviewRepository.getReviewById(reviewId)
                 ?: return@patch call.respond(HttpStatusCode.NotFound, "Review not found")
 
             if (reviewDbo.characterId != characterId) {
@@ -67,7 +67,7 @@ fun Routing.configureUpdateReviewRouting(
                 return@patch call.respond(HttpStatusCode.BadRequest, "Text exceeds 1000 characters")
             }
 
-            reviewsRepository.updateReview(
+            reviewRepository.updateReview(
                 id = reviewId,
                 rating = updates.rating,
                 text = updates.text,

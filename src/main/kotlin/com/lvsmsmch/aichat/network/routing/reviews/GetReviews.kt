@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.reviews
 
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.network.dto_objects.ReviewDto
 import com.lvsmsmch.aichat.utils.toReviewDto
 import com.lvsmsmch.aichat.utils.toUserDto
@@ -13,8 +13,8 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureGetReviewsRouting(
-    reviewsRepository: ReviewsRepository,
-    usersRepository: UsersRepository,
+    reviewRepository: ReviewRepository,
+    userRepository: UserRepository,
 ) {
     @Serializable
     data class Response(
@@ -31,13 +31,13 @@ fun Routing.configureGetReviewsRouting(
             val skip = call.request.queryParameters["skip"]?.toIntOrNull() ?: 0
 
             val reviewsDbo = try {
-                reviewsRepository.getReviews(characterId, filter, limit, skip)
+                reviewRepository.getReviews(characterId, filter, limit, skip)
             } catch (e: Exception) {
                 return@get call.respond(HttpStatusCode.InternalServerError, e.message.toString())
             }
 
             val reviewsDto = reviewsDbo.mapNotNull { reviewDbo ->
-                val userDbo = usersRepository.getUserById(reviewDbo.publisherId) ?: return@mapNotNull null
+                val userDbo = userRepository.getUserById(reviewDbo.publisherId) ?: return@mapNotNull null
                 reviewDbo.toReviewDto(userDbo.toUserDto())
             }
 

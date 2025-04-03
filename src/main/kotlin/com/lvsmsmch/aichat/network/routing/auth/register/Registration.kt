@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.auth.register
 
 import com.lvsmsmch.aichat.db.repositories.auth.attempts.RegistrationAttemptsTracker
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.db.repositories.auth.verification_codes.RegistrationCodesRepository
 import com.lvsmsmch.aichat.utils.EmailSender
 import com.lvsmsmch.aichat.utils.getUserIp
@@ -14,7 +14,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureRegistrationRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     registrationAttemptsTracker: RegistrationAttemptsTracker,
     registrationCodesRepository: RegistrationCodesRepository,
     emailSender: EmailSender,
@@ -41,7 +41,7 @@ fun Routing.configureRegistrationRouting(
             )
             if (recentAttempts > 10) return@post call.respond(HttpStatusCode.TooManyRequests)
 
-            val user = usersRepository.findUserByEmail(request.email)
+            val user = userRepository.findUserByEmail(request.email)
             if (user != null) {
                 return@post call.respond(HttpStatusCode.Forbidden, "This email already registered")
             }

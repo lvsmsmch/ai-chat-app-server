@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.characters
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -10,7 +10,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.logging.*
 
 fun Routing.configureDeleteCharacterRouting(
-    charactersRepository: CharactersRepository,
+    characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
 ) {
 
@@ -25,7 +25,7 @@ fun Routing.configureDeleteCharacterRouting(
             val characterId = call.parameters["id"]
                 ?: return@delete call.respond(HttpStatusCode.BadRequest, "Missing id")
 
-            val character = charactersRepository.getCharacter(characterId)
+            val character = characterRepository.getCharacter(characterId)
                 ?: return@delete call.respond(HttpStatusCode.NotFound, "Character not found")
 
             if (character.publisherId != tokenDbo.userId) {
@@ -33,7 +33,7 @@ fun Routing.configureDeleteCharacterRouting(
             }
 
             try {
-                charactersRepository.deleteCharacter(characterId = characterId)
+                characterRepository.deleteCharacter(characterId = characterId)
             } catch (e: Exception) {
                 return@delete call.respond(HttpStatusCode.InternalServerError, e.message.toString())
             }

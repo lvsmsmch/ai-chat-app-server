@@ -3,7 +3,7 @@ package com.lvsmsmch.aichat.network.routing.auth.register
 import com.lvsmsmch.aichat.db.repositories.auth.attempts.EnterRegistrationCodeAttemptsTracker
 import com.lvsmsmch.aichat.db.repositories.auth.verification_codes.RegistrationCodesRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens.RegistrationCompletionTokenRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.getUserIp
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,7 +14,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureVerifyRegistrationCodeRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     enterRegistrationCodeAttemptsTracker: EnterRegistrationCodeAttemptsTracker,
     registrationCodesRepository: RegistrationCodesRepository,
     registrationCompletionTokensRepository: RegistrationCompletionTokenRepository
@@ -72,7 +72,7 @@ fun Routing.configureVerifyRegistrationCodeRouting(
 
 
             // Get user info
-            val user = usersRepository.findUserByEmail(request.email)
+            val user = userRepository.findUserByEmail(request.email)
             if (user != null) {
                 return@post call.respond(HttpStatusCode.Forbidden, "User already exists")
             }

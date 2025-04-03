@@ -24,7 +24,7 @@ data class UserDbo(
     val profilePicUrl: String = "",
 )
 
-class UsersRepository(
+class UserRepository(
     private val collection: CoroutineCollection<UserDbo>
 ) {
 

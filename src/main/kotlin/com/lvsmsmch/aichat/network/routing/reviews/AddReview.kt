@@ -1,8 +1,8 @@
 package com.lvsmsmch.aichat.network.routing.reviews
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.CharactersRepository
-import com.lvsmsmch.aichat.db.repositories.content.ReviewsRepository
+import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
+import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,8 +14,8 @@ import kotlinx.serialization.Serializable
 
 fun Routing.configureAddReviewRouting(
     sessionRepository: SessionRepository,
-    reviewsRepository: ReviewsRepository,
-    charactersRepository: CharactersRepository,
+    reviewRepository: ReviewRepository,
+    characterRepository: CharacterRepository,
 ) {
 
     @Serializable
@@ -38,7 +38,7 @@ fun Routing.configureAddReviewRouting(
             val characterId = call.parameters["characterId"]
                 ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing character id")
 
-            charactersRepository.getCharacter(characterId)
+            characterRepository.getCharacter(characterId)
                 ?: return@post call.respond(HttpStatusCode.NotFound, "Character not found")
 
             if (request.rating !in 1..5) {
@@ -49,11 +49,11 @@ fun Routing.configureAddReviewRouting(
                 return@post call.respond(HttpStatusCode.BadRequest, "Length exceeded 1000 characters")
             }
 
-            if (reviewsRepository.getReview(userId = tokenDbo.userId, characterId = characterId) != null) {
+            if (reviewRepository.getReview(userId = tokenDbo.userId, characterId = characterId) != null) {
                 return@post call.respond(HttpStatusCode.Forbidden, "You already left a review")
             }
 
-            reviewsRepository.addReview(
+            reviewRepository.addReview(
                 userId = tokenDbo.userId,
                 characterId = characterId,
                 rating = request.rating,

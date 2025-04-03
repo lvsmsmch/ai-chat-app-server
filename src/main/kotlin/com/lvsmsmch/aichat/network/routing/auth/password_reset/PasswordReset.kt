@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.network.routing.auth.password_reset
 
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.verification_tokens.PasswordResetTokenRepository
 import com.lvsmsmch.aichat.utils.EmailSender
 import io.ktor.http.*
@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
 
 
 fun Routing.configurePasswordResetRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     passwordResetTokenRepository: PasswordResetTokenRepository,
     emailSender: EmailSender,
 ) {
@@ -33,7 +33,7 @@ fun Routing.configurePasswordResetRouting(
         try {
             val request = call.receive<Request>()
 
-            usersRepository.findUserByEmail(request.email)
+            userRepository.findUserByEmail(request.email)
                 ?: return@post call.respond(HttpStatusCode.Forbidden, "User with this email not found.")
 
             val token = if (passwordResetTokenRepository.canGenerateNewToken(request.email)) {

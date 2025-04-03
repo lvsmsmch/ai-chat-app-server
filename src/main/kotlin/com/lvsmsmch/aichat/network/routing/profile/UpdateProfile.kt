@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.profile
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import com.lvsmsmch.aichat.utils.hashPassword
 import io.ktor.http.*
@@ -13,7 +13,7 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureProfileUpdatesRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     sessionRepository: SessionRepository,
 ) {
 
@@ -38,9 +38,9 @@ fun Routing.configureProfileUpdatesRouting(
                 return@patch call.respond(HttpStatusCode.BadRequest, "No update fields provided")
             }
 
-            updates.password?.let { usersRepository.updatePassword(tokenDbo.userId, hashPassword(it)) }
-            updates.username?.let { usersRepository.updateUsername(tokenDbo.userId, it) }
-            updates.name?.let { usersRepository.updateName(tokenDbo.userId, it) }
+            updates.password?.let { userRepository.updatePassword(tokenDbo.userId, hashPassword(it)) }
+            updates.username?.let { userRepository.updateUsername(tokenDbo.userId, it) }
+            updates.name?.let { userRepository.updateName(tokenDbo.userId, it) }
 
             call.respond(HttpStatusCode.OK)
         } catch (e: Exception) {

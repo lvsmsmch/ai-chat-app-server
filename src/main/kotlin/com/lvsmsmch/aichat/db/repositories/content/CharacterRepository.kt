@@ -32,7 +32,7 @@ data class CharacterDbo(
     val averageRating: Float = 0f,
 )
 
-class CharactersRepository(
+class CharacterRepository(
     private val collection: CoroutineCollection<CharacterDbo>
 ) {
     suspend fun getCharacters(searchQuery: String, filter: Int, limit: Int, skip: Int): List<CharacterDbo> {
@@ -68,19 +68,20 @@ class CharactersRepository(
     }
 
     suspend fun addCharacter(
+        publisherId: String,
+        publisherUsername: String,
         name: String,
         description: String,
         prompt: String,
-        publisherId: String,
         pictureUrl: String
     ): Boolean {
         val newCharacter = CharacterDbo(
+            publisherId = publisherId,
+            publisherUsername = publisherUsername,
             name = name,
             description = description,
-            picUrl = pictureUrl,
             prompt = prompt,
-            publishedAt = UtcTimestamp.now(),
-            publisherId = publisherId
+            picUrl = pictureUrl,
         )
         return collection.insertOne(newCharacter).wasAcknowledged()
     }

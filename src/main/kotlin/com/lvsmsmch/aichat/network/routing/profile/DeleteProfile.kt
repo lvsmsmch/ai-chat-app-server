@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.profile
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.repositories.content.UsersRepository
+import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.utils.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -10,7 +10,7 @@ import io.ktor.server.routing.*
 import io.ktor.util.logging.*
 
 fun Routing.configureDeleteProfileRouting(
-    usersRepository: UsersRepository,
+    userRepository: UserRepository,
     sessionRepository: SessionRepository,
 ) {
 
@@ -22,7 +22,7 @@ fun Routing.configureDeleteProfileRouting(
                 return@delete call.respond(HttpStatusCode.Unauthorized, e.message)
             }
 
-            usersRepository.deleteUser(userId = tokenDbo.userId)
+            userRepository.deleteUser(userId = tokenDbo.userId)
             call.respond(HttpStatusCode.OK)
         } catch (e: Exception) {
             application.log.error(e)
