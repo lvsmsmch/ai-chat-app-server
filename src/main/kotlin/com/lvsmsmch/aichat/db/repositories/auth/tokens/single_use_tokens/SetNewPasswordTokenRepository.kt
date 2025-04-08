@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenDbo
-import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenVerifier
+import com.lvsmsmch.aichat.db.repositories.auth.tokens.VerifiableToken
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.generateToken
 import kotlinx.serialization.Serializable
@@ -19,7 +19,7 @@ data class SetNewPasswordTokenDbo(
 
 class SetNewPasswordTokenRepository(
     override val collection: CoroutineCollection<SetNewPasswordTokenDbo>
-) : TokenVerifier<SetNewPasswordTokenDbo>, UsableTokensRepository<SetNewPasswordTokenDbo> {
+) : VerifiableToken<SetNewPasswordTokenDbo>, UsableTokensRepository<SetNewPasswordTokenDbo> {
 
     suspend fun createAndSaveNewToken(userId: String): SetNewPasswordTokenDbo {
         val token = generateToken()

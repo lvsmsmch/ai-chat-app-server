@@ -4,9 +4,11 @@ import com.lvsmsmch.aichat.network.routing.auth.login.OAuthProvider
 import com.lvsmsmch.aichat.network.routing.auth.login.OAuthUserData
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.generateUniqueUsername
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
+import org.litote.kmongo.ascending
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.eq
 import org.litote.kmongo.setValue
@@ -27,6 +29,21 @@ data class UserDbo(
 class UserRepository(
     private val collection: CoroutineCollection<UserDbo>
 ) {
+
+    init {
+        initializeIndexes()
+    }
+
+
+    private fun initializeIndexes() {
+        runBlocking {
+            collection.ensureIndex(ascending(UserDbo::email))
+            collection.ensureIndex(ascending(UserDbo::googleOauthId))
+            collection.ensureIndex(ascending(UserDbo::facebookOauthId))
+            collection.ensureIndex(ascending(UserDbo::username))
+        }
+    }
+
 
     suspend fun getUserById(userId: String): UserDbo? {
         return collection.findOneById(userId)
@@ -56,14 +73,6 @@ class UserRepository(
             name = oauthUserData.name ?: "",
             profilePicUrl = oauthUserData.profilePictureUrl ?: ""
         ).also { addUser(it) }
-    }
-
-    suspend fun findUserByGoogleOauthId(oauthId: String): UserDbo? {
-        return collection.findOne(UserDbo::googleOauthId eq oauthId)
-    }
-
-    suspend fun findUserByFacebookOauthId(oauthId: String): UserDbo? {
-        return collection.findOne(UserDbo::facebookOauthId eq oauthId)
     }
 
     suspend fun addUser(userDbo: UserDbo) {

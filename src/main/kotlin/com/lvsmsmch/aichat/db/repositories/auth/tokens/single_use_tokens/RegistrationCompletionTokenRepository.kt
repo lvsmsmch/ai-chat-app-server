@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenDbo
-import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenVerifier
+import com.lvsmsmch.aichat.db.repositories.auth.tokens.VerifiableToken
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.generateToken
 import kotlinx.serialization.Serializable
@@ -19,7 +19,7 @@ data class RegistrationCompletionTokenDbo(
 
 class RegistrationCompletionTokenRepository(
     override val collection: CoroutineCollection<RegistrationCompletionTokenDbo>
-) : TokenVerifier<RegistrationCompletionTokenDbo>, UsableTokensRepository<RegistrationCompletionTokenDbo> {
+) : VerifiableToken<RegistrationCompletionTokenDbo>, UsableTokensRepository<RegistrationCompletionTokenDbo> {
 
     suspend fun createAndSaveNewToken(email: String): RegistrationCompletionTokenDbo {
         val token = generateToken()

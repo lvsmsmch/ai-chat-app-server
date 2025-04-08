@@ -4,6 +4,7 @@ import com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens.Registr
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserDbo
 import com.lvsmsmch.aichat.db.repositories.content.UserRepository
+import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*

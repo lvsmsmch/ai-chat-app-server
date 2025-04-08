@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class CharacterDto(
     val id: String,
-    val publishedAt: String,
-    val publisherUsername: String,
+    val createdAt: String,
+    val authorUsername: String,
     val name: String,
     val description: String,
     val picUrl: String,

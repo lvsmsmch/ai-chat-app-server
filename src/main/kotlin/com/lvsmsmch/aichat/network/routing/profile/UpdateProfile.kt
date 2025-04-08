@@ -2,7 +2,7 @@ package com.lvsmsmch.aichat.network.routing.profile
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserRepository
-import com.lvsmsmch.aichat.utils.UnauthorizedException
+import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
 import com.lvsmsmch.aichat.utils.hashPassword
 import io.ktor.http.*
 import io.ktor.server.application.*

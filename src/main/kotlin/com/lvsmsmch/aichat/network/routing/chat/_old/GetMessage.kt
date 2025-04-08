@@ -1,4 +1,4 @@
-package com.lvsmsmch.aichat.network.routing.chat
+package com.lvsmsmch.aichat.network.routing.chat._old
 
 import com.lvsmsmch.aichat.utils.loadConfig
 import io.ktor.client.*

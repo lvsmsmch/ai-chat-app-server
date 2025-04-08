@@ -19,13 +19,14 @@ enum class CharacterFilter(val code: Int) {
 @Serializable
 data class CharacterDbo(
     @BsonId val id: String = ObjectId().toHexString(),
-    val publishedAt: UtcTimestamp = UtcTimestamp.now(),
-    val publisherId: String,
-    val publisherUsername: String,
+    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val authorId: String,
     val name: String,
     val description: String,
     val prompt: String,
     val picUrl: String,
+    val isPublic: Boolean,
+    val isDeleted: Boolean,
     val totalChats: Int = 0,
     val totalMessages: Int = 0,
     val totalReviews: Int = 0,
@@ -33,55 +34,72 @@ data class CharacterDbo(
 )
 
 class CharacterRepository(
-    private val collection: CoroutineCollection<CharacterDbo>
+    private val collection: CoroutineCollection<CharacterDbo>,
 ) {
-    suspend fun getCharacters(searchQuery: String, filter: Int, limit: Int, skip: Int): List<CharacterDbo> {
+
+    suspend fun getPublicCharacters(
+        searchQuery: String,
+        filter: Int,
+        limit: Int,
+        skip: Int
+    ): List<CharacterDbo> {
         val sortCriteria = when (filter) {
-            CharacterFilter.NEWEST.code -> descending(CharacterDbo::publishedAt)
-            CharacterFilter.OLDEST.code -> ascending(CharacterDbo::publishedAt)
+            CharacterFilter.NEWEST.code -> descending(CharacterDbo::createdAt)
+            CharacterFilter.OLDEST.code -> ascending(CharacterDbo::createdAt)
             CharacterFilter.HIGHEST_RATING.code -> descending(CharacterDbo::averageRating)
             CharacterFilter.LOWEST_RATING.code -> ascending(CharacterDbo::averageRating)
             CharacterFilter.MOST_POPULAR.code -> descending(CharacterDbo::totalMessages)
             CharacterFilter.LEAST_POPULAR.code -> ascending(CharacterDbo::totalMessages)
-            else -> descending(CharacterDbo::publishedAt)
+            else -> descending(CharacterDbo::createdAt)
         }
 
-        val pipeline = buildList {
+        val filters = and(
+            CharacterDbo::isDeleted eq false,
+            CharacterDbo::isPublic eq true,
             if (searchQuery.isNotBlank()) {
-                val searchFilter = or(
+                or(
                     CharacterDbo::name.regex(".*$searchQuery.*", "i"),
                     CharacterDbo::description.regex(".*$searchQuery.*", "i")
                 )
-                add(match(searchFilter))
-            }
+            } else EMPTY_BSON
+        )
 
-            add(sort(sortCriteria))
-            add(skip(skip))
-            add(limit(limit))
-        }
-
-        return collection.aggregate<CharacterDbo>(pipeline).toList()
+        return collection.find(filters)
+            .sort(sortCriteria)
+            .skip(skip)
+            .limit(limit)
+            .toList()
     }
 
     suspend fun getCharacter(characterId: String): CharacterDbo? {
         return collection.findOneById(characterId)
     }
 
+    suspend fun getCharacters(userId: String, isPublic: Boolean): List<CharacterDbo> {
+        val filter = and(
+            CharacterDbo::authorId eq userId,
+            CharacterDbo::isDeleted eq false,
+            CharacterDbo::isPublic eq isPublic,
+        )
+
+        return collection.find(filter).toList()
+    }
+
     suspend fun addCharacter(
         publisherId: String,
-        publisherUsername: String,
         name: String,
         description: String,
         prompt: String,
         pictureUrl: String
     ): Boolean {
         val newCharacter = CharacterDbo(
-            publisherId = publisherId,
-            publisherUsername = publisherUsername,
+            authorId = publisherId,
             name = name,
             description = description,
             prompt = prompt,
             picUrl = pictureUrl,
+            isPublic = true,
+            isDeleted = false,
         )
         return collection.insertOne(newCharacter).wasAcknowledged()
     }
@@ -94,7 +112,27 @@ class CharacterRepository(
         return updateResult.modifiedCount > 0
     }
 
-    suspend fun deleteCharacter(characterId: String): Boolean {
-        return collection.deleteOneById(characterId).deletedCount > 0
+    suspend fun onChatAdded(characterId: String) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalChats, 1))
+    }
+
+    suspend fun onMessageAdded(characterId: String) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalMessages, 1))
+    }
+
+    suspend fun onReviewAdded(characterId: String) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalReviews, 1))
+    }
+
+    suspend fun onReviewDeleted(characterId: String) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalReviews, -1))
+    }
+
+    suspend fun onAverageRatingChanged(characterId: String, averageRating: Float) {
+        collection.updateOneById(characterId, setValue(CharacterDbo::averageRating, averageRating))
+    }
+
+    suspend fun deleteCharacter(characterId: String) {
+        collection.updateOneById(characterId, setValue(CharacterDbo::isDeleted, true))
     }
 }

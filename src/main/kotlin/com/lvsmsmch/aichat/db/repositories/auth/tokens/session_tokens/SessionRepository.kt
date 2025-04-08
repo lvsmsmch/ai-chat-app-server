@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenDbo
-import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenVerifier
+import com.lvsmsmch.aichat.db.repositories.auth.tokens.VerifiableToken
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.generateToken
 import com.mongodb.client.model.Filters
@@ -25,7 +25,7 @@ data class SessionDbo(
 
 class SessionRepository(
     override val collection: CoroutineCollection<SessionDbo>
-): TokenVerifier<SessionDbo> {
+): VerifiableToken<SessionDbo> {
 
     init {
         initializeIndexes()

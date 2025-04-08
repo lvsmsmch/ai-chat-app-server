@@ -3,7 +3,7 @@ package com.lvsmsmch.aichat.network.routing.characters
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserRepository
-import com.lvsmsmch.aichat.utils.UnauthorizedException
+import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
 import com.lvsmsmch.aichat.utils.uploadImageOnServer
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -78,11 +78,8 @@ fun Routing.configureAddCharacterRouting(
 
             val pictureUrl = pictureFile?.let { uploadImageOnServer(it) } ?: ""
 
-            val publisherUsername = userRepository.getUserById(tokenDbo.userId)?.username ?: ""
-
             characterRepository.addCharacter(
                 publisherId = tokenDbo.userId,
-                publisherUsername = publisherUsername,
                 name = name,
                 description = description,
                 prompt = prompt,

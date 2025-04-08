@@ -1,11 +1,10 @@
 package com.lvsmsmch.aichat.network.routing.reviews
 
+import com.lvsmsmch.aichat.db.repositories._utils.Mapper
+import com.lvsmsmch.aichat.db.repositories._utils.toReviewDto
 import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.db.repositories.content.ReviewRepository
-import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.network.dto_objects.ReviewDto
-import com.lvsmsmch.aichat.utils.toReviewDto
-import com.lvsmsmch.aichat.utils.toUserDto
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -16,7 +15,7 @@ import kotlinx.serialization.Serializable
 fun Routing.configureGetReviewRouting(
     reviewRepository: ReviewRepository,
     characterRepository: CharacterRepository,
-    userRepository: UserRepository,
+    mapper: Mapper,
 ) {
     @Serializable
     data class Response(
@@ -41,15 +40,7 @@ fun Routing.configureGetReviewRouting(
                 return@get call.respond(HttpStatusCode.NotFound, "Review not found for this character")
             }
 
-            val userDto = if (!reviewDbo.isAnonymous) {
-                val userDbo = userRepository.getUserById(reviewDbo.publisherId)
-                    ?: return@get call.respond(HttpStatusCode.InternalServerError, "User information not found")
-                userDbo.toUserDto()
-            } else {
-                null
-            }
-
-            val reviewDto = reviewDbo.toReviewDto(userDto)
+            val reviewDto = reviewDbo.toReviewDto(mapper)
             call.respond(HttpStatusCode.OK, Response(reviewDto))
 
         } catch (e: Exception) {

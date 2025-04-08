@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.db.repositories.content
 
-import com.lvsmsmch.aichat.db.repositories._utils.Matches
+import com.lvsmsmch.aichat.db.repositories._utils.MatchPositions
 import com.lvsmsmch.aichat.db.repositories._utils.SearchUtil
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.coroutines.*
@@ -15,6 +15,7 @@ data class ChatDbo(
     @BsonId val id: String = ObjectId().toHexString(),
     val createdAt: UtcTimestamp = UtcTimestamp.now(),
     val userId: String,
+    val characterId: String,
     val characterName: String,
     val characterDescription: String,
     val characterPrompt: String,
@@ -24,7 +25,7 @@ data class ChatDbo(
 
 class ChatRepository(
     private val collection: CoroutineCollection<ChatDbo>,
-    private val messageCollection: CoroutineCollection<MessageDbo>
+    private val countMessagesByChatId: (chatId: String) -> Int,
 ) {
 
     init {
@@ -36,26 +37,38 @@ class ChatRepository(
      */
     private fun initializeIndexes() {
         runBlocking {
-            // Basic index for filtering by userId
-            collection.ensureIndex(
-                ascending(ChatDbo::userId)
-            )
-
-            // Index for character name searches
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::characterName
-                )
-            )
+            collection.ensureIndex(ascending(ChatDbo::userId))
+            collection.ensureIndex(ascending(ChatDbo::characterId))
+            collection.ensureIndex(ascending(ChatDbo::userId, ChatDbo::characterName))
         }
     }
+
+
+    /**
+     * Search for chats by character name
+     */
+    suspend fun searchChatsByCharacterName(
+        searchText: String,
+        userId: String
+    ): Map<ChatDbo, MatchPositions> {
+        val filter = and(
+            ChatDbo::userId eq userId,
+            ChatDbo::characterName.regex(".*$searchText.*", "i")
+        )
+
+        return collection.find(filter)
+            .toList()
+            .associateWith { SearchUtil.findAllMatches(it.characterName, searchText) }
+            .filter { it.value.positions.isNotEmpty() }
+    }
+
 
     /**
      * Create a new chat
      */
     suspend fun createChat(
         userId: String,
+        characterId: String,
         characterName: String,
         characterDescription: String,
         characterPrompt: String,
@@ -64,11 +77,12 @@ class ChatRepository(
     ): ChatDbo {
         val chat = ChatDbo(
             userId = userId,
+            characterId = characterId,
             characterName = characterName,
             characterDescription = characterDescription,
             characterPrompt = characterPrompt,
             characterPicUrl = characterPicUrl,
-            isChatMuted = isChatMuted
+            isChatMuted = isChatMuted,
         )
         collection.insertOne(chat)
         return chat
@@ -82,13 +96,6 @@ class ChatRepository(
     }
 
     /**
-     * Get a chat with its last message by ID
-     */
-    suspend fun getChatWithLastMessageById(chatId: String): ChatDbo? {
-        return getChatById(chatId)
-    }
-
-    /**
      * Get all chats for a user with their last messages
      */
     suspend fun getChatsByUserId(userId: String): List<ChatDbo> {
@@ -96,39 +103,14 @@ class ChatRepository(
     }
 
     /**
-     * Search for chats by character name
-     */
-    suspend fun searchChatsByCharacterName(
-        searchText: String,
-        userId: String
-    ): Map<ChatDbo, Matches> {
-        val filter = and(
-            ChatDbo::userId eq userId,
-            ChatDbo::characterName.regex(".*$searchText.*", "i")
-        )
-
-        return collection.find(filter)
-            .toList()
-            .associateWith { Matches(SearchUtil.findAllMatches(it.characterName, searchText)) }
-            .filter { it.value.matches.isNotEmpty() }
-    }
-
-    /**
      * Retrieve chat dbo list by ids
      */
-    suspend fun getChatByIds(chatIds: List<String>): List<ChatDbo> {
+    suspend fun getChatsByIds(chatIds: List<String>): List<ChatDbo> {
         if (chatIds.isEmpty()) {
             return emptyList()
         }
 
         return collection.find(ChatDbo::id.`in`(chatIds)).toList()
-    }
-
-    /**
-     * Count total messages in a chat
-     */
-    suspend fun countMessagesByChatId(chatId: String): Long {
-        return messageCollection.countDocuments(MessageDbo::chatId eq chatId)
     }
 
     /**
@@ -144,5 +126,22 @@ class ChatRepository(
     suspend fun countChatsByUserId(userId: String): Long {
         val filter = ChatDbo::userId eq userId
         return collection.countDocuments(filter)
+    }
+
+
+    suspend fun getUserIdByChatId(chatId: String): String {
+        return collection.findOneById(chatId)?.userId ?: ""
+    }
+
+    suspend fun getCharacterIdByChatId(chatId: String): String {
+        return collection.findOneById(chatId)?.characterId ?: ""
+    }
+
+    suspend fun getAllChatIdsForUser(userId: String): List<String> {
+        return collection
+            .find(ChatDbo::userId eq userId)
+            .projection(ChatDbo::id)
+            .toList()
+            .map { it.id }
     }
 }

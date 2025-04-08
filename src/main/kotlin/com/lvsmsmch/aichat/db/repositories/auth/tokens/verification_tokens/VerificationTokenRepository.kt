@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.db.repositories.auth.tokens.verification_tokens
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenDbo
-import com.lvsmsmch.aichat.db.repositories.auth.tokens.TokenVerifier
+import com.lvsmsmch.aichat.db.repositories.auth.tokens.VerifiableToken
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.generateToken
 import kotlinx.serialization.Serializable
@@ -27,7 +27,7 @@ data class VerificationTokenDbo(
 
 abstract class VerificationTokenRepository(
     override val collection: CoroutineCollection<VerificationTokenDbo>
-): TokenVerifier<VerificationTokenDbo> {
+): VerifiableToken<VerificationTokenDbo> {
     
     suspend fun canGenerateNewToken(email: String): Boolean {
         val latestCode = getToken(email)

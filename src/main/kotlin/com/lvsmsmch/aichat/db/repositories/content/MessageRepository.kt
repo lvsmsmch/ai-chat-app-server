@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.db.repositories.content
 
-import com.lvsmsmch.aichat.db.repositories._utils.Matches
+import com.lvsmsmch.aichat.db.repositories._utils.MatchPositions
 import com.lvsmsmch.aichat.db.repositories._utils.SearchUtil
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.coroutines.runBlocking
@@ -13,17 +13,21 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 @Serializable
 data class MessageDbo(
     @BsonId val id: String = ObjectId().toHexString(),
-    val chatId: String,
     val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val chatId: String,
     val isSentByUser: Boolean = false,
-    val content: String,
+    val senderId: String,       // User id or Character id
+    val text: String,
+    val isRead: Boolean = false,
     val editedAt: UtcTimestamp? = null,
-    val metadata: Map<String, String> = emptyMap() // For additional data like attachments, reactions, etc.
+    val metadata: Map<String, String> = emptyMap()
 )
 
 class MessageRepository(
     private val collection: CoroutineCollection<MessageDbo>,
-    private val chatCollection: CoroutineCollection<ChatDbo>
+    private val onMessageAdded: (characterId: String) -> Unit,
+    private val getAllChatIdsForUser: (userId: String) -> List<String>,
+    private val getCharacterIdByChatId: (chatId: String) -> String,
 ) {
 
     init {
@@ -42,11 +46,6 @@ class MessageRepository(
                     MessageDbo::createdAt
                 )
             )
-
-            // Index for content searches
-            collection.ensureIndex(
-                ascending(MessageDbo::chatId, MessageDbo::content)
-            )
         }
     }
 
@@ -56,38 +55,22 @@ class MessageRepository(
     suspend fun searchMessagesByContentInAllChats(
         searchText: String,
         userId: String,
-    ): Map<MessageDbo, Matches> {
+    ): Map<MessageDbo, MatchPositions> {
+        val chatIds = getAllChatIdsForUser(userId)
 
-        val userChatIds = chatCollection
-            .find(ChatDbo::userId eq userId)
-            .projection(ChatDbo::id)
-            .toList()
-            .map { it.id }
-
-        if (userChatIds.isEmpty()) {
+        if (chatIds.isEmpty()) {
             return emptyMap()
         }
 
-        return searchMessagesByContentInChatIds(searchText, userChatIds)
-    }
-
-
-    /**
-     * Search for messages by content across a user's chats
-     */
-    suspend fun searchMessagesByContentInChatIds(
-        searchText: String,
-        chatsIds: List<String>,
-    ): Map<MessageDbo, Matches> {
         val filter = and(
-            MessageDbo::chatId.`in`(chatsIds),
-            MessageDbo::content.regex(".*$searchText.*", "i")
+            MessageDbo::chatId.`in`(chatIds),
+            MessageDbo::text.regex(".*$searchText.*", "i")
         )
 
         return collection.find(filter)
             .sort(descending(MessageDbo::createdAt))
             .toList()
-            .associateWith { Matches(SearchUtil.findAllMatches(it.content, searchText)) }
+            .associateWith { SearchUtil.findAllMatches(it.text, searchText) }
     }
 
 
@@ -97,17 +80,17 @@ class MessageRepository(
     suspend fun searchMessagesInChat(
         searchText: String,
         chatId: String,
-    ): Map<MessageDbo, Matches> {
+    ): Map<MessageDbo, MatchPositions> {
 
         val filter = and(
             MessageDbo::chatId eq chatId,
-            MessageDbo::content.regex(".*$searchText.*", "i")
+            MessageDbo::text.regex(".*$searchText.*", "i")
         )
 
         return collection.find(filter)
             .sort(descending(MessageDbo::createdAt))
             .toList()
-            .associateWith { Matches(SearchUtil.findAllMatches(it.content, searchText)) }
+            .associateWith { SearchUtil.findAllMatches(it.text, searchText) }
     }
 
     /**
@@ -122,11 +105,13 @@ class MessageRepository(
         val message = MessageDbo(
             chatId = chatId,
             isSentByUser = isSentByUser,
-            content = content,
+            senderId = "",
+            text = content,
             metadata = metadata
         )
 
         collection.insertOne(message)
+        onMessageAdded(getCharacterIdByChatId(message.chatId))
         return message
     }
 
@@ -168,7 +153,7 @@ class MessageRepository(
         val updateResult = collection.updateOneById(
             messageId,
             combine(
-                setValue(MessageDbo::content, newContent),
+                setValue(MessageDbo::text, newContent),
                 setValue(MessageDbo::editedAt, now)
             )
         )
@@ -213,6 +198,20 @@ class MessageRepository(
         return collection.countDocuments(MessageDbo::chatId eq chatId)
     }
 
+
+    /**
+     * Count total messages in a chat
+     */
+    suspend fun countUnreadMessagesInChat(chatId: String): Long {
+        return collection.countDocuments(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::isRead eq false
+            )
+        )
+    }
+
+
     /**
      * Get the most recent message in a chat
      */
@@ -232,5 +231,43 @@ class MessageRepository(
             setValue(MessageDbo::metadata, metadata)
         )
         return updateResult.modifiedCount > 0
+    }
+
+    /**
+     * Mark a message as read
+     */
+    suspend fun markMessageAsRead(messageId: String): Boolean {
+        val updateResult = collection.updateOneById(messageId, setValue(MessageDbo::isRead, true))
+        return updateResult.modifiedCount > 0
+    }
+
+    /**
+     * Mark all character messages in a chat as read
+     */
+    suspend fun markAllCharacterMessagesAsRead(chatId: String): Long {
+        val filter = and(
+            MessageDbo::chatId eq chatId,
+            MessageDbo::isSentByUser eq false,
+            MessageDbo::isRead eq false
+        )
+        val updateResult = collection.updateMany(filter, setValue(MessageDbo::isRead, true))
+        return updateResult.modifiedCount
+    }
+
+    /**
+     * Generate and add an AI response to a user message
+     */
+    suspend fun generateAiResponse(chatId: String, userMessageText: String): MessageDbo {
+        // This is a placeholder for the actual AI response generation
+        // In a real implementation, this would call your AI service
+
+        // For now, just return a simple acknowledgment message
+        val responseText = "I received your message: \"$userMessageText\""
+
+        return addMessage(
+            chatId = chatId,
+            isSentByUser = false,
+            content = responseText
+        )
     }
 }

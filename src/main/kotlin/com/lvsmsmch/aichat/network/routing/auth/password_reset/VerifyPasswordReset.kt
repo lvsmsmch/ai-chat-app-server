@@ -2,7 +2,7 @@ package com.lvsmsmch.aichat.network.routing.auth.password_reset
 
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.single_use_tokens.SetNewPasswordTokenRepository
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.verification_tokens.PasswordResetTokenRepository
-import com.lvsmsmch.aichat.utils.UnauthorizedException
+import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*

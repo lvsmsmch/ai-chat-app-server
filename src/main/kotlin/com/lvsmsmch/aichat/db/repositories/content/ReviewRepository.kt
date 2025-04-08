@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat.db.repositories.content
 
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
+import org.bson.Document
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.conversions.Bson
 import org.bson.types.ObjectId
@@ -28,7 +29,10 @@ data class ReviewDbo(
 )
 
 class ReviewRepository(
-    private val collection: CoroutineCollection<ReviewDbo>
+    private val collection: CoroutineCollection<ReviewDbo>,
+    private val onReviewAdded: (characterId: String) -> Unit,
+    private val onReviewDeleted: (characterId: String) -> Unit,
+    private val onAverageRatingChanged: (characterId: String, newRating: Float) -> Unit,
 ) {
 
     suspend fun getReviews(characterId: String, filter: Int, limit: Int, skip: Int): List<ReviewDbo> {
@@ -66,7 +70,7 @@ class ReviewRepository(
         rating: Int,
         text: String,
         isAnonymous: Boolean,
-    ): Boolean {
+    ) {
         val newReview = ReviewDbo(
             characterId = characterId,
             isAnonymous = isAnonymous,
@@ -76,8 +80,10 @@ class ReviewRepository(
             text = text
         )
 
-        val insertResult = collection.insertOne(newReview)
-        return insertResult.wasAcknowledged()
+        collection.insertOne(newReview)
+
+        onReviewAdded(newReview.characterId)
+        onAverageRatingChanged(characterId, calcNewAvgRating(characterId))
     }
 
     suspend fun updateReview(
@@ -85,31 +91,53 @@ class ReviewRepository(
         rating: Int? = null,
         text: String? = null,
         isAnonymous: Boolean? = null,
-    ): Boolean {
-        val updates = mutableListOf<Bson>()
+    ) {
+        val reviewDbo = getReviewById(id) ?: return
 
+        val updates = mutableListOf<Bson>()
         if (rating != null) { updates.add(setValue(ReviewDbo::rating, rating))}
         if (text != null) { updates.add(setValue(ReviewDbo::text, text))}
         if (isAnonymous != null) { updates.add(setValue(ReviewDbo::isAnonymous, isAnonymous))}
         updates.add(setValue(ReviewDbo::editedAt, UtcTimestamp.now()))
 
-        val updateResult = collection.updateOneById(id, combine(updates))
-        return updateResult.modifiedCount > 0
+        collection.updateOneById(id, combine(updates))
+
+        onAverageRatingChanged(reviewDbo.characterId, calcNewAvgRating(reviewDbo.characterId))
     }
+
+    suspend fun deleteReview(userId: String, characterId: String) {
+        val review = getReview(userId, characterId) ?: return
+        deleteReviewById(review.id)
+    }
+
+    suspend fun deleteReviewById(reviewId: String) {
+        val reviewDbo = getReviewById(reviewId) ?: return
+
+        collection.deleteOneById(reviewId)
+
+        onReviewDeleted(reviewDbo.characterId)
+        onAverageRatingChanged(reviewDbo.characterId, calcNewAvgRating(reviewDbo.characterId))
+    }
+
 
     suspend fun isReviewOwnedByUser(reviewId: String, userId: String): Boolean {
         val review = getReviewById(reviewId)
         return review?.publisherId == userId
     }
 
-    suspend fun deleteReview(userId: String, characterId: String): Boolean {
-        val review = getReview(userId, characterId) ?: return false
-        val deleteResult = collection.deleteOneById(review.id)
-        return deleteResult.deletedCount > 0
-    }
 
-    suspend fun deleteReviewById(reviewId: String): Boolean {
-        val deleteResult = collection.deleteOneById(reviewId)
-        return deleteResult.deletedCount > 0
+
+    private suspend fun calcNewAvgRating(characterId: String): Float {
+        val pipeline = listOf(
+            match(ReviewDbo::characterId eq characterId),
+            group(
+                id = null,
+                ReviewDbo::rating avg "averageRating"
+            )
+        )
+
+        val result = collection.aggregate<Document>(pipeline).first()
+
+        return result?.getDouble("averageRating")?.toFloat() ?: 0f
     }
 }

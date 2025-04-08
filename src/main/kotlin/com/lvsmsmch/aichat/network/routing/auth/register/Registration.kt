@@ -48,7 +48,7 @@ fun Routing.configureRegistrationRouting(
 
             val codeToBeVerified = if (registrationCodesRepository.canGenerateNewCode(request.email)) {
                 val newCodeDbo = registrationCodesRepository.createNewVerificationCode(request.email)
-                emailSender.sendLoginVerificationCode(request.email, newCodeDbo.code)
+                emailSender.sendRegistrationVerificationCode(request.email, newCodeDbo.code)
                 registrationCodesRepository.save(newCodeDbo)
                 newCodeDbo
             } else {

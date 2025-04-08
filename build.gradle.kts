@@ -30,6 +30,7 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
 
     // KMongo - downgrade to version compatible with Kotlin 1.8.x

@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.db.repositories.auth.tokens
 
-import com.lvsmsmch.aichat.utils.UnauthorizedException
+import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import io.ktor.server.application.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -12,8 +12,10 @@ interface TokenDbo {
     val expiresAt: UtcTimestamp
 }
 
-interface TokenVerifier<T : TokenDbo> {
+interface VerifiableToken<T : TokenDbo> {
+
     val collection: CoroutineCollection<T>
+
     suspend fun verifyToken(call: ApplicationCall): T {
         val authHeader = call.request.headers["Authorization"]
             ?: throw UnauthorizedException("Missing Authorization header")

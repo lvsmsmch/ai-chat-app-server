@@ -59,42 +59,6 @@ fun checkPassword(providedPassword: String, storedHash: String): Boolean {
     return BCrypt.checkpw(providedPassword, storedHash)
 }
 
-fun sendVerificationCode(email: String, verificationCode: Int) {
-    val config = loadConfig()
-
-    val properties = Properties().apply {
-        put("mail.smtp.auth", "true")
-        put("mail.smtp.starttls.enable", "true")
-        put("mail.smtp.host", config.getProperty("SMTP_HOST"))
-        put("mail.smtp.port", config.getProperty("SMTP_PORT"))
-    }
-
-    val session = Session.getInstance(properties, object : Authenticator() {
-        override fun getPasswordAuthentication(): PasswordAuthentication {
-            return PasswordAuthentication(
-                config.getProperty("SMTP_USERNAME"),
-                config.getProperty("SMTP_PASSWORD")
-            )
-        }
-    })
-
-    try {
-        val message = MimeMessage(session).apply {
-            setFrom(InternetAddress(config.getProperty("SMTP_USERNAME"), "My app name"))
-            setRecipients(Message.RecipientType.TO, InternetAddress.parse(email))
-            subject = "Your Verification Code"
-            setText("Your verification code is: $verificationCode\n\nIf you didn't register, just ignore this email.")
-        }
-
-        Transport.send(message)
-        println("Email sent successfully to $email")
-    } catch (e: MessagingException) {
-        e.printStackTrace()
-        println("Failed to send email: ${e.message}")
-    }
-}
-
-
 suspend fun uploadImageOnServer(image: File): String {
     return UUID.randomUUID().toString() + ".jpg"
 }

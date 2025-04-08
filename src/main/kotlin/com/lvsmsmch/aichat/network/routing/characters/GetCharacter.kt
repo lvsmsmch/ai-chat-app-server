@@ -1,8 +1,9 @@
 package com.lvsmsmch.aichat.network.routing.characters
 
+import com.lvsmsmch.aichat.db.repositories._utils.Mapper
+import com.lvsmsmch.aichat.db.repositories._utils.toCharacterDto
 import com.lvsmsmch.aichat.db.repositories.content.CharacterRepository
 import com.lvsmsmch.aichat.network.dto_objects.CharacterDto
-import com.lvsmsmch.aichat.utils.toCharacterDto
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -11,7 +12,8 @@ import io.ktor.util.logging.*
 import kotlinx.serialization.Serializable
 
 fun Routing.configureGetCharacterRouting(
-    characterRepository: CharacterRepository
+    characterRepository: CharacterRepository,
+    mapper: Mapper
 ) {
 
     @Serializable
@@ -27,7 +29,7 @@ fun Routing.configureGetCharacterRouting(
             val characterDbo = characterRepository.getCharacter(characterId)
                 ?: return@get call.respond(HttpStatusCode.NotFound, "Character not found")
 
-            val characterDto = characterDbo.toCharacterDto()
+            val characterDto = characterDbo.toCharacterDto(mapper)
 
             call.respond(HttpStatusCode.OK, Response(characterDto))
 
