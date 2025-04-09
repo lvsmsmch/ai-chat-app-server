@@ -84,7 +84,7 @@ fun checkPassword(providedPassword: String, storedHash: String): Boolean {
     return BCrypt.checkpw(providedPassword, storedHash)
 }
 
-suspend fun uploadImageOnServer(image: File): String {
+fun uploadImageOnServer(image: File): String {
     return UUID.randomUUID().toString() + ".jpg"
 }
 
