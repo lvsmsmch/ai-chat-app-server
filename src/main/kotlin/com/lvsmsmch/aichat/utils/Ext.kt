@@ -1,24 +1,51 @@
 package com.lvsmsmch.aichat.utils
 
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import com.lvsmsmch.aichat.network.routing.chat.*
+import com.lvsmsmch.aichat.network.routing.notifications.NotificationWsEvent
+import com.lvsmsmch.aichat.network.routing.notifications.NotificationWsRequest
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
-import jakarta.mail.*
-import jakarta.mail.internet.InternetAddress
-import jakarta.mail.internet.MimeMessage
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 import org.mindrot.jbcrypt.BCrypt
 import java.io.File
 import java.security.SecureRandom
 import java.util.*
 import kotlin.random.Random
+
+
+val defaultJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    encodeDefaults = true
+    serializersModule = SerializersModule {
+        polymorphic(ChatWsRequest::class) {
+            subclass(ChatWsRequest.SendMessage::class)
+            subclass(ChatWsRequest.EditMessage::class)
+            subclass(ChatWsRequest.DeleteMessage::class)
+            subclass(ChatWsRequest.MarkAsRead::class)
+            subclass(ChatWsRequest.MarkAsReadAll::class)
+        }
+        polymorphic(ChatWsEvent::class) {
+            subclass(ChatWsEvent.CharacterTyping::class)
+            subclass(ChatWsEvent.NewMessage::class)
+            subclass(ChatWsEvent.MessageDeleted::class)
+            subclass(ChatWsEvent.MessageEdited::class)
+            subclass(ChatWsEvent.Error::class)
+        }
+        polymorphic(NotificationWsRequest::class) {
+            subclass(NotificationWsRequest.Ping::class)
+        }
+        polymorphic(NotificationWsEvent::class) {
+            subclass(NotificationWsEvent.Pong::class)
+            subclass(NotificationWsEvent.ChatStateChanged::class)
+            subclass(NotificationWsEvent.Error::class)
+        }
+    }
+}
 
 fun ApplicationCall.getUserIp(): String {
     val forwardedForHeader = request.header("X-Forwarded-For")
@@ -37,8 +64,6 @@ fun loadConfig(): Properties {
     properties.load(inputStream)
     return properties
 }
-
-
 
 fun generateToken(): String {
     val secureRandom = SecureRandom()

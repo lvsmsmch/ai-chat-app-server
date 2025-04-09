@@ -253,21 +253,4 @@ class MessageRepository(
         val updateResult = collection.updateMany(filter, setValue(MessageDbo::isRead, true))
         return updateResult.modifiedCount
     }
-
-    /**
-     * Generate and add an AI response to a user message
-     */
-    suspend fun generateAiResponse(chatId: String, userMessageText: String): MessageDbo {
-        // This is a placeholder for the actual AI response generation
-        // In a real implementation, this would call your AI service
-
-        // For now, just return a simple acknowledgment message
-        val responseText = "I received your message: \"$userMessageText\""
-
-        return addMessage(
-            chatId = chatId,
-            isSentByUser = false,
-            content = responseText
-        )
-    }
 }
