@@ -32,12 +32,7 @@ fun Routing.configureDeleteCharacterRouting(
                 return@delete call.respond(HttpStatusCode.Forbidden, "You can't delete this character")
             }
 
-            try {
-                characterRepository.deleteCharacter(characterId = characterId)
-            } catch (e: Exception) {
-                return@delete call.respond(HttpStatusCode.InternalServerError, e.message.toString())
-            }
-
+            characterRepository.deleteCharacter(characterId = characterId)
             call.respond(HttpStatusCode.NoContent)
 
         } catch (e: Exception) {

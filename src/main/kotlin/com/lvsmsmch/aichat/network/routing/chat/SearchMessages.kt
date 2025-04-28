@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat.network.routing.chat
 
 import com.lvsmsmch.aichat.db.repositories._utils.Mapper
-import com.lvsmsmch.aichat.db.repositories._utils.MatchPositions
+import com.lvsmsmch.aichat.utils.MatchPositions
 import com.lvsmsmch.aichat.db.repositories._utils.toMessageDto
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.ChatRepository
@@ -36,7 +36,6 @@ fun Routing.configureMessageHistorySearchRouting(
 
     get("/chats/{chatId}/messages/search") {
         try {
-            // Authenticate user
             val sessionDbo = try {
                 sessionRepository.verifyToken(call)
             } catch (e: UnauthorizedException) {
@@ -75,10 +74,7 @@ fun Routing.configureMessageHistorySearchRouting(
                 )
             }
 
-            call.respond(
-                MessageSearchResponse(matches = matches)
-            )
-
+            call.respond(MessageSearchResponse(matches = matches))
         } catch (e: Exception) {
             application.log.error(e)
             call.respond(

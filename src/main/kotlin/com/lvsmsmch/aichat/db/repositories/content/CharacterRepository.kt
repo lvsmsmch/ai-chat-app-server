@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.db.repositories.content
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.conversions.Bson
 import org.bson.types.ObjectId
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -16,6 +17,7 @@ enum class CharacterFilter(val code: Int) {
     LEAST_POPULAR(5),
 }
 
+
 @Serializable
 data class CharacterDbo(
     @BsonId val id: String = ObjectId().toHexString(),
@@ -26,7 +28,6 @@ data class CharacterDbo(
     val prompt: String,
     val picUrl: String,
     val isPublic: Boolean,
-    val isDeleted: Boolean,
     val totalChats: Int = 0,
     val totalMessages: Int = 0,
     val totalReviews: Int = 0,
@@ -35,8 +36,35 @@ data class CharacterDbo(
 
 class CharacterRepository(
     private val collection: CoroutineCollection<CharacterDbo>,
+    private val onCharacterChanged: (dbo: CharacterDbo) -> Unit,
 ) {
 
+
+    /**
+     * CREATE
+     */
+    suspend fun addCharacter(
+        publisherId: String,
+        name: String,
+        description: String,
+        prompt: String,
+        pictureUrl: String
+    ): Boolean {
+        val newCharacter = CharacterDbo(
+            authorId = publisherId,
+            name = name,
+            description = description,
+            prompt = prompt,
+            picUrl = pictureUrl,
+            isPublic = true,
+        )
+        return collection.insertOne(newCharacter).wasAcknowledged()
+    }
+
+
+    /**
+     * READ
+     */
     suspend fun getPublicCharacters(
         searchQuery: String,
         filter: Int,
@@ -54,7 +82,6 @@ class CharacterRepository(
         }
 
         val filters = and(
-            CharacterDbo::isDeleted eq false,
             CharacterDbo::isPublic eq true,
             if (searchQuery.isNotBlank()) {
                 or(
@@ -78,39 +105,49 @@ class CharacterRepository(
     suspend fun getCharacters(userId: String, isPublic: Boolean): List<CharacterDbo> {
         val filter = and(
             CharacterDbo::authorId eq userId,
-            CharacterDbo::isDeleted eq false,
             CharacterDbo::isPublic eq isPublic,
         )
 
         return collection.find(filter).toList()
     }
 
-    suspend fun addCharacter(
-        publisherId: String,
-        name: String,
-        description: String,
-        prompt: String,
-        pictureUrl: String
-    ): Boolean {
-        val newCharacter = CharacterDbo(
-            authorId = publisherId,
-            name = name,
-            description = description,
-            prompt = prompt,
-            picUrl = pictureUrl,
-            isPublic = true,
-            isDeleted = false,
-        )
-        return collection.insertOne(newCharacter).wasAcknowledged()
+
+    /**
+     * UPDATE
+     */
+    suspend fun updateCharacter(
+        characterId: String,
+        name: String? = null,
+        description: String? = null,
+        prompt: String? = null,
+        pictureUrl: String? = null
+    ) {
+        val updates = mutableListOf<Bson>()
+
+        name?.let { updates.add(setValue(CharacterDbo::name, it)) }
+        description?.let { updates.add(setValue(CharacterDbo::description, it)) }
+        prompt?.let { updates.add(setValue(CharacterDbo::prompt, it)) }
+        pictureUrl?.let { updates.add(setValue(CharacterDbo::picUrl, it)) }
+
+        if (updates.isEmpty()) {
+            return
+        }
+
+        collection.updateOneById(characterId, combine(*updates.toTypedArray()))
     }
 
-    suspend fun incrementMessageCount(characterId: String): Boolean {
-        val updateResult = collection.updateOneById(
-            characterId,
-            inc(CharacterDbo::totalMessages, 1)
-        )
-        return updateResult.modifiedCount > 0
+
+    /**
+     * DELETE
+     */
+    suspend fun deleteCharacter(characterId: String) {
+        collection.deleteOneById(characterId)
     }
+
+
+    /**
+     * OTHER
+     */
 
     suspend fun onChatAdded(characterId: String) {
         collection.updateOneById(characterId, inc(CharacterDbo::totalChats, 1))
@@ -130,9 +167,5 @@ class CharacterRepository(
 
     suspend fun onAverageRatingChanged(characterId: String, averageRating: Float) {
         collection.updateOneById(characterId, setValue(CharacterDbo::averageRating, averageRating))
-    }
-
-    suspend fun deleteCharacter(characterId: String) {
-        collection.updateOneById(characterId, setValue(CharacterDbo::isDeleted, true))
     }
 }

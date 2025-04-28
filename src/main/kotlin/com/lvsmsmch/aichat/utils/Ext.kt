@@ -1,8 +1,6 @@
 package com.lvsmsmch.aichat.utils
 
 import com.lvsmsmch.aichat.network.routing.chat.*
-import com.lvsmsmch.aichat.network.routing.notifications.NotificationWsEvent
-import com.lvsmsmch.aichat.network.routing.notifications.NotificationWsRequest
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
@@ -22,27 +20,35 @@ val defaultJson = Json {
     isLenient = true
     encodeDefaults = true
     serializersModule = SerializersModule {
-        polymorphic(ChatWsRequest::class) {
-            subclass(ChatWsRequest.SendMessage::class)
-            subclass(ChatWsRequest.EditMessage::class)
-            subclass(ChatWsRequest.DeleteMessage::class)
-            subclass(ChatWsRequest.MarkAsRead::class)
-            subclass(ChatWsRequest.MarkAsReadAll::class)
+        polymorphic(MessagesWsRequest::class) {
+            subclass(MessagesWsRequest.SendMessage::class)
+            subclass(MessagesWsRequest.ReloadMessage::class)
+            subclass(MessagesWsRequest.EditMessage::class)
+            subclass(MessagesWsRequest.MarkAsRead::class)
+            subclass(MessagesWsRequest.MarkAsReadAll::class)
+            subclass(MessagesWsRequest.DeleteMessage::class)
+            subclass(MessagesWsRequest.DeleteMessageRange::class)
+            subclass(MessagesWsRequest.DeleteAllMessages::class)
         }
-        polymorphic(ChatWsEvent::class) {
-            subclass(ChatWsEvent.CharacterTyping::class)
-            subclass(ChatWsEvent.NewMessage::class)
-            subclass(ChatWsEvent.MessageDeleted::class)
-            subclass(ChatWsEvent.MessageEdited::class)
-            subclass(ChatWsEvent.Error::class)
+        polymorphic(MessagesWsEvent::class) {
+            subclass(MessagesWsEvent.NewMessage::class)
+            subclass(MessagesWsEvent.MessageEdited::class)
+            subclass(MessagesWsEvent.CharacterTyping::class)
+            subclass(MessagesWsEvent.MessageRangeDeleted::class)
+            subclass(MessagesWsEvent.AllMessagesDeleted::class)
+            subclass(MessagesWsEvent.ChatDeleted::class)
+            subclass(MessagesWsEvent.Error::class)
         }
-        polymorphic(NotificationWsRequest::class) {
-            subclass(NotificationWsRequest.Ping::class)
+        polymorphic(ChatsWsRequest::class) {
         }
-        polymorphic(NotificationWsEvent::class) {
-            subclass(NotificationWsEvent.Pong::class)
-            subclass(NotificationWsEvent.ChatStateChanged::class)
-            subclass(NotificationWsEvent.Error::class)
+        polymorphic(ChatsWsEvent::class) {
+            subclass(ChatsWsEvent.ChatAdded::class)
+            subclass(ChatsWsEvent.ChatChanged::class)
+            subclass(ChatsWsEvent.ChatRangeDeleted::class)
+            subclass(ChatsWsEvent.Error::class)
+        }
+        polymorphic(PingPongMessage::class) {
+            subclass(PingPongMessage.Ping::class)
         }
     }
 }
@@ -82,10 +88,6 @@ fun hashPassword(providedPassword: String): String {
 
 fun checkPassword(providedPassword: String, storedHash: String): Boolean {
     return BCrypt.checkpw(providedPassword, storedHash)
-}
-
-fun uploadImageOnServer(image: File): String {
-    return UUID.randomUUID().toString() + ".jpg"
 }
 
 fun generateUniqueUsername(): String {

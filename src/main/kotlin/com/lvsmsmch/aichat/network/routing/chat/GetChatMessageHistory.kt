@@ -24,10 +24,10 @@ fun Routing.configureMessageHistoryRouting(
     @Serializable
     data class MessageHistoryResponse(
         val messages: List<MessageDto>,
-        val totalCount: Long
+        val totalCount: Int
     )
 
-    get("/chats/{chatId}/messages") {
+    get("/chats/{chatId}/message_history") {
         try {
             // Authenticate user
             val sessionDbo = try {
@@ -66,7 +66,7 @@ fun Routing.configureMessageHistoryRouting(
             )
 
             // Get total count for pagination
-            val totalCount = messageRepository.countMessagesByChatId(chatId)
+            val totalCount = messageRepository.countMessagesInChat(chatId)
 
             // Convert to DTOs
             val messageDtos = messages.map { it.toMessageDto(mapper) }

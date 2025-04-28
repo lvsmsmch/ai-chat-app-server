@@ -32,7 +32,6 @@ fun Routing.configureGetCharacterDetailsRouting(
             val characterDetailsDto = characterDbo.toCharacterDetailsDto(mapper)
 
             call.respond(HttpStatusCode.OK, Response(characterDetailsDto))
-
         } catch (e: Exception) {
             application.log.error(e)
             call.respond(HttpStatusCode.InternalServerError, "An error occurred processing your request")

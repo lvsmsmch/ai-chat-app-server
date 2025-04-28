@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.db.repositories._utils
 import com.lvsmsmch.aichat.db.repositories.content.*
 import com.lvsmsmch.aichat.network.dto_objects.*
 import com.lvsmsmch.aichat.utils.Repositories
+import io.ktor.server.plugins.*
 
 class Mapper(val repositories: Repositories)
 
@@ -78,15 +79,24 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
 }
 
 suspend fun ChatDbo.toChatDto(mapper: Mapper): ChatDto {
+    val repositories = mapper.repositories
+
+    val character = repositories.characterRepository.getCharacter(characterId)
+        ?: throw NotFoundException("Character with id $characterId not found")
+    val lastMessageDbo = repositories.messageRepository.getLastMessageInChat(id)
+//    val unreadMessageCount = repositories.messageRepository.countUnreadMessagesInChat(id)
+
     return ChatDto(
         id = id,
         createdAt = createdAt,
         userId = userId,
         characterId = characterId,
-        characterName = characterName,
-        characterDescription = characterDescription,
-        characterPrompt = characterPrompt,
-        characterPicUrl = characterPicUrl,
+        characterName = character.name,
+        characterDescription = character.description,
+        characterPrompt = character.prompt,
+        characterPicUrl = character.picUrl,
         isChatMuted = isChatMuted,
+        lastMessage = lastMessage?.toMessageDto(mapper),
+        unreadMessageCount = unreadMessageCount,
     )
 }

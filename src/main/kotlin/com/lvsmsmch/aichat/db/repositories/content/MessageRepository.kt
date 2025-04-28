@@ -1,11 +1,18 @@
 package com.lvsmsmch.aichat.db.repositories.content
 
-import com.lvsmsmch.aichat.db.repositories._utils.MatchPositions
-import com.lvsmsmch.aichat.db.repositories._utils.SearchUtil
+import com.lvsmsmch.aichat.db.repositories._utils.ChangeEvent
+import com.lvsmsmch.aichat.utils.MatchPositions
+import com.lvsmsmch.aichat.utils.SearchUtil
+import com.lvsmsmch.aichat.db.repositories._utils.watchAsFlow
 import com.lvsmsmch.aichat.utils.UtcTimestamp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.conversions.Bson
 import org.bson.types.ObjectId
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -14,20 +21,21 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 data class MessageDbo(
     @BsonId val id: String = ObjectId().toHexString(),
     val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val editedAt: UtcTimestamp? = null,
     val chatId: String,
     val isSentByUser: Boolean = false,
-    val senderId: String,       // User id or Character id
-    val text: String,
+    val isLoading: Boolean = false,
+    val isFailed: Boolean = false,
     val isRead: Boolean = false,
-    val editedAt: UtcTimestamp? = null,
-    val metadata: Map<String, String> = emptyMap()
+    val text: String,
+    val imageUrl: String? = null,
 )
 
 class MessageRepository(
     private val collection: CoroutineCollection<MessageDbo>,
-    private val onMessageAdded: (characterId: String) -> Unit,
-    private val getAllChatIdsForUser: (userId: String) -> List<String>,
-    private val getCharacterIdByChatId: (chatId: String) -> String,
+    private val onMessageAddedForChat: (chatId: String) -> Unit,
+    private val onNewLastMessageInChat: (chatId: String, messageDbo: MessageDbo?) -> Unit,
+    private val onNewUnreadCountForChat: (chatId: String, unreadCount: Int) -> Unit,
 ) {
 
     init {
@@ -49,39 +57,73 @@ class MessageRepository(
         }
     }
 
+
+
+
+
     /**
-     * Search for messages by content across a user's chats
+     * FLOW
      */
-    suspend fun searchMessagesByContentInAllChats(
-        searchText: String,
-        userId: String,
-    ): Map<MessageDbo, MatchPositions> {
-        val chatIds = getAllChatIdsForUser(userId)
 
-        if (chatIds.isEmpty()) {
-            return emptyMap()
+
+
+    private val changeEventsFlow: SharedFlow<ChangeEvent<MessageDbo>> by lazy {
+        collection
+            .watchAsFlow()
+            .shareIn(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+                started = SharingStarted.Eagerly,
+                replay = 0
+            )
+    }
+
+    fun collectAllEventsForChatId(chatId: String): Flow<ChangeEvent<MessageDbo>> {
+        return changeEventsFlow.filter {
+            when (it) {
+                is ChangeEvent.Created -> it.new.chatId == chatId
+                is ChangeEvent.Updated -> it.new.chatId == chatId
+                is ChangeEvent.Deleted -> it.old.chatId == chatId
+            }
         }
+    }
 
-        val filter = and(
-            MessageDbo::chatId.`in`(chatIds),
-            MessageDbo::text.regex(".*$searchText.*", "i")
+
+
+    /**
+     * CREATE
+     */
+    suspend fun addMessage(
+        chatId: String,
+        isSentByUser: Boolean,
+        isLoading: Boolean,
+        isFailed: Boolean,
+        content: String,
+        imageUrl: String? = null,
+    ): MessageDbo {
+        val message = MessageDbo(
+            chatId = chatId,
+            isSentByUser = isSentByUser,
+            isLoading = isLoading,
+            isFailed = isFailed,
+            text = content,
+            imageUrl = imageUrl
         )
-
-        return collection.find(filter)
-            .sort(descending(MessageDbo::createdAt))
-            .toList()
-            .associateWith { SearchUtil.findAllMatches(it.text, searchText) }
+        collection.insertOne(message)
+        onMessageAddedForChat(chatId)
+        onNewLastMessageInChat(message.chatId, message)
+        onNewUnreadCountForChat(message.chatId, countUnreadMessagesInChat(chatId))
+        return message
     }
 
 
     /**
-     * Search messages in a specific chat by content text
+     * READ
      */
+
     suspend fun searchMessagesInChat(
         searchText: String,
         chatId: String,
     ): Map<MessageDbo, MatchPositions> {
-
         val filter = and(
             MessageDbo::chatId eq chatId,
             MessageDbo::text.regex(".*$searchText.*", "i")
@@ -93,38 +135,10 @@ class MessageRepository(
             .associateWith { SearchUtil.findAllMatches(it.text, searchText) }
     }
 
-    /**
-     * Add a new message to a chat
-     */
-    suspend fun addMessage(
-        chatId: String,
-        isSentByUser: Boolean,
-        content: String,
-        metadata: Map<String, String> = emptyMap()
-    ): MessageDbo {
-        val message = MessageDbo(
-            chatId = chatId,
-            isSentByUser = isSentByUser,
-            senderId = "",
-            text = content,
-            metadata = metadata
-        )
-
-        collection.insertOne(message)
-        onMessageAdded(getCharacterIdByChatId(message.chatId))
-        return message
-    }
-
-    /**
-     * Get a message by its ID
-     */
     suspend fun getMessageById(messageId: String): MessageDbo? {
         return collection.findOneById(messageId)
     }
 
-    /**
-     * Get messages from a chat with pagination
-     */
     suspend fun getMessagesByChatId(
         chatId: String,
         limit: Int = 50,
@@ -144,77 +158,19 @@ class MessageRepository(
             .toList()
     }
 
-    /**
-     * Edit a message
-     */
-    suspend fun editMessage(messageId: String, newContent: String): Boolean {
-        val now = UtcTimestamp.now()
-
-        val updateResult = collection.updateOneById(
-            messageId,
-            combine(
-                setValue(MessageDbo::text, newContent),
-                setValue(MessageDbo::editedAt, now)
-            )
-        )
-
-        return updateResult.modifiedCount > 0
+    suspend fun countMessagesInChat(chatId: String): Int {
+        return collection.countDocuments(MessageDbo::chatId eq chatId).toInt()
     }
 
-    /**
-     * Delete a message
-     */
-    suspend fun deleteMessage(messageId: String): Boolean {
-        return collection.deleteOneById(messageId).deletedCount > 0
-    }
-
-    /**
-     * Delete multiple messages by their IDs
-     *
-     * @param messageIds List of message IDs to delete
-     * @return The number of messages successfully deleted
-     */
-    suspend fun deleteMessagesByIds(messageIds: List<String>): Long {
-        if (messageIds.isEmpty()) {
-            return 0
-        }
-
-        val deleteResult = collection.deleteMany(MessageDbo::id.`in`(messageIds))
-        return deleteResult.deletedCount
-    }
-
-    /**
-     * Delete all messages in a chat
-     */
-    suspend fun deleteAllMessagesInChat(chatId: String): Long {
-        val deleteResult = collection.deleteMany(MessageDbo::chatId eq chatId)
-        return deleteResult.deletedCount
-    }
-
-    /**
-     * Count total messages in a chat
-     */
-    suspend fun countMessagesByChatId(chatId: String): Long {
-        return collection.countDocuments(MessageDbo::chatId eq chatId)
-    }
-
-
-    /**
-     * Count total messages in a chat
-     */
-    suspend fun countUnreadMessagesInChat(chatId: String): Long {
+    suspend fun countUnreadMessagesInChat(chatId: String): Int {
         return collection.countDocuments(
             and(
                 MessageDbo::chatId eq chatId,
                 MessageDbo::isRead eq false
             )
-        )
+        ).toInt()
     }
 
-
-    /**
-     * Get the most recent message in a chat
-     */
     suspend fun getLastMessageInChat(chatId: String): MessageDbo? {
         return collection.find(MessageDbo::chatId eq chatId)
             .sort(descending(MessageDbo::createdAt))
@@ -222,35 +178,85 @@ class MessageRepository(
             .first()
     }
 
-    /**
-     * Update message metadata
-     */
-    suspend fun updateMessageMetadata(messageId: String, metadata: Map<String, String>): Boolean {
-        val updateResult = collection.updateOneById(
-            messageId,
-            setValue(MessageDbo::metadata, metadata)
-        )
-        return updateResult.modifiedCount > 0
+    private suspend fun isMessageLastInItsChat(messageId: String): Boolean {
+        val chatId = getMessageById(messageId)?.chatId ?: return false
+        return getLastMessageInChat(chatId)?.id == messageId
+    }
+
+    suspend fun doAllMessagesBelongToChat(messageIds: List<String>, chatId: String): Boolean {
+        if (messageIds.isEmpty()) return true
+
+        // Count messages that match both the IDs and the chatId
+        val matchingCount = collection.countDocuments(
+            and(
+                MessageDbo::id.`in`(messageIds),
+                MessageDbo::chatId eq chatId
+            )
+        ).toInt()
+
+        // If all messages belong to the chat, the counts should match
+        return matchingCount == messageIds.size
     }
 
     /**
-     * Mark a message as read
+     * UPDATE
      */
-    suspend fun markMessageAsRead(messageId: String): Boolean {
-        val updateResult = collection.updateOneById(messageId, setValue(MessageDbo::isRead, true))
-        return updateResult.modifiedCount > 0
+
+    suspend fun updateMessage(
+        messageId: String,
+        isLoading: Boolean? = null,
+        isFailed: Boolean? = null,
+        text: String? = null,
+        imageUrl: String? = null,
+    ) {
+        collection.findOneById(messageId) ?: return
+        val updates = mutableListOf<Bson>()
+        isLoading?.let { updates.add(setValue(MessageDbo::isLoading, it)) }
+        isFailed?.let { updates.add(setValue(MessageDbo::isFailed, it)) }
+        text?.let { updates.add(setValue(MessageDbo::text, it)) }
+        imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
+        if (updates.isEmpty()) return // Nothing to update
+        collection.updateOneById(messageId, combine(*updates.toTypedArray()))
+        if (isMessageLastInItsChat(messageId)) {
+            getMessageById(messageId)?.let { onNewLastMessageInChat(it.chatId, it) }
+        }
     }
 
-    /**
-     * Mark all character messages in a chat as read
-     */
-    suspend fun markAllCharacterMessagesAsRead(chatId: String): Long {
+    suspend fun markMessageAsRead(messageId: String) {
+        val chatId = getMessageById(messageId)?.chatId ?: return
+        collection.updateOneById(messageId, setValue(MessageDbo::isRead, true))
+        onNewUnreadCountForChat(chatId, countUnreadMessagesInChat(chatId))
+    }
+
+    suspend fun markAllCharacterMessagesAsRead(chatId: String) {
         val filter = and(
             MessageDbo::chatId eq chatId,
             MessageDbo::isSentByUser eq false,
             MessageDbo::isRead eq false
         )
-        val updateResult = collection.updateMany(filter, setValue(MessageDbo::isRead, true))
-        return updateResult.modifiedCount
+        collection.updateMany(filter, setValue(MessageDbo::isRead, true))
+        onNewUnreadCountForChat(chatId, 0)
+    }
+
+
+    /**
+     * DELETE
+     */
+    suspend fun deleteMessage(messageId: String) {
+        deleteMessagesByIds(listOf(messageId))
+    }
+
+    suspend fun deleteMessagesByIds(messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        val chatId = getMessageById(messageIds.first())?.chatId ?: return
+        collection.deleteMany(MessageDbo::id.`in`(messageIds))
+        onNewLastMessageInChat(chatId, getLastMessageInChat(chatId))
+        onNewUnreadCountForChat(chatId, countUnreadMessagesInChat(chatId))
+    }
+
+    suspend fun deleteAllMessagesInChat(chatId: String) {
+        collection.deleteMany(MessageDbo::chatId eq chatId)
+        onNewLastMessageInChat(chatId, null)
+        onNewUnreadCountForChat(chatId, 0)
     }
 }

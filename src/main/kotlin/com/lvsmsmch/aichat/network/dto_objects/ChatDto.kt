@@ -2,13 +2,11 @@ package com.lvsmsmch.aichat.network.dto_objects
 
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.types.ObjectId
 
 @Serializable
 data class ChatDto(
-    @BsonId val id: String = ObjectId().toHexString(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val id: String,
+    val createdAt: UtcTimestamp,
     val userId: String,
     val characterId: String,
     val characterName: String,
@@ -16,4 +14,6 @@ data class ChatDto(
     val characterPrompt: String,
     val characterPicUrl: String,
     val isChatMuted: Boolean,
+    val lastMessage: MessageDto?,
+    val unreadMessageCount: Int
 )

@@ -1,4 +1,4 @@
-package com.lvsmsmch.aichat.db.repositories._utils
+package com.lvsmsmch.aichat.utils
 
 import kotlinx.serialization.Serializable
 

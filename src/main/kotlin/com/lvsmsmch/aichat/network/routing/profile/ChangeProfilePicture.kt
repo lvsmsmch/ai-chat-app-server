@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.network.routing.profile
 import com.lvsmsmch.aichat.db.repositories.auth.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.db.repositories.content.UserRepository
 import com.lvsmsmch.aichat.network.routing.auth.UnauthorizedException
+import com.lvsmsmch.aichat.utils.ImageServer
 import com.lvsmsmch.aichat.utils.uploadImageOnServer
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -53,7 +54,8 @@ fun Routing.configureChangeProfilePictureRouting(
             }
 
             // Upload image and update user profile
-            val newUrl = uploadImageOnServer(pictureFile!!)
+            val newUrl = ImageServer.uploadImageOnServer(pictureFile!!)
+
             userRepository.updateUserProfilePicture(
                 userId = tokenDbo.userId,
                 profilePictureUrl = newUrl
