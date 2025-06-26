@@ -47,6 +47,9 @@ dependencies {
     implementation("org.mindrot:jbcrypt:0.4")
     implementation("com.sun.mail:jakarta.mail:2.0.1")
 
+    // Google Auth (for subscriptions)
+    implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
+
     // Tests
     testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.22") // Match Kotlin version
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")

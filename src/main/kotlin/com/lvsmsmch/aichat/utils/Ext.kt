@@ -1,15 +1,26 @@
 package com.lvsmsmch.aichat.utils
 
-import com.lvsmsmch.aichat.network.routing.chat.*
+import com.lvsmsmch.aichat.chat.network.ChatWsEvent
+import com.lvsmsmch.aichat.chat.network.ChatWsRequest
+import com.lvsmsmch.aichat.chat.network.PingPongMessage
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.util.pipeline.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
+import org.litote.kmongo.coroutine.CoroutineCollection
 import org.mindrot.jbcrypt.BCrypt
-import java.io.File
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.*
 import kotlin.random.Random
@@ -20,32 +31,18 @@ val defaultJson = Json {
     isLenient = true
     encodeDefaults = true
     serializersModule = SerializersModule {
-        polymorphic(MessagesWsRequest::class) {
-            subclass(MessagesWsRequest.SendMessage::class)
-            subclass(MessagesWsRequest.ReloadMessage::class)
-            subclass(MessagesWsRequest.EditMessage::class)
-            subclass(MessagesWsRequest.MarkAsRead::class)
-            subclass(MessagesWsRequest.MarkAsReadAll::class)
-            subclass(MessagesWsRequest.DeleteMessage::class)
-            subclass(MessagesWsRequest.DeleteMessageRange::class)
-            subclass(MessagesWsRequest.DeleteAllMessages::class)
+        polymorphic(ChatWsRequest::class) {
+            subclass(ChatWsRequest.SyncChatListRequest::class)
+            subclass(ChatWsRequest.AddChatRequest::class)
+            subclass(ChatWsRequest.UpdateChatRequest::class)
+            subclass(ChatWsRequest.DeleteChatRequest::class)
         }
-        polymorphic(MessagesWsEvent::class) {
-            subclass(MessagesWsEvent.NewMessage::class)
-            subclass(MessagesWsEvent.MessageEdited::class)
-            subclass(MessagesWsEvent.CharacterTyping::class)
-            subclass(MessagesWsEvent.MessageRangeDeleted::class)
-            subclass(MessagesWsEvent.AllMessagesDeleted::class)
-            subclass(MessagesWsEvent.ChatDeleted::class)
-            subclass(MessagesWsEvent.Error::class)
-        }
-        polymorphic(ChatsWsRequest::class) {
-        }
-        polymorphic(ChatsWsEvent::class) {
-            subclass(ChatsWsEvent.ChatAdded::class)
-            subclass(ChatsWsEvent.ChatChanged::class)
-            subclass(ChatsWsEvent.ChatRangeDeleted::class)
-            subclass(ChatsWsEvent.Error::class)
+        polymorphic(ChatWsEvent::class) {
+            subclass(ChatWsEvent.ChatAdded::class)
+            subclass(ChatWsEvent.ChatUpdated::class)
+            subclass(ChatWsEvent.ChatAddFailed::class)
+            subclass(ChatWsEvent.ChatDeleted::class)
+            subclass(ChatWsEvent.Error::class)
         }
         polymorphic(PingPongMessage::class) {
             subclass(PingPongMessage.Ping::class)
@@ -53,12 +50,32 @@ val defaultJson = Json {
     }
 }
 
+suspend inline fun ApplicationCall.respondSuccess() {
+    this.respond(
+        HttpStatusCode.OK,
+        ApiResponse<Nothing>(status = HttpStatusCode.OK.value)
+    )
+}
+
+suspend inline fun <reified T> ApplicationCall.respondSuccess(data: T) {
+    this.respond(
+        HttpStatusCode.OK,
+        ApiResponse(status = HttpStatusCode.OK.value, data = data)
+    )
+}
+
+suspend fun ApplicationCall.respondError(httpStatusCode: HttpStatusCode, code: String, message: String) {
+    this.respond(
+        httpStatusCode,
+        ApiResponse<Nothing>(status = httpStatusCode.value, error = ErrorDetails(code, message))
+    )
+}
+
 fun ApplicationCall.getUserIp(): String {
     val forwardedForHeader = request.header("X-Forwarded-For")
     if (!forwardedForHeader.isNullOrBlank()) {
         return forwardedForHeader.split(",")[0].trim()
     }
-
     return request.origin.remoteHost
 }
 
@@ -94,4 +111,82 @@ fun generateUniqueUsername(): String {
     val adjectives = listOf("Fast", "Cool", "Brave", "Happy", "Sly", "Mighty", "Wild", "Fierce", "Clever")
     val nouns = listOf("Tiger", "Falcon", "Wizard", "Ninja", "Panther", "Wolf", "Phoenix", "Warrior", "Shadow")
     return "${adjectives.random()}${nouns.random()}${(1000..9999).random()}"
+}
+
+inline fun <reified T : Any> createDatabaseEventsFlow(
+    collection: CoroutineCollection<T>,
+): SharedFlow<DatabaseEvent<T>> {
+    return collection
+        .watchAsFlow()
+        .onEach { event -> logDatabaseEvent(event, collection.namespace.collectionName) }
+        .shareIn(
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            started = SharingStarted.Eagerly,
+            replay = 0
+        )
+}
+
+
+fun generateHash(hashSize: Int, vararg values: String): String {
+    val combined = values.joinToString(":")
+    return MessageDigest.getInstance("MD5")
+        .digest(combined.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+        .take(hashSize)
+}
+
+fun Application.logStructuredError(
+    call: ApplicationCall,
+    errorCode: String,
+    statusCode: Int,
+    message: String,
+    userId: String? = null,
+    exception: Throwable? = null
+) {
+    data class ErrorLogEntry(
+        val errorCode: String,
+        val statusCode: Int,
+        val uri: String,
+        val method: String,
+        val message: String,
+        val correlationId: String? = null,
+        val userId: String? = null,
+        val stackTrace: String? = null
+    )
+
+    val entry = ErrorLogEntry(
+        errorCode = errorCode,
+        statusCode = statusCode,
+        uri = call.request.path(),
+        method = call.request.httpMethod.value,
+        message = message,
+        correlationId = call.request.header("X-Correlation-ID"),
+        userId = userId,
+        stackTrace = exception?.stackTraceToString()
+    )
+
+    this.log.error(Json.encodeToString(entry))
+}
+
+suspend fun <T : com.lvsmsmch.aichat.auth.database.tokens.TokenDbo> PipelineContext<Unit, ApplicationCall>.verifyToken(
+    tokenRepository: com.lvsmsmch.aichat.auth.database.tokens.TokenRepository<T>
+): T {
+    val authHeader = call.request.headers["Authorization"]
+        ?: throw BadRequestException("Missing Authorization header")
+
+    if (!authHeader.startsWith("Bearer ")) {
+        throw BadRequestException("Invalid Authorization format. Must use Bearer token")
+    }
+
+    val token = authHeader.removePrefix("Bearer ").trim()
+    if (token.isEmpty()) {
+        throw BadRequestException("Empty authentication token")
+    }
+
+    val tokenDbo = tokenRepository.get(token)
+    if (tokenDbo == null || tokenDbo.expiresAt.isInPast()) {
+        throw TokenExpiredException("Authentication token has expired")
+    }
+
+    return tokenDbo
 }

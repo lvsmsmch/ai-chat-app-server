@@ -1,0 +1,159 @@
+package com.lvsmsmch.aichat.user.database
+
+import com.lvsmsmch.aichat.utils.*
+import com.mongodb.client.model.Updates
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.conversions.Bson
+import org.bson.types.ObjectId
+import org.litote.kmongo.*
+import org.litote.kmongo.coroutine.CoroutineCollection
+
+
+
+
+
+class UserRepository(
+    private val collection: CoroutineCollection<UserDbo>
+) {
+
+    /**
+     * Initialize indexes for the collection
+     */
+
+    init {
+        initializeIndexes()
+    }
+
+
+    private fun initializeIndexes() {
+        runBlocking {
+            collection.ensureIndex(ascending(UserDbo::email))
+            collection.ensureIndex(ascending(UserDbo::googleOauthId))
+            collection.ensureIndex(ascending(UserDbo::facebookOauthId))
+            collection.ensureIndex(ascending(UserDbo::username))
+        }
+    }
+
+
+    /**
+     * FLOW
+     */
+
+    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+
+
+    /**
+     * CREATE
+     */
+    suspend fun addUser(userDbo: UserDbo) {
+        collection.insertOne(userDbo)
+    }
+
+    /**
+     * READ
+     */
+
+    suspend fun getUserById(userId: String): UserDbo? {
+        return collection.findOneById(userId)
+    }
+
+    suspend fun findUserByEmail(email: String): UserDbo? {
+        return collection.findOne(UserDbo::email eq email)
+    }
+
+    suspend fun findByGoogleId(googleId: String): UserDbo? {
+        return collection.findOne(UserDbo::googleOauthId eq googleId)
+    }
+
+    suspend fun findByDeviceId(deviceId: String): UserDbo? {
+        return collection.findOne(UserDbo::deviceId eq deviceId)
+    }
+
+    suspend fun getActiveUsersSince(since: UtcTimestamp): List<UserDbo> {
+        return collection.find(
+            UserDbo::lastActiveAt gte since
+        ).toList()
+    }
+
+    /**
+     * UPDATE
+     */
+    suspend fun updateUser(
+        userId: String,
+        email: String? = null,
+        username: String? = null,
+        name: String? = null,
+        bio: String? = null,
+        profilePictureUrl: String? = null,
+        hashedPassword: String? = null,
+    ) {
+        collection.findOneById(userId) ?: return
+        val updates = mutableListOf<Bson>()
+        email?.let { updates.add(setValue(UserDbo::email, it)) }
+        username?.let { updates.add(setValue(UserDbo::username, it)) }
+        name?.let { updates.add(setValue(UserDbo::name, it)) }
+        bio?.let { updates.add(setValue(UserDbo::bio, it)) }
+        profilePictureUrl?.let { updates.add(setValue(UserDbo::profilePictureUrl, it)) }
+        hashedPassword?.let { updates.add(setValue(UserDbo::hashedPassword, it)) }
+        if (updates.isEmpty()) return // Nothing to update
+        collection.updateOneById(userId, combine(*updates.toTypedArray()))
+    }
+
+    suspend fun linkGoogleToUser(
+        userId: String,
+        googleId: String,
+        email: String? = null,
+        name: String? = null,
+        profilePictureUrl: String? = null,
+    ) {
+        collection.findOneById(userId) ?: return
+        collection.updateOneById(
+            userId, combine(
+                Updates.set(UserDbo::accountType.name, AccountType.REGISTERED),
+                Updates.set(UserDbo::deviceId.name, null),
+                Updates.set(UserDbo::googleOauthId.name, googleId),
+                Updates.set(UserDbo::email.name, email),
+                Updates.set(UserDbo::name.name, name),
+                Updates.set(UserDbo::profilePictureUrl.name, profilePictureUrl),
+            )
+        )
+    }
+
+    suspend fun incrementFollowingCount(userId: String, increment: Int) {
+        collection.updateOneById(
+            userId,
+            inc(UserDbo::followingCount, increment)
+        )
+    }
+
+    suspend fun incrementFollowerCount(userId: String, increment: Int) {
+        collection.updateOneById(
+            userId,
+            inc(UserDbo::followerCount, increment)
+        )
+    }
+
+    suspend fun incrementPublicCharacterCount(userId: String, increment: Int) {
+        collection.updateOneById(
+            userId,
+            inc(UserDbo::publicCharacterCount, increment)
+        )
+    }
+
+    suspend fun incrementPrivateCharacterCount(userId: String, increment: Int) {
+        collection.updateOneById(
+            userId,
+            inc(UserDbo::privateCharacterCount, increment)
+        )
+    }
+
+    /**
+     * DELETE
+     */
+    suspend fun deleteUser(userId: String): Boolean {
+        val deleteResult = collection.deleteOneById(userId)
+        return deleteResult.deletedCount > 0
+    }
+}

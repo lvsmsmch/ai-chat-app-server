@@ -1,0 +1,334 @@
+package com.lvsmsmch.aichat.character.database
+
+import com.lvsmsmch.aichat.utils.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import org.bson.codecs.pojo.annotations.BsonId
+import org.bson.conversions.Bson
+import org.bson.types.ObjectId
+import org.litote.kmongo.*
+import org.litote.kmongo.coroutine.CoroutineCollection
+
+
+
+
+
+@Serializable
+data class CharacterDbo(
+    @BsonId val id: String = ObjectId().toHexString(),
+    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val authorId: String,
+    val name: String,
+    val description: String,
+    val prompt: String,
+    val picUrl: String,
+    val visibility: Int,
+    val category: String,
+    val tags: List<String>,
+    val totalChats: Int = 0,
+    val totalMessages: Int = 0,
+    val totalReviews: Int = 0,
+    val averageRating: Float = 0f,
+    val trendingScore: Float = 0f,
+    val trendingScoreUpdatedAt: UtcTimestamp? = null,
+    val recommendationScore: Float = 0f,
+    val recommendationScoreUpdatedAt: UtcTimestamp? = null,
+    val coOccurrenceScore: Map<String, Float> = emptyMap(),
+    val coOccurrenceScoreUpdatedAt: UtcTimestamp? = null,
+    val isDeleted: Boolean = false,
+)
+
+class CharacterRepository(
+    private val collection: CoroutineCollection<CharacterDbo>
+) {
+
+    /**
+     * Initialize indexes for the collection
+     */
+
+    init {
+        initializeIndexes()
+    }
+
+
+    private fun initializeIndexes() {
+        runBlocking {
+            collection.ensureIndex(ascending(CharacterDbo::authorId))
+        }
+    }
+
+    /**
+     * FLOW
+     */
+
+    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+
+    /**
+     * CREATE
+     */
+
+    suspend fun addCharacter(character: CharacterDbo) {
+        collection.insertOne(character)
+    }
+
+    /**
+     * READ
+     */
+    suspend fun getCharacters(
+        searchQuery: String = "",
+        sortCriteria: Int? = null,
+        categories: List<CharacterCategory> = CharacterCategory.entries.toList(),
+        page: Int,
+        size: Int,
+        shuffleSeed: Int? = null,
+        authorId: String? = null,
+        visibilityFilter: Int? = null,
+    ): List<CharacterDbo> {
+        val sortCriteriaBson = when (sortCriteria) {
+            CharacterSortCriteria.NEWEST.code -> descending(CharacterDbo::createdAt)
+            CharacterSortCriteria.OLDEST.code -> ascending(CharacterDbo::createdAt)
+            CharacterSortCriteria.HIGHEST_RATING.code -> descending(CharacterDbo::averageRating)
+            CharacterSortCriteria.LOWEST_RATING.code -> ascending(CharacterDbo::averageRating)
+            CharacterSortCriteria.MOST_POPULAR.code -> descending(CharacterDbo::totalMessages)
+            CharacterSortCriteria.LEAST_POPULAR.code -> ascending(CharacterDbo::totalMessages)
+            CharacterSortCriteria.TRENDING.code -> descending(CharacterDbo::trendingScore)
+            CharacterSortCriteria.RECOMMENDED.code -> descending(CharacterDbo::recommendationScore)
+            else -> descending(CharacterDbo::createdAt)
+        }
+
+        val filters = and(
+            CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
+            CharacterDbo::category `in` categories.map { it.code },
+            if (searchQuery.isNotBlank()) {
+                or(
+                    CharacterDbo::name.regex(".*$searchQuery.*", "i"),
+                    CharacterDbo::description.regex(".*$searchQuery.*", "i")
+                )
+            } else EMPTY_BSON,
+            if (authorId != null) {
+                CharacterDbo::authorId eq authorId
+            } else EMPTY_BSON,
+            if (visibilityFilter != null) {
+                CharacterDbo::visibility eq visibilityFilter
+            } else EMPTY_BSON
+        )
+
+        val all = collection.find(filters)
+
+        val skip = (page - 1) * size
+
+        val sortedList = if (shuffleSeed != null) {
+            all.toList().shuffled(kotlin.random.Random(shuffleSeed))
+        } else {
+            all.sort(sortCriteriaBson).toList()
+        }
+
+        return sortedList.drop(skip).take(size)
+    }
+
+    suspend fun getPersonalizedCharacters(
+        recommendedIds: List<String>,
+        shuffleSeed: Int? = null,
+        page: Int,
+        size: Int
+    ): List<CharacterDbo> {
+        val processedIds = if (shuffleSeed != null) {
+            recommendedIds.shuffled(kotlin.random.Random(shuffleSeed))
+        } else {
+            recommendedIds
+        }
+
+        val skip = (page - 1) * size
+        val selectedIds = processedIds.drop(skip).take(size)
+        return getCharactersByIds(selectedIds)
+    }
+
+    suspend fun getTopCharactersByRecommendationScore(limit: Int): List<String> {
+        return collection.find(
+            and(
+                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
+                CharacterDbo::isDeleted eq false
+            )
+        ).sort(descending(CharacterDbo::recommendationScore))
+            .limit(limit)
+            .toList()
+            .map { it.id }
+    }
+
+    private suspend fun getCharactersByIds(characterIds: List<String>): List<CharacterDbo> {
+        val filters = and(
+            CharacterDbo::id `in` characterIds,
+            CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
+            CharacterDbo::isDeleted eq false
+        )
+
+        val characters = collection.find(filters).toList()
+
+        // Сохраняем порядок из recommendedIds
+        return characterIds.mapNotNull { id ->
+            characters.find { it.id == id }
+        }
+    }
+
+
+    suspend fun getCharactersByUserId(
+        userId: String,
+        includePrivate: Boolean = false
+    ): List<CharacterDbo> {
+        val filters = and(
+            CharacterDbo::authorId eq userId,
+            if (includePrivate) {
+                EMPTY_BSON
+            } else {
+                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
+            },
+            CharacterDbo::isDeleted eq false
+        )
+
+        return collection.find(filters).toList()
+    }
+
+    suspend fun countCharactersByUserId(
+        userId: String,
+        visibility: CharacterVisibility
+    ): Int {
+        val filters = and(
+            CharacterDbo::authorId eq userId,
+            CharacterDbo::visibility eq visibility.code,
+            CharacterDbo::isDeleted eq false
+        )
+
+        return collection.countDocuments(filters).toInt()
+    }
+
+    private suspend fun calculatePersonalizedScore(
+        character: CharacterDbo,
+        userCharacterIds: List<String>
+    ): Float {
+        var score = character.recommendationScore * 0.3f // базовый recommendation score
+
+        // Content-based similarity (категория + теги)
+        userCharacterIds.forEach { userCharId ->
+            val userChar = getCharacter(userCharId)
+            userChar?.let {
+                if (it.category == character.category) score += 0.2f
+                val commonTags = it.tags.intersect(character.tags.toSet()).size
+                score += commonTags * 0.1f
+            }
+        }
+
+        // Collaborative filtering
+        character.coOccurrenceScore.forEach { (charId, coScore) ->
+            if (charId in userCharacterIds) {
+                score += coScore * 0.4f
+            }
+        }
+
+        return score / maxOf(userCharacterIds.size, 1)
+    }
+
+
+    suspend fun getAllPublicCharactersForCategory(category: CharacterCategory): List<CharacterDbo> {
+        return collection.find(
+            and(
+                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
+                CharacterDbo::isDeleted eq false,
+                CharacterDbo::category eq category.code
+            )
+        ).toList()
+    }
+
+    suspend fun getAllPublicCharacters(): List<CharacterDbo> {
+        return collection.find(CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code).toList()
+    }
+
+    suspend fun getCharacter(characterId: String): CharacterDbo? {
+        return collection.findOneById(characterId)
+    }
+
+    /**
+     * UPDATE
+     */
+    suspend fun updateCharacter(
+        characterId: String,
+        name: String? = null,
+        description: String? = null,
+        prompt: String? = null,
+        visibility: Int? = null,
+        pictureUrl: String? = null,
+        category: CharacterCategory? = null,
+        tags: List<CharacterTag>? = null,
+    ) {
+        val updates = mutableListOf<Bson>()
+
+        name?.let { updates.add(setValue(CharacterDbo::name, it)) }
+        description?.let { updates.add(setValue(CharacterDbo::description, it)) }
+        prompt?.let { updates.add(setValue(CharacterDbo::prompt, it)) }
+        visibility?.let { updates.add(setValue(CharacterDbo::visibility, it)) }
+        pictureUrl?.let { updates.add(setValue(CharacterDbo::picUrl, it)) }
+        category?.let { updates.add(setValue(CharacterDbo::category, it.code)) }
+        tags?.let { updates.add(setValue(CharacterDbo::tags, it.map { tag -> tag.code })) }
+
+        if (updates.isEmpty()) {
+            return
+        }
+
+        collection.updateOneById(characterId, combine(*updates.toTypedArray()))
+    }
+
+    suspend fun updateAvgRating(characterId: String, newRating: Float) {
+        collection.updateOneById(characterId, setValue(CharacterDbo::averageRating, newRating))
+    }
+
+    suspend fun updateTrendingScore(characterId: String, trendingScore: Float) {
+        collection.updateOneById(characterId, setValue(CharacterDbo::trendingScore, trendingScore))
+        collection.updateOneById(characterId, setValue(CharacterDbo::trendingScoreUpdatedAt, UtcTimestamp.now()))
+    }
+
+    suspend fun updateRecommendationScore(characterId: String, recommendationScore: Float) {
+        collection.updateOneById(
+            characterId,
+            combine(
+                setValue(CharacterDbo::recommendationScore, recommendationScore),
+                setValue(CharacterDbo::recommendationScoreUpdatedAt, UtcTimestamp.now())
+            )
+        )
+    }
+
+    suspend fun updateCoOccurrenceScore(characterId: String, scores: Map<String, Float>) {
+        collection.updateOneById(
+            characterId,
+            combine(
+                setValue(CharacterDbo::coOccurrenceScore, scores),
+                setValue(CharacterDbo::coOccurrenceScoreUpdatedAt, UtcTimestamp.now())
+            )
+        )
+    }
+
+    suspend fun incrementReviewsCount(characterId: String, increment: Int) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalReviews, increment))
+    }
+
+    suspend fun incrementChatsCount(characterId: String, increment: Int) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalChats, increment))
+    }
+
+    suspend fun incrementMessagesCount(characterId: String, increment: Int) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalMessages, increment))
+    }
+
+    /**
+     * DELETE
+     */
+    suspend fun deleteCharacter(characterId: String) {
+        collection.deleteOneById(characterId)
+    }
+
+    suspend fun deleteAllCharacterByUserId(userId: String) {
+        collection.deleteMany(
+            and(
+                CharacterDbo::authorId eq userId
+            )
+        )
+    }
+}

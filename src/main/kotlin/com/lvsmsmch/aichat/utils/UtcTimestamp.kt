@@ -1,20 +1,21 @@
+// UtcTimestamp.kt
 package com.lvsmsmch.aichat.utils
 
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-
 
 /**
  * A custom timestamp class that wraps `Instant` for better serialization.
- *
- * 🔹 **Stored in MongoDB as:** Epoch milliseconds (`Long`).
+ * 🔹 **Stored in MongoDB as:** ISO-8601 format string (e.g., `"2025-03-12T14:30:00Z"`).
  * 🔹 **Output (toString) format:** ISO-8601 (e.g., `"2025-03-12T14:30:00Z"`).
  */
-
-
 @Serializable(with = UtcTimestampSerializer::class)
-data class UtcTimestamp(val instant: Instant) {
+class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
+
+    val epochMillis get() = instant.toEpochMilli()
 
     fun addSeconds(seconds: Long) = UtcTimestamp(instant.plus(seconds, ChronoUnit.SECONDS))
     fun addMinutes(minutes: Long) = UtcTimestamp(instant.plus(minutes, ChronoUnit.MINUTES))
@@ -28,12 +29,36 @@ data class UtcTimestamp(val instant: Instant) {
     fun subtractDays(days: Long) = UtcTimestamp(instant.minus(days, ChronoUnit.DAYS))
     fun subtractMonths(months: Long) = UtcTimestamp(instant.minus(months, ChronoUnit.MONTHS))
     fun subtractYears(years: Long) = UtcTimestamp(instant.minus(years, ChronoUnit.YEARS))
-    fun isBeforeNow() = instant.isBefore(Instant.now())
-    fun isAfterNow() = instant.isAfter(Instant.now())
-    fun isInPast() = isBeforeNow()
-    fun isInFuture() = isAfterNow()
+    fun isInPast() = instant.isBefore(Instant.now())
+    fun isInFuture() = instant.isAfter(Instant.now())
+    fun isBefore(utcTimestamp: UtcTimestamp) = instant.isBefore(utcTimestamp.instant)
+    fun isAfter(utcTimestamp: UtcTimestamp) = instant.isAfter(utcTimestamp.instant)
+
+    // Format the timestamp as an ISO-8601 string
+    override fun toString(): String {
+        return DateTimeFormatter.ISO_INSTANT.format(instant)
+    }
+
+    override fun compareTo(other: UtcTimestamp): Int {
+        return instant.compareTo(other.instant)
+    }
+
+    // Format with a custom pattern
+    fun format(pattern: String, zoneId: ZoneId = ZoneId.systemDefault()): String {
+        val formatter = DateTimeFormatter.ofPattern(pattern).withZone(zoneId)
+        return formatter.format(instant)
+    }
 
     companion object {
         fun now(): UtcTimestamp = UtcTimestamp(Instant.now())
+
+        // Parse from ISO-8601 string
+        fun parse(isoString: String): UtcTimestamp {
+            return UtcTimestamp(Instant.parse(isoString))
+        }
+
+        fun fromEpochMillis(epochMillis: Long): UtcTimestamp {
+            return UtcTimestamp(Instant.ofEpochMilli(epochMillis))
+        }
     }
 }

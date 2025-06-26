@@ -10,10 +10,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * Uses a periodic checking mechanism rather than per-item timers.
  */
 class InactivityBuffer<T>(
-    private val inactivityTimeoutMs: Long = 200,
+    private val inactivityTimeoutMs: Long = 50,
     private val checkIntervalMs: Long = 20,  // How often to check for inactivity
+    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val onBatchReady: suspend (items: List<T>) -> Unit,
-    private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) {
     private val buffer = mutableListOf<T>()
     private val mutex = Mutex()
