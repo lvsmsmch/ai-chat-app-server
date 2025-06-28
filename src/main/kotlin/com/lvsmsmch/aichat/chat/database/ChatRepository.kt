@@ -1,3 +1,5 @@
+// ============= UPDATED CHAT REPOSITORY =============
+
 package com.lvsmsmch.aichat.chat.database
 
 import com.lvsmsmch.aichat.character.database.CharacterDbo
@@ -7,41 +9,13 @@ import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.conversions.Bson
-import org.bson.types.ObjectId
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
-import java.util.*
-
-@Serializable
-enum class ChatType(val code: String) {
-    DIRECT("direct"),
-    GROUP("group")       /* For future. */
-}
-
-@Serializable
-data class ChatDbo(
-    @BsonId val id: String = ObjectId().toHexString(),
-    val clientId: String = UUID.randomUUID().toString(),
-    val lastModifiedAt: UtcTimestamp = UtcTimestamp.now(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val chatType: ChatType = ChatType.DIRECT,
-    val userId: String,
-    val characterIds: List<String> = listOf(),
-    val isChatMuted: Boolean = false,
-    val isDeleted: Boolean = false,
-    val deletedAt: UtcTimestamp = UtcTimestamp.now(),
-)
 
 class ChatRepository(
     private val collection: CoroutineCollection<ChatDbo>
 ) {
-
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -50,15 +24,19 @@ class ChatRepository(
     private fun initializeIndexes() {
         runBlocking {
             collection.ensureIndex(ascending(ChatDbo::userId))
-//            collection.ensureIndex(ascending("${ChatDbo::characters.name}.${CharacterInfo::id.name}"))
+            collection.ensureIndex(ascending(ChatDbo::clientId))
+            collection.ensureIndex(
+                ascending(
+                    ChatDbo::userId,
+                    ChatDbo::lastModifiedAt
+                )
+            )
         }
     }
 
-
     /**
-     * FLOW
+     * FLOW для мониторинга изменений (если понадобится в будущем)
      */
-
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
     fun collectAllEventsForUserId(userId: String): Flow<DatabaseEvent<ChatDbo>> {
@@ -68,14 +46,57 @@ class ChatRepository(
     /**
      * CREATE
      */
-
     suspend fun insertChat(chatDbo: ChatDbo) {
         collection.insertOne(chatDbo)
     }
 
     /**
-     * READ
+     * READ - основные методы
      */
+    suspend fun getChatById(chatId: String): ChatDbo? {
+        return collection.findOneById(chatId)
+    }
+
+    suspend fun getChatByClientId(clientId: String): ChatDbo? {
+        return collection.findOne(ChatDbo::clientId eq clientId)
+    }
+
+    suspend fun getChatsByUserId(userId: String): List<ChatDbo> {
+        return collection.find(
+            and(
+                ChatDbo::userId eq userId,
+                ChatDbo::isDeleted eq false
+            )
+        ).sort(descending(ChatDbo::lastModifiedAt)).toList()
+    }
+
+    /**
+     * READ - методы для синхронизации по времени
+     */
+    suspend fun getChatsByUserIdAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
+        return collection.find(
+            and(
+                ChatDbo::userId eq userId,
+                or(
+                    // Новые чаты
+                    and(
+                        ChatDbo::createdAt gt timestamp,
+                        ChatDbo::isDeleted eq false
+                    ),
+                    // Обновленные чаты
+                    and(
+                        ChatDbo::lastModifiedAt gt timestamp,
+                        ChatDbo::isDeleted eq false
+                    ),
+                    // Удаленные чаты
+                    and(
+                        ChatDbo::deletedAt gt timestamp,
+                        ChatDbo::isDeleted eq true
+                    )
+                )
+            )
+        ).sort(descending(ChatDbo::lastModifiedAt)).toList()
+    }
 
     suspend fun getChatsCreatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
         return collection.find(
@@ -87,7 +108,6 @@ class ChatRepository(
         ).toList()
     }
 
-    // Получить чаты, обновленные (но не созданные) после timestamp
     suspend fun getChatsUpdatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
         return collection.find(
             and(
@@ -99,7 +119,6 @@ class ChatRepository(
         ).toList()
     }
 
-    // Получить ID чатов, удаленных после timestamp
     suspend fun getDeletedChatIdsAfter(userId: String, timestamp: UtcTimestamp): List<String> {
         return collection.find(
             and(
@@ -107,29 +126,12 @@ class ChatRepository(
                 ChatDbo::deletedAt gt timestamp,
                 ChatDbo::isDeleted eq true
             )
-        ).toList().map { it.id }
+        ).toList().map { it.clientId } // Возвращаем clientId для клиента
     }
 
-    suspend fun getChatById(chatId: String): ChatDbo? {
-        return collection.findOneById(chatId)
-    }
-
-    suspend fun getChatsByUserId(userId: String): List<ChatDbo> {
-        return collection.find(ChatDbo::userId eq userId).toList()
-    }
-
-    suspend fun getChatsByIds(chatIds: List<String>): List<ChatDbo> {
-        if (chatIds.isEmpty()) {
-            return emptyList()
-        }
-
-        return collection.find(ChatDbo::id.`in`(chatIds)).toList()
-    }
-
-    suspend fun getAllNonDeletedChats(): List<ChatDbo> {
-        return collection.find(ChatDbo::isDeleted eq false).toList()
-    }
-
+    /**
+     * READ - поиск и валидация
+     */
     suspend fun findChatByUserAndCharacter(
         userId: String,
         characterId: String,
@@ -145,6 +147,23 @@ class ChatRepository(
         )
     }
 
+    suspend fun findGroupChatByUserAndCharacters(
+        userId: String,
+        characterIds: List<String>
+    ): ChatDbo? {
+        // Для группового чата проверяем точное совпадение списка персонажей
+        val sortedCharacterIds = characterIds.sorted()
+        return collection.find(
+            and(
+                ChatDbo::userId eq userId,
+                ChatDbo::chatType eq ChatType.GROUP,
+                ChatDbo::isDeleted eq false
+            )
+        ).toList().find { chat ->
+            chat.characterIds.sorted() == sortedCharacterIds
+        }
+    }
+
     suspend fun doAllChatsBelongToUser(chatIds: List<String>, userId: String): Boolean {
         if (chatIds.isEmpty()) return true
 
@@ -156,6 +175,20 @@ class ChatRepository(
         ).toInt()
 
         return matchingCount == chatIds.size
+    }
+
+    /**
+     * READ - вспомогательные методы
+     */
+    suspend fun getChatsByIds(chatIds: List<String>): List<ChatDbo> {
+        if (chatIds.isEmpty()) {
+            return emptyList()
+        }
+        return collection.find(ChatDbo::id.`in`(chatIds)).toList()
+    }
+
+    suspend fun getAllNonDeletedChats(): List<ChatDbo> {
+        return collection.find(ChatDbo::isDeleted eq false).toList()
     }
 
     /**
@@ -194,32 +227,6 @@ class ChatRepository(
             )
         }
     }
-
-//    suspend fun updateLastMessageInChat(
-//        chatId: String,
-//        message: MessageDbo?
-//    ) {
-//        collection.updateOneById(
-//            chatId,
-//            combine(
-//                setValue(ChatDbo::lastMessage, message),
-//                setValue(ChatDbo::updatedAt, UtcTimestamp.now())
-//            )
-//        )
-//    }
-//
-//    suspend fun updateUnreadMessagesCountInChat(
-//        chatId: String,
-//        unreadMessageCount: Int
-//    ) {
-//        collection.updateOneById(
-//            chatId,
-//            combine(
-//                setValue(ChatDbo::unreadMessageCount, unreadMessageCount),
-//                setValue(ChatDbo::updatedAt, UtcTimestamp.now())
-//            )
-//        )
-//    }
 
     /**
      * DELETE

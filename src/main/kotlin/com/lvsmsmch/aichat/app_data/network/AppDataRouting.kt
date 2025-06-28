@@ -14,7 +14,7 @@ fun Routing.configureAppDataRouting(
                 "http://localhost:8080/images/2.jpg",
                 "http://localhost:8080/images/3.jpg",
             )
-            call.respondSuccess(imageUrls)
+            call.respondSuccess(data = PaywallImagesResponse(imageUrls))
         }
 
     }

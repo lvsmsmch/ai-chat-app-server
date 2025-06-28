@@ -1,25 +1,16 @@
 package com.lvsmsmch.aichat.utils
 
-import com.lvsmsmch.aichat.db.auth.attempts.EnterLoginCodeAttemptsTracker
-import com.lvsmsmch.aichat.db.auth.attempts.EnterRegistrationCodeAttemptsTracker
-import com.lvsmsmch.aichat.db.auth.attempts.LoginAttemptsTracker
-import com.lvsmsmch.aichat.db.auth.attempts.RegistrationAttemptsTracker
-import com.lvsmsmch.aichat.db.auth.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.db.auth.tokens.single_use_tokens.RegistrationCompletionTokenRepository
-import com.lvsmsmch.aichat.db.auth.tokens.single_use_tokens.SetNewPasswordTokenRepository
-import com.lvsmsmch.aichat.db.auth.verification_codes.LoginCodesRepository
-import com.lvsmsmch.aichat.db.auth.verification_codes.RegistrationCodesRepository
 import com.lvsmsmch.aichat.db.content.*
-import com.lvsmsmch.aichat.auth.network.email.login.configureLoginRouting
+import com.lvsmsmch.aichat._trash.login.configureLoginRouting
 import com.lvsmsmch.aichat.auth.network.google.configureGoogleRouting
-import com.lvsmsmch.aichat.auth.network.email.login.configureVerifyLoginCodeRouting
+import com.lvsmsmch.aichat._trash.login.configureVerifyLoginCodeRouting
 import com.lvsmsmch.aichat.auth.network.logout.configureLogoutRouting
-import com.lvsmsmch.aichat.auth.network.email.password_reset.configurePasswordResetRouting
-import com.lvsmsmch.aichat.auth.network.email.password_reset.configureSetNewPasswordRouting
-import com.lvsmsmch.aichat.auth.network.email.password_reset.configureVerifyPasswordResetRouting
-import com.lvsmsmch.aichat.auth.network.email.register.configureCompleteRegistrationRouting
-import com.lvsmsmch.aichat.auth.network.email.register.configureRegistrationRouting
-import com.lvsmsmch.aichat.auth.network.email.register.configureVerifyRegistrationCodeRouting
+import com.lvsmsmch.aichat._trash.password_reset.configurePasswordResetRouting
+import com.lvsmsmch.aichat._trash.password_reset.configureSetNewPasswordRouting
+import com.lvsmsmch.aichat._trash.password_reset.configureVerifyPasswordResetRouting
+import com.lvsmsmch.aichat._trash.register.configureCompleteRegistrationRouting
+import com.lvsmsmch.aichat._trash.register.configureRegistrationRouting
+import com.lvsmsmch.aichat._trash.register.configureVerifyRegistrationCodeRouting
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
@@ -66,16 +57,6 @@ fun Application.configureRouting(
     chatRepository: ChatRepository,
     messageRepository: MessageRepository,
     reviewRepository: ReviewRepository,
-    sessionRepository: SessionRepository,
-    enterLoginCodeAttemptsTracker: EnterLoginCodeAttemptsTracker,
-    enterRegistrationCodeAttemptsTracker: EnterRegistrationCodeAttemptsTracker,
-    loginAttemptsTracker: LoginAttemptsTracker,
-    registrationAttemptsTracker: RegistrationAttemptsTracker,
-    registrationCompletionTokenRepository: RegistrationCompletionTokenRepository,
-    setNewPasswordTokenRepository: SetNewPasswordTokenRepository,
-    passwordResetTokenRepository: com.lvsmsmch.aichat.auth.database.tokens.verification_tokens.PasswordResetTokenRepository,
-    loginCodesRepository: LoginCodesRepository,
-    registrationCodesRepository: RegistrationCodesRepository
 ) {
     routing {
         post("/test") {
@@ -251,12 +232,6 @@ fun Application.configureRouting(
         configureChatWebSocketRouting(
             sessionRepository = sessionRepository,
             messageRepository = messageRepository,
-            chatRepository = chatRepository,
-            mapper = mapper
-        )
-
-        configureChatsWebSocketRouting(
-            sessionRepository = sessionRepository,
             chatRepository = chatRepository,
             mapper = mapper
         )

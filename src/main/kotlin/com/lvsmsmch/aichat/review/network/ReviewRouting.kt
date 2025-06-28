@@ -15,7 +15,7 @@ import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
+import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
 fun Routing.configureReviewRouting(
@@ -31,66 +31,69 @@ fun Routing.configureReviewRouting(
 ) {
     route("/reviews") {
 
+        /**
+         * POST /reviews
+         * Создание нового отзыва
+         */
         post {
             val sessionDbo = sessionRepository.verifyToken(call)
+            val request = call.receive<CreateReviewRequest>()
 
-            val characterId = call.request.queryParameters["characterId"]
-                ?: throw BadRequestException("Missing characterId parameter")
+            characterRepository.getCharacter(request.characterId)
+                ?: throw CharacterNotFoundException(id = request.characterId)
 
-            val rating = call.request.queryParameters["rating"]?.toInt()
-                ?: throw BadRequestException("Missing rating parameter")
-
-            val text = call.request.queryParameters["text"] ?: ""
-
-            characterRepository.getCharacter(characterId)
-                ?: throw CharacterNotFoundException(id = characterId)
-
-            if (reviewRepository.getReview(userId = sessionDbo.userId, characterId = characterId) != null) {
+            if (reviewRepository.getReview(userId = sessionDbo.userId, characterId = request.characterId) != null) {
                 throw AlreadyReviewedException()
             }
 
-            validateReviewRating(rating)
-            validateReviewText(text)
+            validateReviewRating(request.rating)
+            validateReviewText(request.text)
 
             val reviewDbo = ReviewDbo(
                 id = idGenerator.generateId(EntityType.REVIEW),
-                characterId = characterId,
+                characterId = request.characterId,
                 isAnonymous = false,
                 createdAt = UtcTimestamp.now(),
                 authorId = sessionDbo.userId,
-                rating = rating,
-                text = text
+                rating = request.rating,
+                text = request.text
             ).also { reviewRepository.addReview(it) }
 
             characterActivityLogRepository.logActivity(
                 activityType = ActivityType.REVIEW_ADDED,
-                characterId = characterId,
+                characterId = request.characterId,
                 userId = sessionDbo.userId
             )
 
             call.respondSuccess(data = reviewDbo.toReviewDto(mapper))
         }
 
+        /**
+         * GET /reviews
+         * Получение списка отзывов с пагинацией
+         */
         get {
-            val characterId = call.request.queryParameters["characterId"]
-                ?: throw BadRequestException("Missing characterId parameter")
-            val sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0
-            val cursor = call.request.queryParameters["cursor"] // timestamp строка
-            val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
-
-            require(size in 1..50) { "Size must be between 1 and 50" }
-            validateReviewSortCriteria(sortCriteria)
-
-            val beforeTime = cursor?.let { UtcTimestamp.parse(it) }
-
-            val reviewsDbos = reviewRepository.getReviews(
-                characterId = characterId,
-                sortCriteria = sortCriteria,
-                beforeTime = beforeTime,
-                size = size + 1 // +1 для проверки hasMore
+            val request = GetReviewsRequest(
+                characterId = call.request.queryParameters["characterId"]
+                    ?: throw ValidationException("Missing characterId parameter"),
+                sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0,
+                cursor = call.request.queryParameters["cursor"],
+                size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
             )
 
-            val hasMore = reviewsDbos.size > size
+            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            validateReviewSortCriteria(request.sortCriteria)
+
+            val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }
+
+            val reviewsDbos = reviewRepository.getReviews(
+                characterId = request.characterId,
+                sortCriteria = request.sortCriteria,
+                beforeTime = beforeTime,
+                size = request.size + 1 // +1 для проверки hasMore
+            )
+
+            val hasMore = reviewsDbos.size > request.size
             val reviewsToReturn = if (hasMore) reviewsDbos.dropLast(1) else reviewsDbos
 
             val reviews = reviewsToReturn.map { it.toReviewDto(mapper) }
@@ -105,11 +108,15 @@ fun Routing.configureReviewRouting(
             call.respondSuccess(data = response)
         }
 
+        /**
+         * PATCH /reviews/{id}
+         * Обновление отзыва
+         */
         patch("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
-
             val reviewId = call.parameters["id"]
-                ?: throw BadRequestException("Missing id parameter")
+                ?: throw ValidationException("Missing id parameter")
+            val request = call.receive<UpdateReviewRequest>()
 
             val reviewDbo = reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -118,28 +125,26 @@ fun Routing.configureReviewRouting(
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this review")
             }
 
-            val rating = call.request.queryParameters["rating"]?.toInt()
-                ?: throw BadRequestException("Missing rating parameter")
-
-            val text = call.request.queryParameters["text"] ?: ""
-
-            validateReviewRating(rating)
-            validateReviewText(text)
+            validateReviewRating(request.rating)
+            validateReviewText(request.text)
 
             reviewRepository.updateReview(
                 id = reviewId,
-                rating = rating,
-                text = text
+                rating = request.rating,
+                text = request.text
             )
 
             call.respondSuccess()
         }
 
+        /**
+         * DELETE /reviews/{id}
+         * Удаление отзыва
+         */
         delete("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
-
             val reviewId = call.parameters["id"]
-                ?: throw BadRequestException("Missing reviewId parameter")
+                ?: throw ValidationException("Missing reviewId parameter")
 
             val reviewDbo = reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -153,33 +158,37 @@ fun Routing.configureReviewRouting(
             call.respondSuccess()
         }
 
+        /**
+         * POST /reviews/{id}/report
+         * Жалоба на отзыв
+         */
         post("/{id}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
-
             val reviewId = call.parameters["id"]
-                ?: throw BadRequestException("Missing reviewId parameter")
-
-            val reason = call.request.queryParameters["reason"]
-                ?: throw BadRequestException("Missing reason parameter")
-
-            val text = call.request.queryParameters["text"] ?: ""
+                ?: throw ValidationException("Missing reviewId parameter")
+            val request = call.receive<ReportReviewRequest>()
 
             reportRepository.addReport(
                 ReportDbo(
                     reportedBy = currentUserId,
                     entityType = ReportEntity.Review.code,
                     entityId = reviewId,
-                    reason = reason,
-                    text = text
+                    reason = request.reason,
+                    text = request.text
                 )
             )
 
             call.respondSuccess()
         }
 
+        /**
+         * POST /reviews/{id}/like
+         * Лайк отзыва
+         */
         post("/{id}/like") {
             val sessionDbo = sessionRepository.verifyToken(call)
-            val reviewId = call.parameters["id"] ?: throw BadRequestException("Missing reviewId parameter")
+            val reviewId = call.parameters["id"]
+                ?: throw ValidationException("Missing reviewId parameter")
 
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -189,9 +198,14 @@ fun Routing.configureReviewRouting(
             call.respondSuccess()
         }
 
+        /**
+         * POST /reviews/{id}/unlike
+         * Убрать лайк с отзыва
+         */
         post("/{id}/unlike") {
             val sessionDbo = sessionRepository.verifyToken(call)
-            val reviewId = call.parameters["id"] ?: throw BadRequestException("Missing reviewId parameter")
+            val reviewId = call.parameters["id"]
+                ?: throw ValidationException("Missing reviewId parameter")
 
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -201,16 +215,23 @@ fun Routing.configureReviewRouting(
             call.respondSuccess()
         }
 
-        get("/{id}/likes") {    // not needed
+        /**
+         * GET /reviews/{id}/likes
+         * Получение пользователей, лайкнувших отзыв
+         */
+        get("/{id}/likes") {
             sessionRepository.verifyToken(call)
-            val reviewId = call.parameters["id"] ?: throw BadRequestException("Missing reviewId parameter")
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
+            val reviewId = call.parameters["id"]
+                ?: throw ValidationException("Missing reviewId parameter")
+            val request = GetReviewLikesRequest(
+                limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
+            )
 
-            val userIds = reviewLikeRepository.getUsersWhoLiked(reviewId, limit)
+            val userIds = reviewLikeRepository.getUsersWhoLiked(reviewId, request.limit)
             val users = userIds.mapNotNull { userRepository.getUserById(it) }
                 .map { it.toUserDto(mapper) }
 
-            call.respondSuccess(data = users)
+            call.respondSuccess(data = ReviewLikesResponse(users = users))
         }
     }
 }

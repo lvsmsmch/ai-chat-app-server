@@ -13,7 +13,6 @@ import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import java.io.File
@@ -27,12 +26,16 @@ fun Routing.configureUserRouting(
     mapper: Mapper
 ) {
     route("/users") {
-        
+
+        /**
+         * GET /users/{userId}
+         * Получение основной информации о пользователе
+         */
         get("/{userId}") {
             sessionRepository.verifyToken(call)
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
             val userDbo = userRepository.getUserById(userId)
                 ?: throw UserNotFoundException(id = userId)
@@ -40,29 +43,48 @@ fun Routing.configureUserRouting(
             call.respondSuccess(data = userDbo.toUserDto(mapper))
         }
 
+        /**
+         * GET /users/{userId}/details
+         * Получение детальной информации о пользователе
+         */
         get("/{userId}/details") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
             val userDbo = userRepository.getUserById(userId)
                 ?: throw UserNotFoundException(id = userId)
 
-            val isFollowing = followRepository.doesConnectionExist(currentUserId, userId)
-            val userDetails = userDbo.toUserDetailsDto(mapper, isDemanderFollowingThisUser = isFollowing)
+            val userDetails = userDbo.toUserDetailsDto(mapper, demanderId = currentUserId)
             call.respondSuccess(data = userDetails)
         }
 
+        /**
+         * GET /users/{userId}/characters
+         * Получение персонажей пользователя
+         */
+// Заменить эндпоинт GET /users/{userId}/characters в UserRouting.kt:
+
+        /**
+         * GET /users/{userId}/characters
+         * Получение персонажей пользователя с поддержкой курсорной пагинации
+         */
         get("/{userId}/characters") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
-            val visibility = call.request.queryParameters["visibility"]?.toIntOrNull()
+            val request = GetUserCharactersRequest(
+                visibility = call.request.queryParameters["visibility"]?.toIntOrNull(),
+                cursor = call.request.queryParameters["cursor"],
+                size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
+                useCursor = call.request.queryParameters["useCursor"]?.toBooleanStrictOrNull() ?: false
+            )
 
-            visibility?.let { validateCharacterVisibility(it) }
+            request.visibility?.let { validateCharacterVisibility(it) }
+            require(request.size in 1..50) { "Size must be between 1 and 50" }
 
             if (userRepository.getUserById(userId) == null) {
                 throw UserNotFoundException(id = userId)
@@ -70,34 +92,66 @@ fun Routing.configureUserRouting(
 
             val isOwner = currentUserId == userId
 
-            val charactersDbo = characterRepository.getCharacters(
-                sortCriteria = CharacterSortCriteria.NEWEST.code,
-                page = 0,
-                size = 1000,
-                authorId = userId,
-                visibilityFilter = if (isOwner) visibility else CharacterVisibility.PUBLIC.code
-            )
-            val charactersDto = charactersDbo.map { it.toCharacterDto(mapper) }
-            call.respondSuccess(charactersDto)
+            if (request.useCursor) {
+                // Новая курсорная пагинация
+                val result = characterRepository.getUserCharactersWithCursor(
+                    userId = userId,
+                    includePrivate = isOwner,
+                    visibility = if (isOwner) request.visibility else CharacterVisibility.PUBLIC.code,
+                    cursor = request.cursor,
+                    size = request.size
+                )
+
+                val charactersDto = result.items.map { it.toCharacterDto(mapper) }
+                val response = UserCharactersResponse(
+                    characters = charactersDto,
+                    nextCursor = result.nextCursor,
+                    hasMore = result.hasMore
+                )
+                call.respondSuccess(data = response)
+            } else {
+                // Старая пагинация для backward compatibility
+                val charactersDbo = characterRepository.getCharacters(
+                    sortCriteria = CharacterSortCriteria.NEWEST.code,
+                    page = 0,
+                    size = 1000, // Возвращаем все для совместимости
+                    authorId = userId,
+                    visibilityFilter = if (isOwner) request.visibility else CharacterVisibility.PUBLIC.code
+                )
+                val charactersDto = charactersDbo.map { it.toCharacterDto(mapper) }
+                val response = UserCharactersResponse(
+                    characters = charactersDto,
+                    nextCursor = null,
+                    hasMore = false
+                )
+                call.respondSuccess(data = response)
+            }
         }
 
+        /**
+         * GET /users/{userId}/followers
+         * Получение подписчиков пользователя
+         */
         get("/{userId}/followers") {
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
-            val cursor = call.request.queryParameters["cursor"] // timestamp строка
-            val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
+                ?: throw ValidationException("Missing userId parameter")
 
-            require(size in 1..50) { "Size must be between 1 and 50" }
+            val request = GetFollowersRequest(
+                cursor = call.request.queryParameters["cursor"],
+                size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
+            )
 
-            val beforeTime = cursor?.let { UtcTimestamp.parse(it) }
+            require(request.size in 1..50) { "Size must be between 1 and 50" }
+
+            val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }
 
             val followsDbos = followRepository.getFollowers(
                 userId = userId,
                 beforeTime = beforeTime,
-                size = size + 1
+                size = request.size + 1
             )
 
-            val hasMore = followsDbos.size > size
+            val hasMore = followsDbos.size > request.size
             val followersToReturn = if (hasMore) followsDbos.dropLast(1) else followsDbos
 
             val followers = followersToReturn.mapNotNull {
@@ -119,23 +173,30 @@ fun Routing.configureUserRouting(
             call.respondSuccess(data = response)
         }
 
+        /**
+         * GET /users/{userId}/following
+         * Получение подписок пользователя
+         */
         get("/{userId}/following") {
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
-            val cursor = call.request.queryParameters["cursor"] // timestamp строка
-            val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
+                ?: throw ValidationException("Missing userId parameter")
 
-            require(size in 1..50) { "Size must be between 1 and 50" }
+            val request = GetFollowingRequest(
+                cursor = call.request.queryParameters["cursor"],
+                size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
+            )
 
-            val beforeTime = cursor?.let { UtcTimestamp.parse(it) }
+            require(request.size in 1..50) { "Size must be between 1 and 50" }
+
+            val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }
 
             val followsDbos = followRepository.getFollowings(
                 userId = userId,
                 beforeTime = beforeTime,
-                size = size + 1
+                size = request.size + 1
             )
 
-            val hasMore = followsDbos.size > size
+            val hasMore = followsDbos.size > request.size
             val followingToReturn = if (hasMore) followsDbos.dropLast(1) else followsDbos
 
             val following = followingToReturn.mapNotNull {
@@ -157,10 +218,15 @@ fun Routing.configureUserRouting(
             call.respondSuccess(data = response)
         }
 
+        /**
+         * PATCH /users/{userId}
+         * Обновление профиля пользователя (multipart/form-data)
+         */
         patch("/{userId}") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
-            val userId = call.parameters["userId"] ?: throw BadRequestException("Missing userId parameter")
+            val userId = call.parameters["userId"]
+                ?: throw ValidationException("Missing userId parameter")
 
             if (userId != sessionDbo.userId) {
                 throw ForbiddenException("You can only edit your own profile")
@@ -169,7 +235,7 @@ fun Routing.configureUserRouting(
             // Check content type to ensure it's multipart/form-data
             val contentType = call.request.contentType()
             if (!contentType.match(ContentType.MultiPart.FormData)) {
-                throw BadRequestException("Content-Type must be multipart of form data")
+                throw ValidationException("Content-Type must be multipart of form data")
             }
 
             // Process multipart form data
@@ -226,19 +292,27 @@ fun Routing.configureUserRouting(
                 profilePictureUrl = profilePictureUrl,
             )
 
-            call.respondSuccess()
+            val updatedUser = userRepository.getUserById(userId)
+                ?: throw UserNotFoundException()
+
+
+            call.respondSuccess(data = updatedUser.toUserDto(mapper))
         }
 
+        /**
+         * POST /users/{userId}/follow
+         * Подписка на пользователя
+         */
         post("/{userId}/follow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
             userRepository.getUserById(userId) ?: throw UserNotFoundException(userId)
 
             if (currentUserId == userId) {
-                throw BadRequestException("Cannot follow yourself")
+                throw ValidationException("Cannot follow yourself")
             }
 
             followRepository.addConnection(followerId = currentUserId, followeeId = userId)
@@ -246,16 +320,20 @@ fun Routing.configureUserRouting(
             call.respondSuccess()
         }
 
+        /**
+         * POST /users/{userId}/unfollow
+         * Отписка от пользователя
+         */
         post("/{userId}/unfollow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
             userRepository.getUserById(userId) ?: throw UserNotFoundException(userId)
 
             if (currentUserId == userId) {
-                throw BadRequestException("Cannot unfollow yourself")
+                throw ValidationException("Cannot unfollow yourself")
             }
 
             followRepository.removeConnection(followerId = currentUserId, followeeId = userId)
@@ -263,10 +341,15 @@ fun Routing.configureUserRouting(
             call.respondSuccess()
         }
 
+        /**
+         * DELETE /users/{userId}
+         * Удаление пользователя
+         */
         delete("/{userId}") {
-            val sessionDbo = verifyToken(sessionRepository)
+            val sessionDbo = sessionRepository.verifyToken(call)
 
-            val userId = call.parameters["userId"] ?: throw BadRequestException("Missing userId parameter")
+            val userId = call.parameters["userId"]
+                ?: throw ValidationException("Missing userId parameter")
 
             if (userId != sessionDbo.userId) {
                 throw ForbiddenException("You can only edit your own profile")
@@ -277,24 +360,25 @@ fun Routing.configureUserRouting(
             call.respondSuccess()
         }
 
+        /**
+         * POST /users/{userId}/report
+         * Жалоба на пользователя
+         */
         post("/{userId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw BadRequestException("Missing userId parameter")
+                ?: throw ValidationException("Missing userId parameter")
 
-            val reason = call.request.queryParameters["reason"]
-                ?: throw BadRequestException("Missing reason parameter")
-
-            val text = call.request.queryParameters["text"] ?: ""
+            val request = call.receive<ReportUserRequest>()
 
             reportRepository.addReport(
                 ReportDbo(
                     reportedBy = currentUserId,
                     entityType = ReportEntity.User.code,
                     entityId = userId,
-                    reason = reason,
-                    text = text
+                    reason = request.reason,
+                    text = request.text
                 )
             )
 

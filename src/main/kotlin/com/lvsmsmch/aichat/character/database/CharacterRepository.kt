@@ -10,34 +10,6 @@ import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 
 
-
-
-
-@Serializable
-data class CharacterDbo(
-    @BsonId val id: String = ObjectId().toHexString(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val authorId: String,
-    val name: String,
-    val description: String,
-    val prompt: String,
-    val picUrl: String,
-    val visibility: Int,
-    val category: String,
-    val tags: List<String>,
-    val totalChats: Int = 0,
-    val totalMessages: Int = 0,
-    val totalReviews: Int = 0,
-    val averageRating: Float = 0f,
-    val trendingScore: Float = 0f,
-    val trendingScoreUpdatedAt: UtcTimestamp? = null,
-    val recommendationScore: Float = 0f,
-    val recommendationScoreUpdatedAt: UtcTimestamp? = null,
-    val coOccurrenceScore: Map<String, Float> = emptyMap(),
-    val coOccurrenceScoreUpdatedAt: UtcTimestamp? = null,
-    val isDeleted: Boolean = false,
-)
-
 class CharacterRepository(
     private val collection: CoroutineCollection<CharacterDbo>
 ) {
@@ -188,6 +160,71 @@ class CharacterRepository(
         return collection.find(filters).toList()
     }
 
+    suspend fun getUserCharactersWithCursor(
+        userId: String,
+        includePrivate: Boolean = false,
+        visibility: Int? = null,
+        cursor: String? = null,
+        size: Int = 10
+    ): CursorResult<CharacterDbo> {
+        val beforeTime = cursor?.let { UtcTimestamp.parse(it) }
+
+        val filters = and(
+            CharacterDbo::authorId eq userId,
+            if (includePrivate) {
+                if (visibility != null) {
+                    CharacterDbo::visibility eq visibility
+                } else {
+                    EMPTY_BSON
+                }
+            } else {
+                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
+            },
+            CharacterDbo::isDeleted eq false,
+            if (beforeTime != null) {
+                CharacterDbo::createdAt lt beforeTime
+            } else {
+                EMPTY_BSON
+            }
+        )
+
+        val characters = collection.find(filters)
+            .sort(descending(CharacterDbo::createdAt))
+            .limit(size + 1)
+            .toList()
+
+        val hasMore = characters.size > size
+        val items = if (hasMore) characters.dropLast(1) else characters
+        val nextCursor = if (hasMore) items.lastOrNull()?.createdAt?.toString() else null
+
+        return CursorResult(
+            items = items,
+            nextCursor = nextCursor,
+            hasMore = hasMore
+        )
+    }
+
+    // Также добавить data class для результата:
+    data class CursorResult<T>(
+        val items: List<T>,
+        val nextCursor: String?,
+        val hasMore: Boolean
+    ) {
+        companion object {
+            fun <T> empty(): CursorResult<T> = CursorResult(
+                items = emptyList(),
+                nextCursor = null,
+                hasMore = false
+            )
+
+            fun <T> single(item: T): CursorResult<T> = CursorResult(
+                items = listOf(item),
+                nextCursor = null,
+                hasMore = false
+            )
+        }
+    }
+
     suspend fun countCharactersByUserId(
         userId: String,
         visibility: CharacterVisibility
@@ -254,6 +291,7 @@ class CharacterRepository(
         name: String? = null,
         description: String? = null,
         prompt: String? = null,
+        initialMessage: String? = null,
         visibility: Int? = null,
         pictureUrl: String? = null,
         category: CharacterCategory? = null,
@@ -264,6 +302,7 @@ class CharacterRepository(
         name?.let { updates.add(setValue(CharacterDbo::name, it)) }
         description?.let { updates.add(setValue(CharacterDbo::description, it)) }
         prompt?.let { updates.add(setValue(CharacterDbo::prompt, it)) }
+        initialMessage?.let { updates.add(setValue(CharacterDbo::initialMessage, it)) }
         visibility?.let { updates.add(setValue(CharacterDbo::visibility, it)) }
         pictureUrl?.let { updates.add(setValue(CharacterDbo::picUrl, it)) }
         category?.let { updates.add(setValue(CharacterDbo::category, it.code)) }

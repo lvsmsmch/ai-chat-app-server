@@ -12,7 +12,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
+import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -26,18 +26,18 @@ fun Routing.configureAuthRouting(
 ) {
     route("/auth") {
 
+        /**
+         * POST /auth/google
+         * Авторизация через Google OAuth
+         */
         post("/google") {
-            val deviceId = call.request.queryParameters["deviceId"]
-                ?: throw BadRequestException("Missing deviceId parameter")
-            
-            val googleToken = call.request.queryParameters["googleToken"]
-                ?: throw BadRequestException("Missing googleToken parameter")
+            val request = call.receive<GoogleAuthRequest>()
 
-            validateDeviceId(deviceId)
+            validateDeviceId(request.deviceId)
 
             // Получаем данные пользователя из Google
             val oauthUserData = HttpClient().use { client ->
-                val apiUrl = "https://oauth2.googleapis.com/tokeninfo?id_token=${googleToken}"
+                val apiUrl = "https://oauth2.googleapis.com/tokeninfo?id_token=${request.googleToken}"
                 val response = client.get(apiUrl)
                 if (response.status != HttpStatusCode.OK) {
                     application.log.error(
@@ -59,7 +59,7 @@ fun Routing.configureAuthRouting(
             }
 
             val userDbo = userRepository.findByGoogleId(oauthUserData.id)
-                ?: userRepository.findByDeviceId(deviceId)?.let {
+                ?: userRepository.findByDeviceId(request.deviceId)?.let {
                     userRepository.linkGoogleToUser(
                         userId = it.id,
                         googleId = oauthUserData.id,
@@ -84,21 +84,24 @@ fun Routing.configureAuthRouting(
                     userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
-                    userDetailsDto = userDbo.toUserDetailsDto(mapper, isDemanderFollowingThisUser = false),
+                    userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
                 )
             )
         }
 
+        /**
+         * POST /auth/guest
+         * Авторизация как гость
+         */
         post("/guest") {
-            val deviceId = call.request.queryParameters["deviceId"]
-                ?: throw BadRequestException("Missing deviceId parameter")
+            val request = call.receive<GuestAuthRequest>()
 
-            validateDeviceId(deviceId)
+            validateDeviceId(request.deviceId)
 
-            val userDbo = userRepository.findByDeviceId(deviceId)
+            val userDbo = userRepository.findByDeviceId(request.deviceId)
                 ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
-                    deviceId = deviceId
+                    deviceId = request.deviceId
                 ).also { userRepository.addUser(it) }
 
             val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
@@ -108,11 +111,15 @@ fun Routing.configureAuthRouting(
                     userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
-                    userDetailsDto = userDbo.toUserDetailsDto(mapper, isDemanderFollowingThisUser = false),
+                    userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
                 )
             )
         }
 
+        /**
+         * POST /auth/logout
+         * Выход из системы
+         */
         post("/logout") {
             val sessionDbo = sessionRepository.verifyToken(call)
             sessionRepository.delete(sessionDbo.token)

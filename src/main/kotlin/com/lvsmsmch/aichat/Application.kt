@@ -104,6 +104,8 @@ fun Application.module() {
         chatRepository = chatRepository,
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
+        reviewLikeRepository = reviewLikeRepository,
+        followRepository = followRepository,
     )
 
     val repositoriesConnectionsJob = configureRepositoriesConnections(

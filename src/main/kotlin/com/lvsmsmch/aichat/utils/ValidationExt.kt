@@ -79,8 +79,14 @@ fun validateCharacterDescription(description: String) {
 }
 
 fun validateCharacterPrompt(prompt: String) {
-    if (prompt.isEmpty() || prompt.length > 1000) {
-        throw ValidationException("Prompt must be between 1 and 1000 characters")
+    if (prompt.isEmpty() || prompt.length > 2000) {
+        throw ValidationException("Prompt must be between 1 and 2000 characters")
+    }
+}
+
+fun validateCharacterInitialMessage(initialMessage: String) {
+    if (initialMessage.isEmpty() || initialMessage.length > 1000) {
+        throw ValidationException("initialMessage must be between 1 and 1000 characters")
     }
 }
 
@@ -148,6 +154,21 @@ fun validateCharacterPicture(pictureFile: File) {
         maxDimensionsPixels = 2000 to 2000,
         aspectRatio = 1.0f
     )
+}
+
+fun validateMessageText(messageText: String) {
+    if (messageText.length > 1000) {
+        throw ValidationException("Message is too long")
+    }
+}
+
+fun validateChatCharactersIdsSize(characterIdsSize: Int) {
+    if (characterIdsSize <= 0) {
+        throw ValidationException("Character IDs cannot be empty")
+    }
+    if (characterIdsSize > 10) {
+        throw ValidationException("You can't have more than 10 character in one group chat")
+    }
 }
 
 private fun validatePicture(

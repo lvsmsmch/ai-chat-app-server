@@ -12,10 +12,12 @@ import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.review.network.ReviewDto
 import com.lvsmsmch.aichat.user.database.AccountType
+import com.lvsmsmch.aichat.user.database.FollowRepository
 import com.lvsmsmch.aichat.user.database.UserDbo
 import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.user.network.UserDetailsDto
 import com.lvsmsmch.aichat.user.network.UserDto
+import com.lvsmsmch.aichat.user.network.UserFullInfoDto
 
 class Mapper(
     val userRepository: UserRepository,
@@ -24,6 +26,7 @@ class Mapper(
     val messageRepository: MessageRepository,
     val reviewRepository: ReviewRepository,
     val reviewLikeRepository: ReviewLikeRepository,
+    val followRepository: FollowRepository,
 )
 
 suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
@@ -37,7 +40,7 @@ suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
 
 suspend fun UserDbo.toUserDetailsDto(
     mapper: Mapper,
-    isDemanderFollowingThisUser: Boolean
+    demanderId: String
 ): UserDetailsDto {
     return UserDetailsDto(
         id = id,
@@ -48,7 +51,17 @@ suspend fun UserDbo.toUserDetailsDto(
         privateCharactersCount = privateCharacterCount,
         followersCount = followerCount,
         followingCount = followingCount,
-        isFollowing = isDemanderFollowingThisUser
+        isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id)
+    )
+}
+
+suspend fun UserDbo.toUserFullInfoDto(
+    mapper: Mapper,
+    demanderId: String
+): UserFullInfoDto {
+    return UserFullInfoDto(
+        user = toUserDto(mapper),
+        userDetails = toUserDetailsDto(mapper, demanderId),
     )
 }
 
@@ -106,7 +119,8 @@ suspend fun CharacterDbo.toCharacterDetailsDto(mapper: Mapper): CharacterDetails
 suspend fun CharacterDbo.toCharacterPrivateInfoDto(mapper: Mapper): CharacterPrivateInfoDto {
     return CharacterPrivateInfoDto(
         id = id,
-        prompt = prompt
+        prompt = prompt,
+        initialMessage = initialMessage
     )
 }
 
@@ -141,39 +155,39 @@ suspend fun ReviewDbo.toReviewDto(mapper: Mapper, currentUserId: String? = null)
     )
 }
 
-suspend fun ChatDbo.toAddedChatDto(mapper: Mapper): AddedChatDto {
-    return AddedChatDto(
+suspend fun ChatDbo.toChatDto(
+    mapper: Mapper
+): ChatDto {
+    val characters = characterIds.mapNotNull { charId ->
+        mapper.characterRepository.getCharacter(charId)?.toCharacterDto(mapper)
+    }
+
+    return ChatDto(
+        id = clientId,
+        chatType = chatType.code,
+        characters = characters,
+        isMuted = isChatMuted,
         createdAt = createdAt.toString(),
-        chatType = chatType.code,
-        characterIds = characterIds,
-        isChatMuted = isChatMuted,
+        updatedAt = lastModifiedAt.toString(),
     )
 }
 
-suspend fun ChatDbo.toUpdatedChatDto(mapper: Mapper): UpdatedChatDto {
-    return UpdatedChatDto(
-        chatType = chatType.code,
-        characterIds = characterIds,
-        isChatMuted = isChatMuted,
-    )
-}
+suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
+    val status = when (status) {
+        MessageStatus.COMPLETED.value -> MessageStatus.COMPLETED.value
+        MessageStatus.FAILED.value -> MessageStatus.FAILED.value
+        MessageStatus.STREAMING.value -> MessageStatus.STREAMING.value
+        else -> MessageStatus.COMPLETED.value
+    }
 
-suspend fun MessageDbo.toUpdatedMessageDto(mapper: Mapper): UpdatedMessageDto {
-    return UpdatedMessageDto(
-        messageId = clientId,
+    return MessageDto(
+        id = clientId,
+        chatId = chatClientId,
         text = text,
-        isRead = isRead,
-        completedStatus = completedStatus,
-    )
-}
-
-suspend fun MessageDbo.toAddedMessageDto(mapper: Mapper): AddedMessageDto {
-    return AddedMessageDto(
-        messageId = clientId,
-        createdAt = createdAt.toString(),
         senderId = senderId,
-        text = text,
+        isFromUser = isSentByUser,
+        createdAt = createdAt.toString(),
         isRead = isRead,
-        completedStatus = completedStatus,
+        status = status
     )
 }

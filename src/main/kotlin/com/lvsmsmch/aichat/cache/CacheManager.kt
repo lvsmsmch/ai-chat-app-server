@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.cache.database.*
 import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.character.database.CharacterVisibility
-import com.lvsmsmch.aichat.character.network.CachedCharactersResultDto
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 
 class CacheManager(

@@ -3,47 +3,14 @@ package com.lvsmsmch.aichat.chat.database
 import com.lvsmsmch.aichat.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.conversions.Bson
-import org.bson.types.ObjectId
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
-import java.util.*
 
-@Serializable
-enum class CompletedStatus(val code: String) {
-    NOT_COMPLETED("not_completed"),
-    COMPLETED("completed"),
-    FAILED("failed");
-}
-
-@Serializable
-data class MessageDbo(
-    @BsonId val id: String = ObjectId().toHexString(),
-    val clientId: String = UUID.randomUUID().toString(),
-    val lastModifiedAt: UtcTimestamp = UtcTimestamp.now(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val chatId: String,
-    val senderId: String,
-    val isSentByUser: Boolean = false,
-    val text: String,
-    val imageUrl: String? = null,
-    val isRead: Boolean = false,
-    val completedStatus: String,
-    val isCompleted: Boolean = false,
-    val isFailedToComplete: Boolean = false,
-    val isDeleted: Boolean = false,
-    val deletedAt: UtcTimestamp = UtcTimestamp.now(),
-)
 
 class MessageRepository(
     private val collection: CoroutineCollection<MessageDbo>
 ) {
-
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         runBlocking {
@@ -55,46 +22,126 @@ class MessageRepository(
                 )
             )
             collection.ensureIndex(MessageDbo::clientId)
+            collection.ensureIndex(MessageDbo::senderId)
         }
     }
 
-
     /**
-     * FLOW
+     * FLOW для стриминга обновлений сообщений
      */
-
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    fun collectAllEventsForUserId(userId: String): Flow<DatabaseEvent<MessageDbo>> {
-        return databaseEventsFlow.filter { it.latestObject.senderId == userId }
+    fun streamMessageUpdates(messageId: String): Flow<MessageUpdateEvent> {
+        return databaseEventsFlow
+            .filter { event ->
+                when (event) {
+                    is DatabaseEvent.Updated -> event.new.id == messageId
+                    else -> false
+                }
+            }
+            .map { event ->
+                val message = (event as DatabaseEvent.Updated).new
+                MessageUpdateEvent(
+                    messageId = message.id,
+                    newText = message.text,
+                    isComplete = message.status == MessageStatus.COMPLETED.value,
+                    isFailed = message.status == MessageStatus.FAILED.value
+                )
+            }
     }
 
-    fun collectAllEventsForChatIds(chatIds: List<String>): Flow<DatabaseEvent<MessageDbo>> {
-        return databaseEventsFlow.filter { event -> event.latestObject.chatId in chatIds }
-    }
-
-    fun collectAllEventsForChatId(chatId: String): Flow<DatabaseEvent<MessageDbo>> {
-        return databaseEventsFlow.filter { event -> event.latestObject.chatId == chatId }
-    }
+    data class MessageUpdateEvent(
+        val messageId: String,
+        val newText: String,
+        val isComplete: Boolean,
+        val isFailed: Boolean
+    )
 
     /**
      * CREATE
      */
-
     suspend fun insertMessage(messageDbo: MessageDbo) {
         collection.insertOne(messageDbo)
     }
 
     /**
-     * READ
+     * READ - основные методы
      */
+    suspend fun getMessageById(messageId: String): MessageDbo? {
+        return collection.findOneById(messageId)
+    }
+
+    suspend fun findByClientId(clientMessageId: String): MessageDbo? {
+        return collection.findOne(MessageDbo::clientId eq clientMessageId)
+    }
+
+    suspend fun getLastMessageInChat(chatId: String): MessageDbo? {
+        return collection.find(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::isDeleted eq false
+            )
+        ).sort(descending(MessageDbo::createdAt))
+            .limit(1)
+            .first()
+    }
+
+    suspend fun countUnreadMessagesInChat(chatId: String, userId: String): Int {
+        return collection.countDocuments(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::isRead eq false,
+                MessageDbo::senderId ne userId, // Не считаем собственные сообщения
+                MessageDbo::isDeleted eq false
+            )
+        ).toInt()
+    }
+
+    /**
+     * READ - методы для курсорной пагинации
+     */
+    suspend fun getMessagesPaginated(
+        chatId: String,
+        cursor: String? = null,
+        limit: Int = 50
+    ): List<MessageDbo> {
+        val baseFilter = and(
+            MessageDbo::chatId eq chatId,
+            MessageDbo::isDeleted eq false
+        )
+
+        val filter = if (cursor != null) {
+            val cursorMessage = findByClientId(cursor) ?: return emptyList()
+            and(baseFilter, MessageDbo::createdAt lt cursorMessage.createdAt)
+        } else {
+            baseFilter
+        }
+
+        return collection.find(filter)
+            .sort(descending(MessageDbo::createdAt))
+            .limit(limit)
+            .toList()
+    }
+
+    /**
+     * READ - методы для синхронизации по времени
+     */
+
+    suspend fun getMessagesCreatedBefore(chatId: String, timestamp: UtcTimestamp): List<MessageDbo> {
+        return collection.find(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt lt timestamp,
+                MessageDbo::isDeleted eq false
+            )
+        ).sort(ascending(MessageDbo::createdAt)).toList()
+    }
 
     suspend fun getMessagesCreatedAfter(chatId: String, timestamp: UtcTimestamp): List<MessageDbo> {
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
                 MessageDbo::createdAt gt timestamp,
-                MessageDbo::lastModifiedAt gt timestamp,
                 MessageDbo::isDeleted eq false
             )
         ).sort(ascending(MessageDbo::createdAt)).toList()
@@ -118,13 +165,95 @@ class MessageRepository(
                 MessageDbo::deletedAt gt timestamp,
                 MessageDbo::isDeleted eq true
             )
-        ).toList().map { it.id }
+        ).toList().map { it.clientId } // Возвращаем clientId для клиента
     }
 
-    suspend fun getMessageById(messageId: String): MessageDbo? {
-        return collection.findOneById(messageId)
+    /**
+     * READ - методы для умной синхронизации в диапазоне
+     */
+    suspend fun getMessagesUpdatedInRange(
+        chatId: String,
+        afterTimestamp: UtcTimestamp,
+        oldestTime: UtcTimestamp,
+        newestTime: UtcTimestamp
+    ): List<MessageDbo> {
+        return collection.find(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt gte oldestTime,
+                MessageDbo::createdAt lte newestTime,
+                MessageDbo::lastModifiedAt gt afterTimestamp,
+                MessageDbo::isDeleted eq false
+            )
+        ).sort(ascending(MessageDbo::createdAt)).toList()
     }
 
+    suspend fun getDeletedMessageIdsInRange(
+        chatId: String,
+        afterTimestamp: UtcTimestamp,
+        oldestTime: UtcTimestamp,
+        newestTime: UtcTimestamp
+    ): List<String> {
+        return collection.find(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt gte oldestTime,
+                MessageDbo::createdAt lte newestTime,
+                MessageDbo::deletedAt gt afterTimestamp,
+                MessageDbo::isDeleted eq true
+            )
+        ).toList().map { it.clientId }
+    }
+
+    suspend fun hasUpdatesBeforeTime(
+        chatId: String,
+        afterTimestamp: UtcTimestamp,
+        beforeTime: UtcTimestamp
+    ): Boolean {
+        return collection.countDocuments(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt lt beforeTime,
+                or(
+                    MessageDbo::lastModifiedAt gt afterTimestamp,
+                    and(
+                        MessageDbo::isDeleted eq true,
+                        MessageDbo::deletedAt gt afterTimestamp
+                    )
+                )
+            )
+        ) > 0
+    }
+
+    suspend fun hasMessagesAfterTime(chatId: String, afterTime: UtcTimestamp): Boolean {
+        return collection.countDocuments(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt gt afterTime,
+                MessageDbo::isDeleted eq false
+            )
+        ) > 0
+    }
+
+    suspend fun hasChangesAfter(chatId: String, timestamp: UtcTimestamp): Boolean {
+        return collection.countDocuments(
+            and(
+                MessageDbo::chatId eq chatId,
+                or(
+                    MessageDbo::createdAt gt timestamp,
+                    MessageDbo::lastModifiedAt gt timestamp,
+                    and(
+                        MessageDbo::isDeleted eq true,
+                        MessageDbo::deletedAt gt timestamp
+                    )
+                )
+            )
+        ) > 0
+    }
+
+    /**
+     * READ - вспомогательные методы
+     */
     suspend fun getAllMessagesByChatId(
         chatId: String,
         descending: Boolean = true,
@@ -140,62 +269,28 @@ class MessageRepository(
             .toList()
     }
 
-    suspend fun countMessagesInChat(chatId: String): Int {
-        return collection.countDocuments(MessageDbo::chatId eq chatId).toInt()
-    }
-
-    suspend fun countUnreadMessagesInChat(chatId: String): Int {
-        return collection.countDocuments(
-            and(
-                MessageDbo::chatId eq chatId,
-                MessageDbo::isRead eq false
-            )
-        ).toInt()
-    }
-
-    suspend fun getLastMessageInChat(chatId: String): MessageDbo? {
-        return collection.find(MessageDbo::chatId eq chatId)
-            .sort(descending(MessageDbo::createdAt))
-            .limit(1)
-            .first()
-    }
-
-    private suspend fun isMessageLastInItsChat(messageId: String): Boolean {
-        val chatId = getMessageById(messageId)?.chatId ?: return false
-        return getLastMessageInChat(chatId)?.id == messageId
-    }
-
-    suspend fun doAllMessagesBelongToChat(messageIds: List<String>, chatId: String): Boolean {
-        if (messageIds.isEmpty()) return true
-
-        // Count messages that match both the IDs and the chatId
-        val matchingCount = collection.countDocuments(
-            and(
-                MessageDbo::id.`in`(messageIds),
-                MessageDbo::chatId eq chatId
-            )
-        ).toInt()
-
-        // If all messages belong to the chat, the counts should match
-        return matchingCount == messageIds.size
+    suspend fun doAllMessageIdsBelongToChat(
+        chatId: String,
+        messageIds: List<String>
+    ): Boolean {
+        // todo
     }
 
     /**
      * UPDATE
      */
-
     suspend fun updateMessage(
         messageId: String,
         imageUrl: String? = null,
         isRead: Boolean? = null,
-        completedStatus: String? = null,
+        status: String? = null,
         text: String? = null,
     ) {
         collection.findOneById(messageId) ?: return
         val updates = mutableListOf<Bson>()
         imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
-        completedStatus?.let { updates.add(setValue(MessageDbo::completedStatus, it)) }
+        status?.let { updates.add(setValue(MessageDbo::status, it)) }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
         if (updates.isEmpty()) return // Nothing to update
         collection.updateOneById(
@@ -207,12 +302,40 @@ class MessageRepository(
         )
     }
 
+    suspend fun markMessagesAsRead(messageIds: List<String>, userId: String): Int {
+        if (messageIds.isEmpty()) return 0
+
+        val result = collection.updateMany(
+            and(
+                MessageDbo::clientId `in` messageIds,
+                MessageDbo::isRead eq false
+            ),
+            combine(
+                setValue(MessageDbo::isRead, true),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+            )
+        )
+
+        return result.modifiedCount.toInt()
+    }
 
     /**
      * DELETE
      */
-    suspend fun deleteMessage(messageId: String) {
-        deleteMessagesByIds(listOf(messageId))
+
+    suspend fun deleteMessagesByIds(chatId: String, messageIds: List<String>) {
+        if (messageIds.isEmpty()) return
+        collection.updateMany(
+            and(
+                MessageDbo::id `in` messageIds,
+                MessageDbo::chatId eq chatId,
+            ),
+            combine(
+                setValue(MessageDbo::isDeleted, true),
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+            )
+        )
     }
 
     suspend fun deleteMessagesByIds(messageIds: List<String>) {

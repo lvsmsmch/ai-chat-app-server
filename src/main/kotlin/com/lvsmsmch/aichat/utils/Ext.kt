@@ -1,8 +1,7 @@
 package com.lvsmsmch.aichat.utils
 
-import com.lvsmsmch.aichat.chat.network.ChatWsEvent
-import com.lvsmsmch.aichat.chat.network.ChatWsRequest
-import com.lvsmsmch.aichat.chat.network.PingPongMessage
+import com.lvsmsmch.aichat.auth.database.tokens.TokenDbo
+import com.lvsmsmch.aichat.auth.database.tokens.TokenRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -15,9 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
@@ -25,29 +21,10 @@ import java.security.SecureRandom
 import java.util.*
 import kotlin.random.Random
 
-
 val defaultJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
     encodeDefaults = true
-    serializersModule = SerializersModule {
-        polymorphic(ChatWsRequest::class) {
-            subclass(ChatWsRequest.SyncChatListRequest::class)
-            subclass(ChatWsRequest.AddChatRequest::class)
-            subclass(ChatWsRequest.UpdateChatRequest::class)
-            subclass(ChatWsRequest.DeleteChatRequest::class)
-        }
-        polymorphic(ChatWsEvent::class) {
-            subclass(ChatWsEvent.ChatAdded::class)
-            subclass(ChatWsEvent.ChatUpdated::class)
-            subclass(ChatWsEvent.ChatAddFailed::class)
-            subclass(ChatWsEvent.ChatDeleted::class)
-            subclass(ChatWsEvent.Error::class)
-        }
-        polymorphic(PingPongMessage::class) {
-            subclass(PingPongMessage.Ping::class)
-        }
-    }
 }
 
 suspend inline fun ApplicationCall.respondSuccess() {
@@ -168,8 +145,8 @@ fun Application.logStructuredError(
     this.log.error(Json.encodeToString(entry))
 }
 
-suspend fun <T : com.lvsmsmch.aichat.auth.database.tokens.TokenDbo> PipelineContext<Unit, ApplicationCall>.verifyToken(
-    tokenRepository: com.lvsmsmch.aichat.auth.database.tokens.TokenRepository<T>
+suspend fun <T : TokenDbo> PipelineContext<Unit, ApplicationCall>.verifyToken(
+    tokenRepository: TokenRepository<T>
 ): T {
     val authHeader = call.request.headers["Authorization"]
         ?: throw BadRequestException("Missing Authorization header")
