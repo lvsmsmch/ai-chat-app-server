@@ -22,6 +22,8 @@ import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat._common.database.ReportDbo
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat._trash.attempts.*
+import com.lvsmsmch.aichat.cache.database.DefaultRecommendationsCacheDbo
+import com.lvsmsmch.aichat.cache.database.DefaultRecommendationsCacheRepository
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.FollowDbo
@@ -68,53 +70,12 @@ fun configureCharacterActivityLogRepository(database: CoroutineDatabase): Charac
     )
 }
 
-fun configureDefaultRecommendationsRepository(database: CoroutineDatabase): DefaultRecommendationsRepository {
-    return DefaultRecommendationsRepository(
-        database.getCollection<DefaultRecommendationsDbo>("default_recommendations"),
+fun configureDefaultRecommendationsRepository(database: CoroutineDatabase): DefaultRecommendationsCacheRepository {
+    return DefaultRecommendationsCacheRepository(
+        database.getCollection<DefaultRecommendationsCacheDbo>("default_recommendations"),
     )
 }
 
 fun configureSessionRepository(database: CoroutineDatabase): SessionRepository {
     return SessionRepository(database.getCollection<SessionDbo>("sessions"))
 }
-
-fun configureEnterLoginCodeAttemptsTracker(database: CoroutineDatabase): EnterLoginCodeAttemptsTracker {
-    return EnterLoginCodeAttemptsTracker(database.getCollection<AttemptDbo>("EnterLoginCodeAttempts"))
-}
-
-fun configureEnterRegistrationCodeAttemptsTracker(database: CoroutineDatabase): EnterRegistrationCodeAttemptsTracker {
-    return EnterRegistrationCodeAttemptsTracker(database.getCollection<AttemptDbo>("EnterRegistrationCodeAttempts"))
-}
-
-fun configureLoginAttemptsTracker(database: CoroutineDatabase): LoginAttemptsTracker {
-    return LoginAttemptsTracker(database.getCollection<AttemptDbo>("LoginAttempts"))
-}
-
-fun configureRegistrationAttemptsTracker(database: CoroutineDatabase): RegistrationAttemptsTracker {
-    return RegistrationAttemptsTracker(database.getCollection<AttemptDbo>("RegistrationAttempts"))
-}
-
-fun configureRegistrationCompletionTokenRepository(database: CoroutineDatabase): RegistrationCompletionTokenRepository {
-    return RegistrationCompletionTokenRepository(database.getCollection<RegistrationCompletionTokenDbo>("RegistrationCompletionTokens"))
-}
-
-fun configureSetNewPasswordTokenRepository(database: CoroutineDatabase): SetNewPasswordTokenRepository {
-    return SetNewPasswordTokenRepository(database.getCollection<SetNewPasswordTokenDbo>("SetNewPasswordToken"))
-}
-
-fun configurePasswordResetTokenRepository(database: CoroutineDatabase): PasswordResetTokenRepository {
-    return PasswordResetTokenRepository(
-        database.getCollection<VerificationTokenDbo>(
-            "PasswordResetToken"
-        )
-    )
-}
-
-fun configureLoginCodesRepository(database: CoroutineDatabase): LoginCodesRepository {
-    return LoginCodesRepository(database.getCollection<VerificationCodeDbo>("LoginCodes"))
-}
-
-fun configureRegistrationCodesRepository(database: CoroutineDatabase): RegistrationCodesRepository {
-    return RegistrationCodesRepository(database.getCollection<VerificationCodeDbo>("RegistrationCodes"))
-}
-

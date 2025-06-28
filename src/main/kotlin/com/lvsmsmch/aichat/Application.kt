@@ -3,11 +3,26 @@ package com.lvsmsmch.aichat
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.database.EntityIdStatsDbo
 import com.lvsmsmch.aichat._common.database.EntityIdStatsRepository
+import com.lvsmsmch.aichat._common.database.ReportDbo
+import com.lvsmsmch.aichat._common.database.ReportRepository
+import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionDbo
+import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
+import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.cache.database.*
-import com.lvsmsmch.aichat.character.database.SearchSuggestionDbo
-import com.lvsmsmch.aichat.character.database.SearchSuggestionsRepository
+import com.lvsmsmch.aichat.character.database.*
+import com.lvsmsmch.aichat.chat.MessageFinisher
+import com.lvsmsmch.aichat.chat.database.ChatDbo
+import com.lvsmsmch.aichat.chat.database.ChatRepository
+import com.lvsmsmch.aichat.chat.database.MessageDbo
+import com.lvsmsmch.aichat.chat.database.MessageRepository
+import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
+import com.lvsmsmch.aichat.review.database.ReviewRepository
+import com.lvsmsmch.aichat.user.database.FollowDbo
+import com.lvsmsmch.aichat.user.database.FollowRepository
+import com.lvsmsmch.aichat.user.database.UserDbo
+import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import com.lvsmsmch.aichat.utils.updaters.*
 import com.lvsmsmch.aichat.utils.workers.fillDefaultSuggestions
@@ -41,15 +56,14 @@ fun Application.module() {
     install(CorrelationIdPlugin)
     configureErrorHandling()
 
-    val emailSender = EmailSender()
-
-    // ========== DATABASE ==========
-
     val databaseScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database = KMongo.createClient("mongodb://localhost:27017").coroutine
         .getDatabase("ai_chat_app_database")
 
+    val sessionRepository = SessionRepository(
+        database.getCollection<SessionDbo>("sessions")
+    )
     val entityIdStatsRepository = EntityIdStatsRepository(
         database.getCollection<EntityIdStatsDbo>("entity_id_stats")
     )
@@ -68,26 +82,47 @@ fun Application.module() {
     val reviewLikeRepository = ReviewLikeRepository(
         database.getCollection<ReviewLikeDbo>("review_likes")
     )
+    val userRepository = UserRepository(
+        database.getCollection<UserDbo>("users")
+    )
+    val followRepository = FollowRepository(
+        database.getCollection<FollowDbo>("follows")
+    )
+    val reportRepository = ReportRepository(
+        database.getCollection<ReportDbo>("reports")
+    )
+    val characterRepository = CharacterRepository(
+        database.getCollection<CharacterDbo>("characters")
+    )
+    val chatRepository = ChatRepository(
+        database.getCollection<ChatDbo>("chats")
+    )
+    val messageRepository = MessageRepository(
+        database.getCollection<MessageDbo>("messages")
+    )
+    val reviewRepository = ReviewRepository(
+        database.getCollection<ReviewDbo>("reviews")
+    )
+    val characterActivityLogRepository = CharacterActivityLogRepository(
+        database.getCollection<CharacterActivityLogDbo>("character_activity_logs")
+    )
+    val characterListCopyRepository = CharacterListCopyRepository(
+        database.getCollection<CharacterListCopyDbo>("character_list_copy_dbo")
+    )
 
-    val userRepository = configureUserRepository(database)
-    val followRepository = configureFollowRepository(database)
-    val reportRepository = configureReportRepository(database)
-    val characterRepository = configureCharacterRepository(database)
-    val chatRepository = configureChatRepository(database)
-    val messageRepository = configureMessageRepository(database)
-    val reviewRepository = configureReviewRepository(database)
-    val sessionRepository = configureSessionRepository(database)
-    val characterActivityLogRepository = configureCharacterActivityLogRepository(database)
-    val defaultRecommendationsRepository = configureDefaultRecommendationsRepository(database)
-    val enterLoginCodeAttemptsTracker = configureEnterLoginCodeAttemptsTracker(database)
-    val enterRegistrationCodeAttemptsTracker = configureEnterRegistrationCodeAttemptsTracker(database)
-    val loginAttemptsTracker = configureLoginAttemptsTracker(database)
-    val registrationAttemptsTracker = configureRegistrationAttemptsTracker(database)
-    val registrationCompletionTokenRepository = configureRegistrationCompletionTokenRepository(database)
-    val setNewPasswordTokenRepository = configureSetNewPasswordTokenRepository(database)
-    val passwordResetTokenRepository = configurePasswordResetTokenRepository(database)
-    val loginCodesRepository = configureLoginCodesRepository(database)
-    val registrationCodesRepository = configureRegistrationCodesRepository(database)
+    val cacheManager = CacheManager(
+        characterRepository = characterRepository,
+        userRecommendationsCacheRepository = userRecommendationsCacheRepository,
+        categoryRecommendationsCacheRepository = categoryRecommendationsCacheRepository,
+        defaultRecommendationsCacheRepository = defaultRecommendationsCacheRepository,
+        characterListCopyRepository = characterListCopyRepository
+    )
+
+    val messageFinisher = MessageFinisher(
+        messageRepository = messageRepository,
+        characterRepository = characterRepository,
+        chatRepository = chatRepository
+    )
 
     val idGenerator = IdGenerator(
         entityIdStatsRepository = entityIdStatsRepository,
@@ -120,8 +155,9 @@ fun Application.module() {
         chatRepository = chatRepository,
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
-        defaultRecommendationsRepository = defaultRecommendationsRepository,
-        searchSuggestionsRepository = searchSuggestionsRepository
+        defaultRecommendationsCacheRepository = defaultRecommendationsCacheRepository,
+        searchSuggestionsRepository = searchSuggestionsRepository,
+        reviewLikeRepository = reviewLikeRepository
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
@@ -182,22 +218,20 @@ fun Application.module() {
 
     configureRouting(
         mapper = mapper,
-        emailSender = emailSender,
         userRepository = userRepository,
         characterRepository = characterRepository,
         chatRepository = chatRepository,
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
         sessionRepository = sessionRepository,
-        enterLoginCodeAttemptsTracker = enterLoginCodeAttemptsTracker,
-        enterRegistrationCodeAttemptsTracker = enterRegistrationCodeAttemptsTracker,
-        loginAttemptsTracker = loginAttemptsTracker,
-        registrationAttemptsTracker = registrationAttemptsTracker,
-        registrationCompletionTokenRepository = registrationCompletionTokenRepository,
-        setNewPasswordTokenRepository = setNewPasswordTokenRepository,
-        passwordResetTokenRepository = passwordResetTokenRepository,
-        loginCodesRepository = loginCodesRepository,
-        registrationCodesRepository = registrationCodesRepository,
+        followRepository = followRepository,
+        reportRepository = reportRepository,
+        reviewLikeRepository = reviewLikeRepository,
+        characterActivityLogRepository = characterActivityLogRepository,
+        searchSuggestionsRepository = searchSuggestionsRepository,
+        idGenerator = idGenerator,
+        cacheManager = cacheManager,
+        messageFinisher = messageFinisher
     )
 
     environment.monitor.subscribe(ApplicationStopping) {

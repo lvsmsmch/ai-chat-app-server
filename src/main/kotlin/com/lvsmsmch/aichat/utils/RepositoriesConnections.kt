@@ -30,7 +30,7 @@ fun configureRepositoriesConnections(
     chatRepository: ChatRepository,
     messageRepository: MessageRepository,
     reviewRepository: ReviewRepository,
-    defaultRecommendationsRepository: DefaultRecommendationsCacheRepository,
+    defaultRecommendationsCacheRepository: DefaultRecommendationsCacheRepository,
     searchSuggestionsRepository: SearchSuggestionsRepository,
     reviewLikeRepository: ReviewLikeRepository,
 ): Job {
