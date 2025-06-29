@@ -14,18 +14,6 @@ fun validateDeviceId(deviceId: String) {
     }
 }
 
-fun validateUserEmail(email: String) {
-    if (!email.matches(Regex("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}\$"))) {
-        throw ValidationException("Invalid email format")
-    }
-}
-
-fun validateUserPassword(password: String) {
-    if (password.length < 8) {
-        throw ValidationException("Password must be at least 8 characters")
-    }
-}
-
 fun validateUserUsername(username: String) {
     if (username.length < 3 || username.length > 20) {
         throw ValidationException("Username must be between 3 and 20 characters")

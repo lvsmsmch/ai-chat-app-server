@@ -1,13 +1,10 @@
 package com.lvsmsmch.aichat.utils
 
-import com.lvsmsmch.aichat.auth.database.tokens.TokenDbo
-import com.lvsmsmch.aichat.auth.database.tokens.TokenRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,11 +12,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.litote.kmongo.coroutine.CoroutineCollection
-import org.mindrot.jbcrypt.BCrypt
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.*
-import kotlin.random.Random
 
 val defaultJson = Json {
     ignoreUnknownKeys = true
@@ -70,24 +65,6 @@ fun generateToken(): String {
     val bytes = ByteArray(32)
     secureRandom.nextBytes(bytes)
     return bytes.joinToString("") { "%02x".format(it) }
-}
-
-fun generateVerificationCode(): Int {
-    return Random.nextInt(100_000, 999_999)
-}
-
-fun hashPassword(providedPassword: String): String {
-    return BCrypt.hashpw(providedPassword, BCrypt.gensalt())
-}
-
-fun checkPassword(providedPassword: String, storedHash: String): Boolean {
-    return BCrypt.checkpw(providedPassword, storedHash)
-}
-
-fun generateUniqueUsername(): String {
-    val adjectives = listOf("Fast", "Cool", "Brave", "Happy", "Sly", "Mighty", "Wild", "Fierce", "Clever")
-    val nouns = listOf("Tiger", "Falcon", "Wizard", "Ninja", "Panther", "Wolf", "Phoenix", "Warrior", "Shadow")
-    return "${adjectives.random()}${nouns.random()}${(1000..9999).random()}"
 }
 
 inline fun <reified T : Any> createDatabaseEventsFlow(
@@ -143,27 +120,4 @@ fun Application.logStructuredError(
     )
 
     this.log.error(Json.encodeToString(entry))
-}
-
-suspend fun <T : TokenDbo> PipelineContext<Unit, ApplicationCall>.verifyToken(
-    tokenRepository: TokenRepository<T>
-): T {
-    val authHeader = call.request.headers["Authorization"]
-        ?: throw BadRequestException("Missing Authorization header")
-
-    if (!authHeader.startsWith("Bearer ")) {
-        throw BadRequestException("Invalid Authorization format. Must use Bearer token")
-    }
-
-    val token = authHeader.removePrefix("Bearer ").trim()
-    if (token.isEmpty()) {
-        throw BadRequestException("Empty authentication token")
-    }
-
-    val tokenDbo = tokenRepository.get(token)
-    if (tokenDbo == null || tokenDbo.expiresAt.isInPast()) {
-        throw TokenExpiredException("Authentication token has expired")
-    }
-
-    return tokenDbo
 }

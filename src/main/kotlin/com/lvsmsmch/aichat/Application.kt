@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat
 
 import com.lvsmsmch.aichat._common.IdGenerator
+import com.lvsmsmch.aichat._common.UsernameGenerator
 import com.lvsmsmch.aichat._common.database.EntityIdStatsDbo
 import com.lvsmsmch.aichat._common.database.EntityIdStatsRepository
 import com.lvsmsmch.aichat._common.database.ReportDbo
@@ -30,12 +31,15 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.plugins.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.*
 import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.reactivestreams.KMongo
 import java.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 fun main() {
     embeddedServer(Netty, port = 8080) {
@@ -53,6 +57,26 @@ fun Application.module() {
         maxFrameSize = Long.MAX_VALUE
         masking = false
     }
+    install(RateLimit) {
+        global {
+            rateLimiter(limit = 1000, refillPeriod = 1.minutes)
+        }
+
+        register(RateLimitName("ip-based")) {
+            rateLimiter(limit = 100, refillPeriod = 1.minutes)
+            requestKey { call ->
+                call.request.origin.remoteHost
+            }
+        }
+
+        register(RateLimitName("auth-strict")) {
+            rateLimiter(limit = 5, refillPeriod = 1.minutes)
+            requestKey { call ->
+                call.request.origin.remoteHost
+            }
+        }
+    }
+
     install(CorrelationIdPlugin)
     configureErrorHandling()
 
@@ -132,6 +156,8 @@ fun Application.module() {
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
     )
+
+    val usernameGenerator = UsernameGenerator(userRepository)
 
     val mapper = Mapper(
         userRepository = userRepository,
@@ -230,6 +256,7 @@ fun Application.module() {
         characterActivityLogRepository = characterActivityLogRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         idGenerator = idGenerator,
+        usernameGenerator = usernameGenerator,
         cacheManager = cacheManager,
         messageFinisher = messageFinisher
     )

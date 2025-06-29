@@ -18,7 +18,7 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import java.io.File
 
-fun Routing.configureCharacterRouting(
+fun Route.configureCharacterRouting(
     characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
     userRepository: UserRepository,
@@ -105,7 +105,7 @@ fun Routing.configureCharacterRouting(
             ).size
 
             if (existingCharactersCount > 100) {
-                throw ForbiddenException("Too much characters.")
+                throw ValidationException("Maximum characters limit exceeded (100)")
             }
 
             val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) } ?: ""
@@ -145,7 +145,7 @@ fun Routing.configureCharacterRouting(
 
             validateCharacterSearchQuery(request.searchQuery)
             validateCharacterSortCriteria(request.sortCriteria)
-            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
             require(request.cursor >= 0) { "Cursor position must be non-negative" }
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
@@ -218,7 +218,7 @@ fun Routing.configureCharacterRouting(
             if (category != "personalized") {
                 validateCharacterCategory(category)
             }
-            require(request.size > 0) { "Size must be positive" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
             require(request.cursor >= 0) { "Cursor position must be non-negative" }
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
@@ -254,7 +254,7 @@ fun Routing.configureCharacterRouting(
          * Получение основной информации о персонаже
          */
         get("/{id}") {
-            val currentUserId = sessionRepository.verifyToken(call).id
+            val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
                 ?: throw ValidationException("Missing characterId parameter")
@@ -274,7 +274,7 @@ fun Routing.configureCharacterRouting(
          * Получение детальной информации о персонаже
          */
         get("/{id}/details") {
-            val currentUserId = sessionRepository.verifyToken(call).id
+            val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
                 ?: throw ValidationException("Missing characterId parameter")
@@ -294,7 +294,7 @@ fun Routing.configureCharacterRouting(
          * Получение приватной информации о персонаже (только для автора)
          */
         get("/{id}/private") {
-            val currentUserId = sessionRepository.verifyToken(call).id
+            val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
                 ?: throw ValidationException("Missing characterId parameter")

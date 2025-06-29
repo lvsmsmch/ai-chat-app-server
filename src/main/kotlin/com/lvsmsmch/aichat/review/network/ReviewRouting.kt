@@ -18,7 +18,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
-fun Routing.configureReviewRouting(
+fun Route.configureReviewRouting(
     sessionRepository: SessionRepository,
     reviewRepository: ReviewRepository,
     reviewLikeRepository: ReviewLikeRepository,
@@ -81,7 +81,7 @@ fun Routing.configureReviewRouting(
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
             )
 
-            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
             validateReviewSortCriteria(request.sortCriteria)
 
             val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }

@@ -1,7 +1,6 @@
 package com.lvsmsmch.aichat.user.database
 
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.generateUniqueUsername
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 
@@ -10,7 +9,7 @@ data class UserDbo(
     @BsonId val id: String,
     val createdAt: UtcTimestamp = UtcTimestamp.now(),
     val lastActiveAt: UtcTimestamp = UtcTimestamp.now(),
-    val username: String = generateUniqueUsername(),
+    val username: String,
     val name: String? = null,
     val profilePictureUrl: String? = null,
     val email: String? = null,

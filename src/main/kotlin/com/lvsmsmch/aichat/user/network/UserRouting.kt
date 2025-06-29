@@ -5,7 +5,6 @@ import com.lvsmsmch.aichat._common.database.ReportEntity
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
-import com.lvsmsmch.aichat.character.database.CharacterSortCriteria
 import com.lvsmsmch.aichat.character.database.CharacterVisibility
 import com.lvsmsmch.aichat.user.database.FollowRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
@@ -17,7 +16,7 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import java.io.File
 
-fun Routing.configureUserRouting(
+fun Route.configureUserRouting(
     userRepository: UserRepository,
     sessionRepository: SessionRepository,
     followRepository: FollowRepository,
@@ -62,12 +61,6 @@ fun Routing.configureUserRouting(
 
         /**
          * GET /users/{userId}/characters
-         * Получение персонажей пользователя
-         */
-// Заменить эндпоинт GET /users/{userId}/characters в UserRouting.kt:
-
-        /**
-         * GET /users/{userId}/characters
          * Получение персонажей пользователя с поддержкой курсорной пагинации
          */
         get("/{userId}/characters") {
@@ -80,11 +73,10 @@ fun Routing.configureUserRouting(
                 visibility = call.request.queryParameters["visibility"]?.toIntOrNull(),
                 cursor = call.request.queryParameters["cursor"],
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
-                useCursor = call.request.queryParameters["useCursor"]?.toBooleanStrictOrNull() ?: false
             )
 
             request.visibility?.let { validateCharacterVisibility(it) }
-            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
 
             if (userRepository.getUserById(userId) == null) {
                 throw UserNotFoundException(id = userId)
@@ -92,40 +84,21 @@ fun Routing.configureUserRouting(
 
             val isOwner = currentUserId == userId
 
-            if (request.useCursor) {
-                // Новая курсорная пагинация
-                val result = characterRepository.getUserCharactersWithCursor(
-                    userId = userId,
-                    includePrivate = isOwner,
-                    visibility = if (isOwner) request.visibility else CharacterVisibility.PUBLIC.code,
-                    cursor = request.cursor,
-                    size = request.size
-                )
+            val result = characterRepository.getUserCharactersWithCursor(
+                userId = userId,
+                includePrivate = isOwner,
+                visibility = if (isOwner) request.visibility else CharacterVisibility.PUBLIC.code,
+                cursor = request.cursor,
+                size = request.size
+            )
 
-                val charactersDto = result.items.map { it.toCharacterDto(mapper) }
-                val response = UserCharactersResponse(
-                    characters = charactersDto,
-                    nextCursor = result.nextCursor,
-                    hasMore = result.hasMore
-                )
-                call.respondSuccess(data = response)
-            } else {
-                // Старая пагинация для backward compatibility
-                val charactersDbo = characterRepository.getCharacters(
-                    sortCriteria = CharacterSortCriteria.NEWEST.code,
-                    page = 0,
-                    size = 1000, // Возвращаем все для совместимости
-                    authorId = userId,
-                    visibilityFilter = if (isOwner) request.visibility else CharacterVisibility.PUBLIC.code
-                )
-                val charactersDto = charactersDbo.map { it.toCharacterDto(mapper) }
-                val response = UserCharactersResponse(
-                    characters = charactersDto,
-                    nextCursor = null,
-                    hasMore = false
-                )
-                call.respondSuccess(data = response)
-            }
+            val charactersDto = result.items.map { it.toCharacterDto(mapper) }
+            val response = UserCharactersResponse(
+                characters = charactersDto,
+                nextCursor = result.nextCursor,
+                hasMore = result.hasMore
+            )
+            call.respondSuccess(data = response)
         }
 
         /**
@@ -141,7 +114,7 @@ fun Routing.configureUserRouting(
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
             )
 
-            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
 
             val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }
 
@@ -186,7 +159,7 @@ fun Routing.configureUserRouting(
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
             )
 
-            require(request.size in 1..50) { "Size must be between 1 and 50" }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
 
             val beforeTime = request.cursor?.let { UtcTimestamp.parse(it) }
 
@@ -275,7 +248,12 @@ fun Routing.configureUserRouting(
                 throw NoUpdateFieldsProvidedException()
             }
 
-            username?.let { validateUserUsername(it) }
+            username?.let {
+                validateUserUsername(it)
+                if (userRepository.findByUsername(it) != null) {
+                    throw UsernameAlreadyTakenException(it)
+                }
+            }
             name?.let { validateUserName(it) }
             bio?.let { validateUserBio(it) }
             pictureFile?.let { validateUserPicture(it) }
@@ -286,15 +264,14 @@ fun Routing.configureUserRouting(
 
             userRepository.updateUser(
                 userId = userId,
-                username = username,
+                username = username?.lowercase(),
                 name = name,
                 bio = bio,
                 profilePictureUrl = profilePictureUrl,
             )
 
             val updatedUser = userRepository.getUserById(userId)
-                ?: throw UserNotFoundException()
-
+                ?: throw UserNotFoundException(id = userId)
 
             call.respondSuccess(data = updatedUser.toUserDto(mapper))
         }
@@ -309,7 +286,7 @@ fun Routing.configureUserRouting(
             val userId = call.parameters["userId"]
                 ?: throw ValidationException("Missing userId parameter")
 
-            userRepository.getUserById(userId) ?: throw UserNotFoundException(userId)
+            userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
 
             if (currentUserId == userId) {
                 throw ValidationException("Cannot follow yourself")
@@ -330,7 +307,7 @@ fun Routing.configureUserRouting(
             val userId = call.parameters["userId"]
                 ?: throw ValidationException("Missing userId parameter")
 
-            userRepository.getUserById(userId) ?: throw UserNotFoundException(userId)
+            userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
 
             if (currentUserId == userId) {
                 throw ValidationException("Cannot unfollow yourself")

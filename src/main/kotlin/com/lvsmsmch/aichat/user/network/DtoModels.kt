@@ -72,8 +72,7 @@ data class UserCharactersResponse(
 data class GetUserCharactersRequest(
     @SerialName("visibility") val visibility: Int? = null,
     @SerialName("cursor") val cursor: String? = null,
-    @SerialName("size") val size: Int = 10,
-    @SerialName("useCursor") val useCursor: Boolean = false // Для backward compatibility
+    @SerialName("size") val size: Int = 10
 )
 
 @Serializable

@@ -3,10 +3,7 @@ package com.lvsmsmch.aichat.user.database
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Updates
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.conversions.Bson
-import org.bson.types.ObjectId
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 
@@ -57,6 +54,10 @@ class UserRepository(
 
     suspend fun getUserById(userId: String): UserDbo? {
         return collection.findOneById(userId)
+    }
+
+    suspend fun findByUsername(username: String): UserDbo? {
+        return collection.findOne(UserDbo::username eq username)
     }
 
     suspend fun findUserByEmail(email: String): UserDbo? {

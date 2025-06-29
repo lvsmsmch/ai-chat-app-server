@@ -2,9 +2,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "1.9.22" // Instead of 1.8.22
+    kotlin("jvm") version "1.9.22"
     id("io.ktor.plugin") version "2.3.10"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22" // Instead of 1.8.10
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
     application
 }
 
@@ -17,8 +17,8 @@ repositories {
 
 dependencies {
     // Force coroutines version to be consistent
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0") // Instead of 1.7.3
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0") // Instead of 1.7.3
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
 
     // Ktor - all using the same version
     val ktorVersion = "2.3.10"
@@ -32,6 +32,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
+    implementation("io.ktor:ktor-server-rate-limit:$ktorVersion")
 
     // KMongo - downgrade to version compatible with Kotlin 1.8.x
     implementation("org.litote.kmongo:kmongo:5.2.0")
@@ -54,6 +55,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.22") // Match Kotlin version
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("io.mockk:mockk:1.13.7")
+
 }
 
 application {

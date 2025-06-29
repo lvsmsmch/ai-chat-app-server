@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.auth.network
 
 import com.lvsmsmch.aichat._common.IdGenerator
+import com.lvsmsmch.aichat._common.UsernameGenerator
 import com.lvsmsmch.aichat._common.database.EntityType
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.user.database.AccountType
@@ -18,10 +19,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-fun Routing.configureAuthRouting(
+fun Route.configureAuthRouting(
     userRepository: UserRepository,
     sessionRepository: SessionRepository,
     idGenerator: IdGenerator,
+    usernameGenerator: UsernameGenerator,
     mapper: Mapper
 ) {
     route("/auth") {
@@ -35,9 +37,9 @@ fun Routing.configureAuthRouting(
 
             validateDeviceId(request.deviceId)
 
-            // Получаем данные пользователя из Google
             val oauthUserData = HttpClient().use { client ->
-                val apiUrl = "https://oauth2.googleapis.com/tokeninfo?id_token=${request.googleToken}"
+                val googleOauthTokenInfoUrl = loadConfig().getProperty("GOOGLE_OAUTH_TOKEN_INFO_URL")
+                val apiUrl = "$googleOauthTokenInfoUrl?id_token=${request.googleToken}"
                 val response = client.get(apiUrl)
                 if (response.status != HttpStatusCode.OK) {
                     application.log.error(
@@ -70,6 +72,7 @@ fun Routing.configureAuthRouting(
                     userRepository.getUserById(it.id)!!
                 } ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
+                    username = usernameGenerator.generateUniqueUsername(),
                     googleOauthId = oauthUserData.id,
                     email = oauthUserData.email,
                     name = oauthUserData.name,
@@ -101,6 +104,7 @@ fun Routing.configureAuthRouting(
             val userDbo = userRepository.findByDeviceId(request.deviceId)
                 ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
+                    username = usernameGenerator.generateUniqueUsername(),
                     deviceId = request.deviceId
                 ).also { userRepository.addUser(it) }
 

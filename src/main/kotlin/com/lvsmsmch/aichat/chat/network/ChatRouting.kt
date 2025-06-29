@@ -14,10 +14,12 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
-fun Routing.configureChatRouting(
+fun Route.configureChatRouting(
     chatRepository: ChatRepository,
     messageRepository: MessageRepository,
     characterRepository: CharacterRepository,
@@ -158,7 +160,7 @@ fun Routing.configureChatRouting(
             val request = call.receive<CreateDirectChatRequest>()
 
             val characterDbo = characterRepository.getCharacter(request.characterId)
-                ?: throw ValidationException("Character not found")
+                ?: throw CharacterNotFoundException(request.characterId)  // Для персонажей
 
             // Проверяем существующий чат
             val existingChat = chatRepository.findChatByUserAndCharacter(userId, request.characterId)
@@ -311,8 +313,10 @@ fun Routing.configureChatRouting(
             val chatId = call.parameters["chatId"]
                 ?: throw ValidationException("Chat ID is required")
 
-            // Парсим query параметры в request объект
-            val request = call.receive<GetMessagesRequest>()
+            val request = GetMessagesRequest(
+                cursor = call.request.queryParameters["cursor"],
+                size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+            )
 
             val chat = chatRepository.getChatByClientId(chatId)
                 ?: throw ChatNotFoundException(chatId)
@@ -321,17 +325,15 @@ fun Routing.configureChatRouting(
                 throw ForbiddenException("Access denied to this chat")
             }
 
-            if (request.limit !in 1..100) {
-                throw ValidationException("Limit must be between 1 and 100")
-            }
+            require(request.size in 1..100) { "Size must be between 1 and 100" }
 
             val messages = messageRepository.getMessagesPaginated(
                 chatId = chat.id,
                 cursor = request.cursor,
-                limit = request.limit + 1
+                limit = request.size + 1
             )
 
-            val hasMore = messages.size > request.limit
+            val hasMore = messages.size > request.size
             val resultMessages = if (hasMore) messages.dropLast(1) else messages
 
             val nextCursor = if (hasMore) {
@@ -520,6 +522,8 @@ fun Routing.configureChatRouting(
             call.response.cacheControl(CacheControl.NoCache(null))
             call.response.header(HttpHeaders.Connection, "keep-alive")
             call.response.header(HttpHeaders.ContentType, ContentType.Text.EventStream.toString())
+            call.response.header("Cache-Control", "no-cache")
+            call.response.header("X-Accel-Buffering", "no")
 
             call.respondTextWriter(contentType = ContentType.Text.EventStream) {
                 try {
@@ -536,9 +540,7 @@ fun Routing.configureChatRouting(
                             }
                         )
 
-                        @Suppress("BlockingMethodInNonBlockingContext")
                         write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
-                        @Suppress("BlockingMethodInNonBlockingContext")
                         flush()
                     }
 
@@ -564,10 +566,10 @@ fun Routing.configureChatRouting(
                                 error = if (update.isFailed) "Generation failed" else null
                             )
 
-                            @Suppress("BlockingMethodInNonBlockingContext")
-                            write("data: ${defaultJson.encodeToString(chunk)}\n\n")
-                            @Suppress("BlockingMethodInNonBlockingContext")
-                            flush()
+                            withContext(Dispatchers.IO) {
+                                write("data: ${defaultJson.encodeToString(chunk)}\n\n")
+                                flush()
+                            }
 
                             // Если сообщение завершено или ошибка - закрываем стрим
                             if (update.isComplete || update.isFailed) {
@@ -584,9 +586,7 @@ fun Routing.configureChatRouting(
                     )
 
                     try {
-                        @Suppress("BlockingMethodInNonBlockingContext")
                         write("data: ${defaultJson.encodeToString(errorChunk)}\n\n")
-                        @Suppress("BlockingMethodInNonBlockingContext")
                         flush()
                     } catch (writeException: Exception) {
                         // Игнорируем ошибки записи при закрытии соединения

@@ -269,13 +269,6 @@ class MessageRepository(
             .toList()
     }
 
-    suspend fun doAllMessageIdsBelongToChat(
-        chatId: String,
-        messageIds: List<String>
-    ): Boolean {
-        // todo
-    }
-
     /**
      * UPDATE
      */

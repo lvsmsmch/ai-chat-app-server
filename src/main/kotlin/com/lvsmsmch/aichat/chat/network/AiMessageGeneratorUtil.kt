@@ -5,7 +5,6 @@ import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.utils.defaultJson
 import com.lvsmsmch.aichat.utils.loadConfig
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -17,30 +16,12 @@ import kotlinx.serialization.json.*
 
 object AiMessageGeneratorUtil {
 
+    private val openAiApiUrl = loadConfig().getProperty("OPEN_AI_API_URL")
     private val openAiApiKey = loadConfig().getProperty("OPEN_AI_API_KEY")
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(defaultJson)
         }
-    }
-
-    /**
-     * Обычная генерация без стриминга (для совместимости)
-     */
-    suspend fun generateAiMessage(
-        characterDbo: CharacterDbo,
-        messagesHistory: List<MessageDbo>
-    ): String {
-        val messages = buildMessageHistory(characterDbo, messagesHistory)
-        val requestBody = buildRequestBody(messages, stream = false)
-
-        val response = httpClient.post("https://api.openai.com/v1/chat/completions") {
-            header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-            contentType(ContentType.Application.Json)
-            setBody(requestBody)
-        }
-
-        return parseNonStreamingResponse(response)
     }
 
     /**
@@ -57,7 +38,7 @@ object AiMessageGeneratorUtil {
             val messages = buildMessageHistory(characterDbo, messagesHistory)
             val requestBody = buildRequestBody(messages, stream = true)
 
-            val response = httpClient.post("https://api.openai.com/v1/chat/completions") {
+            val response = httpClient.post(openAiApiUrl) {
                 header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
                 header(HttpHeaders.Accept, "text/event-stream")
                 contentType(ContentType.Application.Json)
@@ -129,28 +110,6 @@ object AiMessageGeneratorUtil {
             "presence_penalty" to 0.3,
             "stream" to stream
         )
-    }
-
-    /**
-     * Парсим обычный (не стриминг) ответ
-     */
-    private suspend fun parseNonStreamingResponse(response: HttpResponse): String {
-        val responseBody = response.body<Map<String, Any>>()
-
-        @Suppress("UNCHECKED_CAST")
-        val choices = responseBody["choices"] as? List<Map<String, Any>>
-            ?: throw Exception("Invalid response format")
-
-        if (choices.isEmpty()) {
-            throw Exception("No response generated")
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        val message = choices[0]["message"] as? Map<String, Any>
-            ?: throw Exception("Invalid message format")
-
-        return message["content"] as? String
-            ?: throw Exception("Message content missing")
     }
 
     /**

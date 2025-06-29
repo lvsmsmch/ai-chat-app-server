@@ -2,6 +2,7 @@
 
 package com.lvsmsmch.aichat.chat.network
 
+import com.lvsmsmch.aichat.character.network.CharacterDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -89,7 +90,7 @@ data class CreateChatResponse(
 @Serializable
 data class GetMessagesRequest(
     @SerialName("cursor") val cursor: String? = null,
-    @SerialName("limit") val limit: Int = 50
+    @SerialName("size") val size: Int = 50
 )
 
 @Serializable

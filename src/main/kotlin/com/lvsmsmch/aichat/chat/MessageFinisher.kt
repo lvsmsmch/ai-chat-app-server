@@ -4,7 +4,7 @@ import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.database.MessageStatus
-import com.lvsmsmch.aichat.chat.network.AiMessageGeneratorUtil
+import com.lvsmsmch.aichat.chat.network.TestAiMessageGeneratorUtil
 import kotlinx.coroutines.*
 import kotlinx.coroutines.withTimeout // ✅ Правильно
 import kotlin.time.Duration.Companion.seconds
@@ -37,7 +37,7 @@ class MessageFinisher(
                 )
 
                 withTimeout(timeoutSeconds.seconds) {
-                    AiMessageGeneratorUtil.generateAiMessageWithStreaming(
+                    TestAiMessageGeneratorUtil.generateAiMessageWithStreaming(
                         characterDbo = characterDbo,
                         messagesHistory = messageHistory,
                         onChunk = {

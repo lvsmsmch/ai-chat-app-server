@@ -4,8 +4,7 @@ import com.lvsmsmch.aichat.utils.respondSuccess
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 
-fun Routing.configureAppDataRouting(
-) {
+fun Route.configureAppDataRouting() {
     route("/app-data") {
         
         get("/paywall-images") {
