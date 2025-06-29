@@ -175,13 +175,10 @@ fun Application.module() {
         entityIdStatsRepository = entityIdStatsRepository,
         userRepository = userRepository,
         followRepository = followRepository,
-        reportRepository = reportRepository,
         characterRepository = characterRepository,
-        characterActivityLogRepository = characterActivityLogRepository,
         chatRepository = chatRepository,
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
-        defaultRecommendationsCacheRepository = defaultRecommendationsCacheRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         reviewLikeRepository = reviewLikeRepository
     )

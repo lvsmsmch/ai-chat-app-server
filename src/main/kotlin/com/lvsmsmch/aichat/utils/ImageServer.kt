@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.utils
 
 
+import kotlinx.coroutines.delay
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
@@ -9,6 +10,7 @@ import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import java.io.File
 import java.util.UUID
+import kotlin.random.Random
 
 
 object ImageServer {
@@ -19,7 +21,15 @@ object ImageServer {
      * @param image The image file to upload
      * @return The URL of the uploaded image
      */
-    fun uploadImageOnServer(image: File): String {
+    suspend fun uploadImageOnServer(image: File): String {
+
+
+        // test configuration >>>>>>>>>
+        delay(2000L + Random.nextLong(1000L)) // 2-3 секунды
+        return "https://picsum.photos/800/600?random=${Random.nextInt(100_000)}"
+        // test configuration >>>>>>
+
+
         // S3 configuration
 
         val bucketName = loadConfig().getProperty("AWS_S3_BUCKET_NAME")

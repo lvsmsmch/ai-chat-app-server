@@ -24,6 +24,35 @@ class ReviewRepository(
     private fun initializeIndexes() {
         runBlocking {
             collection.ensureIndex(ascending(ReviewDbo::characterId))
+            collection.ensureIndex(
+                ascending(
+                    ReviewDbo::characterId,
+                    ReviewDbo::createdAt
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    ReviewDbo::characterId,
+                    ReviewDbo::rating
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    ReviewDbo::characterId,
+                    ReviewDbo::likesCount
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    ReviewDbo::authorId,
+                    ReviewDbo::characterId
+                )
+            )
+
+            collection.ensureIndex(ascending(ReviewDbo::authorId))
         }
     }
 
@@ -141,6 +170,14 @@ class ReviewRepository(
         val reviewDbo = getReviewById(reviewId) ?: return
         collection.deleteOneById(reviewId)
         // No need to manually emit updates - the changeEventsFlow will handle it
+    }
+
+    suspend fun deleteAllReviewsByUserId(userId: String) {
+        collection.deleteMany(ReviewDbo::authorId eq userId)
+    }
+
+    suspend fun deleteAllReviewsByCharacterId(characterId: String) {
+        collection.deleteMany(ReviewDbo::characterId eq characterId)
     }
 
     suspend fun isReviewOwnedByUser(reviewId: String, userId: String): Boolean {

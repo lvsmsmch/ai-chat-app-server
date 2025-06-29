@@ -31,6 +31,36 @@ class ChatRepository(
                     ChatDbo::lastModifiedAt
                 )
             )
+            collection.ensureIndex(
+                ascending(
+                    ChatDbo::userId,
+                    ChatDbo::isDeleted
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    ChatDbo::userId,
+                    ChatDbo::chatType,
+                    ChatDbo::characterIds
+                )
+            )
+
+            collection.ensureIndex(ascending(ChatDbo::characterIds))
+
+            collection.ensureIndex(
+                ascending(
+                    ChatDbo::userId,
+                    ChatDbo::createdAt
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    ChatDbo::userId,
+                    ChatDbo::deletedAt
+                )
+            )
         }
     }
 

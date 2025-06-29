@@ -5,6 +5,8 @@ package com.lvsmsmch.aichat.chat.network
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.database.EntityType
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
+import com.lvsmsmch.aichat.character.database.ActivityType
+import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.*
@@ -24,6 +26,7 @@ fun Route.configureChatRouting(
     messageRepository: MessageRepository,
     characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
+    characterActivityLogRepository: CharacterActivityLogRepository,
     idGenerator: IdGenerator,
     messageFinisher: MessageFinisher,
     mapper: Mapper
@@ -180,6 +183,12 @@ fun Route.configureChatRouting(
 
             chatRepository.insertChat(chatDbo)
 
+            characterActivityLogRepository.logActivity(
+                activityType = ActivityType.CHAT_CREATED,
+                characterId = request.characterId,
+                userId = userId
+            )
+
             val newCharacterMessage = MessageDbo(
                 id = idGenerator.generateId(EntityType.MESSAGE),
                 chatId = chatDbo.id,
@@ -228,6 +237,14 @@ fun Route.configureChatRouting(
             )
 
             chatRepository.insertChat(chatDbo)
+
+            characters.map { it.id }.forEach { characterId ->
+                characterActivityLogRepository.logActivity(
+                    activityType = ActivityType.CHAT_CREATED,
+                    characterId = characterId,
+                    userId = userId
+                )
+            }
 
             val chatDto = chatDbo.toChatDto(mapper)
 
@@ -415,6 +432,11 @@ fun Route.configureChatRouting(
                 ).also {
                     messageRepository.insertMessage(it)
                     messageFinisher.finishMessageAsync(it.id)
+                    characterActivityLogRepository.logActivity(
+                        activityType = ActivityType.MESSAGE_SENT,
+                        characterId = characterMessage.characterId,
+                        userId = userId
+                    )
                 }
             }
 
@@ -474,9 +496,16 @@ fun Route.configureChatRouting(
                 throw ForbiddenException("Access denied to this chat")
             }
 
+            val messageDbos = messageRepository.getMessagesByClientIds(request.messageIds)
+
+            val chatIds = messageDbos.map { it.chatId }.toSet().toList()
+
+            if (!chatRepository.doAllChatsBelongToUser(chatIds, userId)) {
+                throw ForbiddenException("Some of messages are not from your chats")
+            }
+
             val updatedCount = messageRepository.markMessagesAsRead(
-                messageIds = request.messageIds,
-                userId = userId
+                messageIds = messageDbos.map { it.id }
             )
 
             call.respondSuccess(

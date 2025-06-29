@@ -26,6 +26,37 @@ class CharacterRepository(
     private fun initializeIndexes() {
         runBlocking {
             collection.ensureIndex(ascending(CharacterDbo::authorId))
+            collection.ensureIndex(ascending(CharacterDbo::visibility))
+
+            collection.ensureIndex(
+                ascending(
+                    CharacterDbo::visibility,
+                    CharacterDbo::category
+                )
+            )
+
+            collection.ensureIndex(descending(CharacterDbo::createdAt))
+            collection.ensureIndex(descending(CharacterDbo::averageRating))
+            collection.ensureIndex(descending(CharacterDbo::totalMessages))
+            collection.ensureIndex(descending(CharacterDbo::trendingScore))
+            collection.ensureIndex(descending(CharacterDbo::recommendationScore))
+
+            collection.ensureIndex(ascending(CharacterDbo::name))
+            collection.ensureIndex(ascending(CharacterDbo::description))
+
+            collection.ensureIndex(
+                ascending(
+                    CharacterDbo::authorId,
+                    CharacterDbo::visibility
+                )
+            )
+
+            collection.ensureIndex(
+                ascending(
+                    CharacterDbo::visibility,
+                    CharacterDbo::recommendationScore
+                )
+            )
         }
     }
 
@@ -52,7 +83,6 @@ class CharacterRepository(
         categories: List<CharacterCategory> = CharacterCategory.entries.toList(),
         page: Int,
         size: Int,
-        shuffleSeed: Int? = null,
         authorId: String? = null,
         visibilityFilter: Int? = null,
     ): List<CharacterDbo> {
@@ -89,37 +119,16 @@ class CharacterRepository(
 
         val skip = (page - 1) * size
 
-        val sortedList = if (shuffleSeed != null) {
-            all.toList().shuffled(kotlin.random.Random(shuffleSeed))
-        } else {
-            all.sort(sortCriteriaBson).toList()
-        }
+        val sortedList = all.sort(sortCriteriaBson).toList()
 
         return sortedList.drop(skip).take(size)
     }
 
-    suspend fun getPersonalizedCharacters(
-        recommendedIds: List<String>,
-        shuffleSeed: Int? = null,
-        page: Int,
-        size: Int
-    ): List<CharacterDbo> {
-        val processedIds = if (shuffleSeed != null) {
-            recommendedIds.shuffled(kotlin.random.Random(shuffleSeed))
-        } else {
-            recommendedIds
-        }
-
-        val skip = (page - 1) * size
-        val selectedIds = processedIds.drop(skip).take(size)
-        return getCharactersByIds(selectedIds)
-    }
 
     suspend fun getTopCharactersByRecommendationScore(limit: Int): List<String> {
         return collection.find(
             and(
                 CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-                CharacterDbo::isDeleted eq false
             )
         ).sort(descending(CharacterDbo::recommendationScore))
             .limit(limit)
@@ -131,7 +140,6 @@ class CharacterRepository(
         val filters = and(
             CharacterDbo::id `in` characterIds,
             CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-            CharacterDbo::isDeleted eq false
         )
 
         val characters = collection.find(filters).toList()
@@ -153,8 +161,7 @@ class CharacterRepository(
                 EMPTY_BSON
             } else {
                 CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
-            },
-            CharacterDbo::isDeleted eq false
+            }
         )
 
         return collection.find(filters).toList()
@@ -180,7 +187,6 @@ class CharacterRepository(
             } else {
                 CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
             },
-            CharacterDbo::isDeleted eq false,
             if (beforeTime != null) {
                 CharacterDbo::createdAt lt beforeTime
             } else {
@@ -232,7 +238,6 @@ class CharacterRepository(
         val filters = and(
             CharacterDbo::authorId eq userId,
             CharacterDbo::visibility eq visibility.code,
-            CharacterDbo::isDeleted eq false
         )
 
         return collection.countDocuments(filters).toInt()
@@ -269,7 +274,6 @@ class CharacterRepository(
         return collection.find(
             and(
                 CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-                CharacterDbo::isDeleted eq false,
                 CharacterDbo::category eq category.code
             )
         ).toList()

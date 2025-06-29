@@ -14,7 +14,6 @@ class MessageRepository(
 
     init {
         runBlocking {
-            // Index for chat messages ordered by creation time
             collection.ensureIndex(
                 ascending(
                     MessageDbo::chatId,
@@ -23,6 +22,30 @@ class MessageRepository(
             )
             collection.ensureIndex(MessageDbo::clientId)
             collection.ensureIndex(MessageDbo::senderId)
+            collection.ensureIndex(
+                ascending(
+                    MessageDbo::chatId,
+                    MessageDbo::isDeleted
+                )
+            )
+            collection.ensureIndex(
+                ascending(
+                    MessageDbo::chatId,
+                    MessageDbo::lastModifiedAt
+                )
+            )
+            collection.ensureIndex(
+                ascending(
+                    MessageDbo::chatId,
+                    MessageDbo::deletedAt
+                )
+            )
+            collection.ensureIndex(
+                ascending(
+                    MessageDbo::isRead,
+                    MessageDbo::senderId
+                )
+            )
         }
     }
 
@@ -269,6 +292,10 @@ class MessageRepository(
             .toList()
     }
 
+    suspend fun getMessagesByClientIds(clientIds: List<String>): List<MessageDbo> {
+        return collection.find(and(MessageDbo::clientId `in` clientIds)).toList()
+    }
+
     /**
      * UPDATE
      */
@@ -295,12 +322,12 @@ class MessageRepository(
         )
     }
 
-    suspend fun markMessagesAsRead(messageIds: List<String>, userId: String): Int {
+    suspend fun markMessagesAsRead(messageIds: List<String>): Int {
         if (messageIds.isEmpty()) return 0
 
         val result = collection.updateMany(
             and(
-                MessageDbo::clientId `in` messageIds,
+                MessageDbo::id `in` messageIds,
                 MessageDbo::isRead eq false
             ),
             combine(

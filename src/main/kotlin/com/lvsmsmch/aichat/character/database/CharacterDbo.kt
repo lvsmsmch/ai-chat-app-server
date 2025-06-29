@@ -27,6 +27,5 @@ data class CharacterDbo(
     val recommendationScore: Float = 0f,
     val recommendationScoreUpdatedAt: UtcTimestamp? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
-    val coOccurrenceScoreUpdatedAt: UtcTimestamp? = null,
-    val isDeleted: Boolean = false,
+    val coOccurrenceScoreUpdatedAt: UtcTimestamp? = null
 )

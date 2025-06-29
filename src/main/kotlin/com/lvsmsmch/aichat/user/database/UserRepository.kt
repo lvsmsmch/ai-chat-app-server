@@ -30,6 +30,8 @@ class UserRepository(
             collection.ensureIndex(ascending(UserDbo::googleOauthId))
             collection.ensureIndex(ascending(UserDbo::facebookOauthId))
             collection.ensureIndex(ascending(UserDbo::username))
+            collection.ensureIndex(ascending(UserDbo::lastActiveAt))
+            collection.ensureIndex(ascending(UserDbo::deviceId))
         }
     }
 

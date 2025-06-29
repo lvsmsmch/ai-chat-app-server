@@ -37,27 +37,6 @@ class SearchSuggestionsRepository(
         }
     }
 
-    private suspend fun seedInitialSuggestions() {
-        val initialSuggestions = listOf(
-            // Английские
-            "anime", "cute", "funny", "cool", "hot", "beautiful",
-            "warrior", "princess", "hero", "villain", "robot",
-
-            // Японские
-            "アニメ", "かわいい", "美少女", "戦士",
-
-            // Русские
-            "аниме", "милая", "крутой", "принцесса",
-
-            // Категории
-            "fantasy", "sci-fi", "historical", "modern"
-        )
-
-        initialSuggestions.forEach { term ->
-            addSuggestion(term)
-        }
-    }
-
     /**
      * FLOW
      */

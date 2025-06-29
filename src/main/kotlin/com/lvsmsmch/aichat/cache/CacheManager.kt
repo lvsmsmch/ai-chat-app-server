@@ -67,6 +67,7 @@ class CacheManager(
                 updateCopyWithFreshList(userId, deviceId, listType)
                 takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
             }
+
             else -> {
                 takeItemsAndMoveCursor(userId, deviceId, listType, cursorPosition, size).copy(refreshed = false)
             }
@@ -87,6 +88,7 @@ class CacheManager(
                 createFreshSearchCopy(userId, deviceId, listType)
                 takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
             }
+
             else -> {
                 // Категории и персонализация - как раньше
                 when {
@@ -94,10 +96,12 @@ class CacheManager(
                         updateCopyWithFreshList(userId, deviceId, listType)
                         takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
                     }
+
                     moveViewedToEndIfNothingToRefresh -> {
                         moveViewedToEnd(userId, deviceId, listType)
                         takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
                     }
+
                     else -> {
                         val copy = characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
                         CachedCharactersResult(refreshed = false, emptyList(), copy?.currentPosition ?: 0)
@@ -155,9 +159,7 @@ class CacheManager(
         while (validCharacters.size < size && currentCursorPos < copy.characterIds.size) {
             copy.characterIds.getOrNull(currentCursorPos)?.let { characterId ->
                 characterRepository.getCharacter(characterId)?.let { characterDbo ->
-                    if (!characterDbo.isDeleted) { // единая логика фильтрации
-                        validCharacters.add(characterDbo)
-                    }
+                    validCharacters.add(characterDbo)
                 }
             }
             currentCursorPos++

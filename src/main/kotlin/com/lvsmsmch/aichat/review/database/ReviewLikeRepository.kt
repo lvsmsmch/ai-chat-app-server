@@ -102,4 +102,12 @@ class ReviewLikeRepository(
         collection.deleteOneById(likeId)
     }
 
+    suspend fun removeAllLikesForReview(reviewId: String) {
+        collection.deleteMany(ReviewLikeDbo::reviewId eq reviewId)
+    }
+
+    suspend fun removeAllLikesByUserId(userId: String) {
+        collection.deleteMany(ReviewLikeDbo::userId eq userId)
+    }
+
 }

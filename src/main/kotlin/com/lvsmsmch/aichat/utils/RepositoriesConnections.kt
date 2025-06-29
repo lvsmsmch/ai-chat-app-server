@@ -24,13 +24,10 @@ fun configureRepositoriesConnections(
     entityIdStatsRepository: EntityIdStatsRepository,
     userRepository: UserRepository,
     followRepository: FollowRepository,
-    reportRepository: ReportRepository,
     characterRepository: CharacterRepository,
-    characterActivityLogRepository: CharacterActivityLogRepository,
     chatRepository: ChatRepository,
     messageRepository: MessageRepository,
     reviewRepository: ReviewRepository,
-    defaultRecommendationsCacheRepository: DefaultRecommendationsCacheRepository,
     searchSuggestionsRepository: SearchSuggestionsRepository,
     reviewLikeRepository: ReviewLikeRepository,
 ): Job {
@@ -63,7 +60,8 @@ fun configureRepositoriesConnections(
                                 entityIdStatsRepository.idWasDeleted(EntityType.USER, event.old.id)
                                 characterRepository.deleteAllCharacterByUserId(event.old.id)
                                 followRepository.removeAllConnectionsContainingUserId(event.old.id)
-                                reportRepository.removeAllReportsByUserId(event.old.id)
+                                reviewRepository.deleteAllReviewsByUserId(event.old.id)
+                                reviewLikeRepository.removeAllLikesByUserId(event.old.id)
                             }
                         }
                     } catch (e: Exception) {
@@ -165,33 +163,20 @@ fun configureRepositoriesConnections(
                                         }
                                     }
                                 }
-
-                                // Обработка soft delete
-                                if (!event.old.isDeleted && event.new.isDeleted) {
-                                    entityIdStatsRepository.idWasDeleted(EntityType.CHARACTER, event.new.id)
-                                    chatRepository.deleteAllChatsByCharacterId(event.new.id)
-
-                                    // ✅ Декремент при удалении
-                                    if (event.new.visibility == CharacterVisibility.PUBLIC.code) {
-                                        userRepository.incrementPublicCharacterCount(userId, -1)
-                                    } else {
-                                        userRepository.incrementPrivateCharacterCount(userId, -1)
-                                    }
-                                }
                             }
 
                             is DatabaseEvent.Deleted -> {
                                 val userId = event.old.authorId
 
                                 entityIdStatsRepository.idWasDeleted(EntityType.CHARACTER, event.old.id)
+                                chatRepository.deleteAllChatsByCharacterId(event.old.id)
+                                reviewRepository.deleteAllReviewsByCharacterId(event.old.id)
 
                                 if (event.old.visibility == CharacterVisibility.PUBLIC.code) {
                                     userRepository.incrementPublicCharacterCount(userId, -1)
                                 } else {
                                     userRepository.incrementPrivateCharacterCount(userId, -1)
                                 }
-
-                                chatRepository.deleteAllChatsByCharacterId(event.old.id)
                             }
                         }
                     } catch (e: Exception) {
@@ -310,6 +295,7 @@ fun configureRepositoriesConnections(
                             is DatabaseEvent.Deleted -> {
                                 entityIdStatsRepository.idWasDeleted(EntityType.REVIEW, event.old.id)
                                 characterRepository.incrementReviewsCount(characterId, -1)
+                                reviewLikeRepository.removeAllLikesForReview(event.old.id)
                                 updateReviewsAvgRating(characterId)
                             }
                         }
