@@ -133,6 +133,11 @@ fun validateCharacterTags(tags: String) {
     }
 }
 
+fun validateCharactersSize(size: Int) {
+    if (size !in 1..10) {
+        throw ValidationException("Unsupported size of characters (should be from 1 to 10)")
+    }
+}
 
 fun validateCharacterPicture(pictureFile: File) {
     validatePicture(
@@ -147,15 +152,6 @@ fun validateCharacterPicture(pictureFile: File) {
 fun validateMessageText(messageText: String) {
     if (messageText.length > 1000) {
         throw ValidationException("Message is too long")
-    }
-}
-
-fun validateChatCharactersIdsSize(characterIdsSize: Int) {
-    if (characterIdsSize <= 0) {
-        throw ValidationException("Character IDs cannot be empty")
-    }
-    if (characterIdsSize > 10) {
-        throw ValidationException("You can't have more than 10 character in one group chat")
     }
 }
 

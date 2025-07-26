@@ -40,7 +40,7 @@ fun Route.configureCharacterRouting(
 
             val contentType = call.request.contentType()
             if (!contentType.match(ContentType.MultiPart.FormData)) {
-                throw ValidationException("Content-Type must be multipart of form data")
+                throw BadRequestException("Content-Type must be multipart of form data")
             }
 
             var name: String? = null
@@ -83,21 +83,21 @@ fun Route.configureCharacterRouting(
                 part.dispose()
             }
 
-            if (name == null) throw ValidationException("Missing name field")
+            if (name == null) throw BadRequestException("Missing name field")
             validateCharacterName(name!!)
-            if (description == null) throw ValidationException("Missing description field")
+            if (description == null) throw BadRequestException("Missing description field")
             validateCharacterDescription(description!!)
-            if (prompt == null) throw ValidationException("Missing prompt field")
+            if (prompt == null) throw BadRequestException("Missing prompt field")
             validateCharacterPrompt(prompt!!)
-            if (initialMessage == null) throw ValidationException("Missing initialMessage field")
+            if (initialMessage == null) throw BadRequestException("Missing initialMessage field")
             validateCharacterInitialMessage(initialMessage!!)
-            if (visibility == null) throw ValidationException("Missing visibility field")
+            if (visibility == null) throw BadRequestException("Missing visibility field")
             validateCharacterVisibility(visibility!!)
-            if (category == null) throw ValidationException("Missing category field")
+            if (category == null) throw BadRequestException("Missing category field")
             validateCharacterCategory(category!!)
-            if (tags == null) throw ValidationException("Missing tags field")
+            if (tags == null) throw BadRequestException("Missing tags field")
             validateCharacterTags(tags!!)
-            if (pictureFile == null) throw ValidationException("Missing pictureFile field")
+            if (pictureFile == null) throw BadRequestException("Missing pictureFile field")
             validateCharacterPicture(pictureFile!!)
 
             val existingCharactersCount = characterRepository.getCharactersByUserId(
@@ -105,7 +105,7 @@ fun Route.configureCharacterRouting(
             ).size
 
             if (existingCharactersCount > 100) {
-                throw ValidationException("Maximum characters limit exceeded (100)")
+                throw BadRequestException("Maximum characters limit exceeded (100)")
             }
 
             val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) } ?: ""
@@ -135,7 +135,7 @@ fun Route.configureCharacterRouting(
 
             val request = SearchCharactersRequest(
                 deviceId = call.request.queryParameters["deviceId"]
-                    ?: throw ValidationException("Missing deviceId field"),
+                    ?: throw BadRequestException("Missing deviceId field"),
                 searchQuery = call.request.queryParameters["searchQuery"] ?: "",
                 sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0,
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
@@ -203,11 +203,11 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val category = call.parameters["category"]
-                ?: throw ValidationException("Missing category field")
+                ?: throw BadRequestException("Missing category field")
 
             val request = GetCharactersByCategoryRequest(
                 deviceId = call.request.queryParameters["deviceId"]
-                    ?: throw ValidationException("Missing deviceId field"),
+                    ?: throw BadRequestException("Missing deviceId field"),
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
                 cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0,
                 refresh = call.request.queryParameters["refresh"]?.toBooleanStrictOrNull() ?: false,
@@ -257,7 +257,7 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val characterDbo = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -277,7 +277,7 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val characterDbo = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -297,7 +297,7 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["id"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val characterDbo = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -317,7 +317,7 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["characterId"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val characterDbo = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -346,7 +346,7 @@ fun Route.configureCharacterRouting(
             val sessionDbo = sessionRepository.verifyToken(call)
 
             val characterId = call.parameters["characterId"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val character = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -357,7 +357,7 @@ fun Route.configureCharacterRouting(
 
             val contentType = call.request.contentType()
             if (!contentType.match(ContentType.MultiPart.FormData)) {
-                throw ValidationException("Content-Type must be multipart of form data")
+                throw BadRequestException("Content-Type must be multipart of form data")
             }
 
             var name: String? = null
@@ -441,7 +441,7 @@ fun Route.configureCharacterRouting(
             val sessionDbo = sessionRepository.verifyToken(call)
 
             val characterId = call.parameters["characterId"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val character = characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
@@ -462,7 +462,7 @@ fun Route.configureCharacterRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val characterId = call.parameters["characterId"]
-                ?: throw ValidationException("Missing characterId parameter")
+                ?: throw BadRequestException("Missing characterId parameter")
 
             val request = call.receive<ReportCharacterRequest>()
 

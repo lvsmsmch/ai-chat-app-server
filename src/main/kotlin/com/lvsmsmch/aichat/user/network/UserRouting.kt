@@ -34,7 +34,7 @@ fun Route.configureUserRouting(
             sessionRepository.verifyToken(call)
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val userDbo = userRepository.getUserById(userId)
                 ?: throw UserNotFoundException(id = userId)
@@ -50,7 +50,7 @@ fun Route.configureUserRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val userDbo = userRepository.getUserById(userId)
                 ?: throw UserNotFoundException(id = userId)
@@ -67,7 +67,7 @@ fun Route.configureUserRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val request = GetUserCharactersRequest(
                 visibility = call.request.queryParameters["visibility"]?.toIntOrNull(),
@@ -107,7 +107,7 @@ fun Route.configureUserRouting(
          */
         get("/{userId}/followers") {
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val request = GetFollowersRequest(
                 cursor = call.request.queryParameters["cursor"],
@@ -152,7 +152,7 @@ fun Route.configureUserRouting(
          */
         get("/{userId}/following") {
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val request = GetFollowingRequest(
                 cursor = call.request.queryParameters["cursor"],
@@ -199,7 +199,7 @@ fun Route.configureUserRouting(
             val sessionDbo = sessionRepository.verifyToken(call)
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             if (userId != sessionDbo.userId) {
                 throw ForbiddenException("You can only edit your own profile")
@@ -208,7 +208,7 @@ fun Route.configureUserRouting(
             // Check content type to ensure it's multipart/form-data
             val contentType = call.request.contentType()
             if (!contentType.match(ContentType.MultiPart.FormData)) {
-                throw ValidationException("Content-Type must be multipart of form data")
+                throw BadRequestException("Content-Type must be multipart of form data")
             }
 
             // Process multipart form data
@@ -284,12 +284,12 @@ fun Route.configureUserRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
 
             if (currentUserId == userId) {
-                throw ValidationException("Cannot follow yourself")
+                throw BadRequestException("Cannot follow yourself")
             }
 
             followRepository.addConnection(followerId = currentUserId, followeeId = userId)
@@ -305,12 +305,12 @@ fun Route.configureUserRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
 
             if (currentUserId == userId) {
-                throw ValidationException("Cannot unfollow yourself")
+                throw BadRequestException("Cannot unfollow yourself")
             }
 
             followRepository.removeConnection(followerId = currentUserId, followeeId = userId)
@@ -326,10 +326,10 @@ fun Route.configureUserRouting(
             val sessionDbo = sessionRepository.verifyToken(call)
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             if (userId != sessionDbo.userId) {
-                throw ForbiddenException("You can only edit your own profile")
+                throw BadRequestException("You can only edit your own profile")
             }
 
             userRepository.deleteUser(userId = userId)
@@ -345,7 +345,7 @@ fun Route.configureUserRouting(
             val currentUserId = sessionRepository.verifyToken(call).userId
 
             val userId = call.parameters["userId"]
-                ?: throw ValidationException("Missing userId parameter")
+                ?: throw BadRequestException("Missing userId parameter")
 
             val request = call.receive<ReportUserRequest>()
 

@@ -75,7 +75,7 @@ fun Route.configureReviewRouting(
         get {
             val request = GetReviewsRequest(
                 characterId = call.request.queryParameters["characterId"]
-                    ?: throw ValidationException("Missing characterId parameter"),
+                    ?: throw BadRequestException("Missing characterId parameter"),
                 sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0,
                 cursor = call.request.queryParameters["cursor"],
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10
@@ -115,7 +115,7 @@ fun Route.configureReviewRouting(
         patch("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing id parameter")
+                ?: throw BadRequestException("Missing id parameter")
             val request = call.receive<UpdateReviewRequest>()
 
             val reviewDbo = reviewRepository.getReviewById(reviewId)
@@ -124,9 +124,8 @@ fun Route.configureReviewRouting(
             if (reviewDbo.authorId != sessionDbo.userId) {
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this review")
             }
-
-            validateReviewRating(request.rating)
-            validateReviewText(request.text)
+            request.rating?.let { validateReviewRating(it)}
+            request.text?.let { validateReviewText(it)}
 
             reviewRepository.updateReview(
                 id = reviewId,
@@ -144,7 +143,7 @@ fun Route.configureReviewRouting(
         delete("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing reviewId parameter")
+                ?: throw BadRequestException("Missing reviewId parameter")
 
             val reviewDbo = reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -165,7 +164,7 @@ fun Route.configureReviewRouting(
         post("/{id}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing reviewId parameter")
+                ?: throw BadRequestException("Missing reviewId parameter")
             val request = call.receive<ReportReviewRequest>()
 
             reportRepository.addReport(
@@ -188,7 +187,7 @@ fun Route.configureReviewRouting(
         post("/{id}/like") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing reviewId parameter")
+                ?: throw BadRequestException("Missing reviewId parameter")
 
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -205,7 +204,7 @@ fun Route.configureReviewRouting(
         post("/{id}/unlike") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing reviewId parameter")
+                ?: throw BadRequestException("Missing reviewId parameter")
 
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
@@ -222,7 +221,7 @@ fun Route.configureReviewRouting(
         get("/{id}/likes") {
             sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
-                ?: throw ValidationException("Missing reviewId parameter")
+                ?: throw BadRequestException("Missing reviewId parameter")
             val request = GetReviewLikesRequest(
                 limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
             )

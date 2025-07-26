@@ -53,10 +53,26 @@ fun Route.configureChatRouting(
             request.chatSyncRequests.forEach { chatSyncRequest ->
                 val chat = chatRepository.getChatByClientId(chatSyncRequest.chatId)
 
-                if (chat != null && chat.userId == userId && !chat.isDeleted) {
+                if (chat != null && chat.userId == userId) {
+                    chatSyncRequest.updateRequest?.let { updateRequest ->
+                        chatRepository.updateChat(
+                            chatId = chat.id,
+                            customName = updateRequest.customName
+                        )
+                    }
 
-                    if (chatSyncRequest.isDeleted == true) {
-                        chatRepository.deleteChat(chatSyncRequest.chatId)
+                    if (chat.isDeleted || chatSyncRequest.isDeleted == true) {
+                        if (!chat.isDeleted) {
+                            chatRepository.deleteChat(chatSyncRequest.chatId)
+                        }
+
+                        chatSyncResponses.add(
+                            ChatSyncResponse(
+                                chatId = chat.clientId,
+                                chat = chatRepository.getChatById(chat.id)!!.toChatDto(mapper),
+                                isDeleted = true
+                            )
+                        )
                         return@forEach
                     }
 
@@ -110,135 +126,96 @@ fun Route.configureChatRouting(
                             newMessages = newMessages.map { it.toMessageDto(mapper) },
                             updatedMessages = updatedMessages.map { it.toMessageDto(mapper) },
                             deletedMessageIds = deletedMessageIds,
-                            lastSyncTimestamp = UtcTimestamp.now().toString()
+                            isDeleted = false
                         )
                     )
                 }
             }
 
 
-            allUserChats
-                .filter { !it.isDeleted && it.clientId !in requestedChatIds }
-                .forEach { chat ->
-                    // Для новых чатов ограничиваем количество сообщений
-                    val limitedMessages = messageRepository.getMessagesPaginated(
-                        chatId = chat.id,
-                        cursor = null,
-                        limit = 50
-                    )
+            if (request.fullSync) {
+                allUserChats
+                    .filter { it.clientId !in requestedChatIds }
+                    .forEach { chat ->
+                        if (chat.isDeleted) {
+                            chatSyncResponses.add(
+                                ChatSyncResponse(
+                                    chatId = chat.clientId,
+                                    chat = chat.toChatDto(mapper),
+                                    isDeleted = true
+                                )
+                            )
 
-                    chatSyncResponses.add(
-                        ChatSyncResponse(
-                            chatId = chat.clientId,
-                            chat = chat.toChatDto(mapper),
-                            newMessages = limitedMessages.map { it.toMessageDto(mapper) },
-                            updatedMessages = emptyList(),
-                            deletedMessageIds = emptyList(),
-                            lastSyncTimestamp = UtcTimestamp.now().toString()
+                            return@forEach
+                        }
+
+                        val limitedMessages = messageRepository.getMessagesPaginated(
+                            chatId = chat.id,
+                            cursor = null,
+                            limit = 50
                         )
-                    )
-                }
 
-            // Находим удаленные чаты
-            val deletedChatIds = allUserChats
-                .filter { it.isDeleted && it.clientId in requestedChatIds }
-                .map { it.clientId }
+                        chatSyncResponses.add(
+                            ChatSyncResponse(
+                                chatId = chat.clientId,
+                                chat = chat.toChatDto(mapper),
+                                newMessages = limitedMessages.map { it.toMessageDto(mapper) },
+                                isDeleted = false
+                            )
+                        )
+                    }
+            }
 
             call.respondSuccess(
                 BatchSyncResponse(
-                    chatSyncResponses = chatSyncResponses,
-                    deletedChatIds = deletedChatIds
+                    chatSyncResponses = chatSyncResponses
                 )
             )
         }
 
         // ========== УПРАВЛЕНИЕ ЧАТАМИ ==========
 
-        /**
-         * POST /chats
-         * Создание нового чата (поддержка direct и group чатов)
-         */
-        post("/new/direct") {
+
+        post("/new") {
             val userId = sessionRepository.verifyToken(call).userId
-            val request = call.receive<CreateDirectChatRequest>()
+            val request = call.receive<CreateChatRequest>()
 
-            val characterDbo = characterRepository.getCharacter(request.characterId)
-                ?: throw CharacterNotFoundException(request.characterId)  // Для персонажей
-
-            // Проверяем существующий чат
-            val existingChat = chatRepository.findChatByUserAndCharacter(userId, request.characterId)
-
-            if (existingChat != null && !existingChat.isDeleted) {
-                throw ValidationException("Chat with this character already exists")
+            chatRepository.getChatByClientId(request.chatId)?.let { _ ->
+                throw ForbiddenException("Chat already exists")
             }
 
-            // Создаем чат
-            val chatDbo = ChatDbo(
-                id = idGenerator.generateId(EntityType.CHAT),
-                clientId = request.chatId,
-                userId = userId,
-                characterIds = listOf(request.characterId),
-                chatType = ChatType.DIRECT
-            )
-
-            chatRepository.insertChat(chatDbo)
-
-            characterActivityLogRepository.logActivity(
-                activityType = ActivityType.CHAT_CREATED,
-                characterId = request.characterId,
-                userId = userId
-            )
-
-            val newCharacterMessage = MessageDbo(
-                id = idGenerator.generateId(EntityType.MESSAGE),
-                chatId = chatDbo.id,
-                chatClientId = chatDbo.clientId,
-                clientId = request.initialMessageId,
-                senderId = request.characterId,
-                isSentByUser = false,
-                text = "",
-                status = MessageStatus.STREAMING.value,
-            ).also {
-                messageRepository.insertMessage(it)
-                messageFinisher.finishMessageAsync(it.id)
-            }
-
-            val chatDto = chatDbo.toChatDto(mapper)
-
-            call.respondSuccess(
-                CreateChatResponse(
-                    chat = chatDto,
-                    initialMessage = newCharacterMessage.toMessageDto(mapper)
-                )
-            )
-        }
-
-        post("/new/group") {
-            val userId = sessionRepository.verifyToken(call).userId
-            val request = call.receive<CreateGroupChatRequest>()
-
-            if (request.characterIds.size !in 2..10) {
-                throw ValidationException("Unsupported size of characters (should be from 2 to 10)")
-            }
+            validateCharactersSize(request.characterIds.size)
 
             val characters = request.characterIds.mapNotNull { charId ->
                 characterRepository.getCharacter(charId)
             }
 
             if (characters.size != request.characterIds.size) {
-                throw ValidationException("Some characters not found")
+                throw BadRequestException("Some characters not found")
+            }
+
+            val isDirect = request.characterIds.size == 1
+
+            if (isDirect) {
+                val existingChat = chatRepository.findChatByUserAndCharacter(
+                    userId, request.characterIds.first()
+                )
+                if (existingChat != null && !existingChat.isDeleted) {
+                    throw BadRequestException("Chat with this character already exists")
+                }
             }
 
             val chatDbo = ChatDbo(
                 id = idGenerator.generateId(EntityType.CHAT),
+                clientId = request.chatId,
                 userId = userId,
                 characterIds = request.characterIds,
-                chatType = ChatType.GROUP
+                type = if (isDirect) ChatType.DIRECT else ChatType.GROUP
             )
 
             chatRepository.insertChat(chatDbo)
 
-            characters.map { it.id }.forEach { characterId ->
+            request.characterIds.forEach { characterId ->
                 characterActivityLogRepository.logActivity(
                     activityType = ActivityType.CHAT_CREATED,
                     characterId = characterId,
@@ -246,9 +223,32 @@ fun Route.configureChatRouting(
                 )
             }
 
+
+            val initialMessage = if (request.initialMessageId != null) {
+                MessageDbo(
+                    id = idGenerator.generateId(EntityType.MESSAGE),
+                    chatId = chatDbo.id,
+                    chatClientId = chatDbo.clientId,
+                    clientId = request.initialMessageId,
+                    senderId = request.characterIds.first(),
+                    isSentByUser = false,
+                    text = "",
+                    status = MessageStatus.STREAMING.value,
+                ).also {
+                    messageRepository.insertMessage(it)
+                    messageFinisher.finishMessageAsync(it.id)
+                }
+            } else null
+
+
             val chatDto = chatDbo.toChatDto(mapper)
 
-            call.respondSuccess(CreateChatResponse(chat = chatDto))
+            call.respondSuccess(
+                CreateChatResponse(
+                    chat = chatDto,
+                    initialMessage = initialMessage?.toMessageDto(mapper)
+                )
+            )
         }
 
         /**
@@ -258,7 +258,7 @@ fun Route.configureChatRouting(
         get("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
 
             val chat = chatRepository.getChatByClientId(chatId)
                 ?: throw ChatNotFoundException(chatId)
@@ -278,7 +278,7 @@ fun Route.configureChatRouting(
         put("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
             val request = call.receive<UpdateChatRequest>()
 
             val chat = chatRepository.getChatByClientId(chatId)
@@ -290,7 +290,7 @@ fun Route.configureChatRouting(
 
             chatRepository.updateChat(
                 chatId = chat.id,
-                isChatMuted = request.isMuted
+                customName = request.customName
             )
 
             val updatedChat = chatRepository.getChatById(chat.id)!!
@@ -306,7 +306,7 @@ fun Route.configureChatRouting(
         delete("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
 
             val chat = chatRepository.getChatByClientId(chatId)
                 ?: throw ChatNotFoundException(chatId)
@@ -319,6 +319,47 @@ fun Route.configureChatRouting(
             call.respondSuccess()
         }
 
+        /**
+         * DELETE /chats
+         * Удаление списка чатов
+         */
+        post("/delete") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val request = call.receive<DeleteChatsRequest>()
+
+            if (request.chatIds.isEmpty()) {
+                throw BadRequestException("At least one chat ID must be provided")
+            }
+
+            if (request.chatIds.size > 100) {
+                throw BadRequestException("Cannot delete more than 100 chats at once")
+            }
+
+            val chatIds = request.chatIds.distinct()
+            val chats = chatRepository.getChatsByClientIds(chatIds)
+
+            // Проверяем, что все чаты найдены
+            val foundChatIds = chats.map { it.clientId }.toSet()
+            val notFoundChatIds = chatIds.toSet() - foundChatIds
+            if (notFoundChatIds.isNotEmpty()) {
+                throw BadRequestException("Chats not found: ${notFoundChatIds.joinToString(", ")}")
+            }
+
+            // Проверяем, что все чаты принадлежат пользователю
+            val unauthorizedChats = chats.filter { it.userId != userId }
+            if (unauthorizedChats.isNotEmpty()) {
+                val unauthorizedIds = unauthorizedChats.map { it.clientId }
+                throw ForbiddenException("Access denied to chats: ${unauthorizedIds.joinToString(", ")}")
+            }
+
+            // Удаляем чаты
+            val chatDbIds = chats.map { it.id }
+            chatRepository.deleteChatsByIds(chatDbIds)
+
+            call.respondSuccess(
+                DeleteChatsResponse(isSuccess = true)
+            )
+        }
         // ========== СООБЩЕНИЯ ==========
 
         /**
@@ -328,7 +369,7 @@ fun Route.configureChatRouting(
         get("/{chatId}/messages") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
 
             val request = GetMessagesRequest(
                 cursor = call.request.queryParameters["cursor"],
@@ -376,7 +417,7 @@ fun Route.configureChatRouting(
         post("/{chatId}/messages") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
             val request = call.receive<SendMessageRequest>()
 
             val chat = chatRepository.getChatByClientId(chatId)
@@ -386,11 +427,10 @@ fun Route.configureChatRouting(
                 throw ForbiddenException("Access denied to this chat")
             }
 
-            // Проверяем умную синхронизацию
-            val syncRequired = if (request.lastChatSyncTimestamp != null) {
-                val lastSync = UtcTimestamp.parse(request.lastChatSyncTimestamp)
-                messageRepository.hasChangesAfter(chat.id, lastSync)
-            } else false
+            val syncRequired = messageRepository.hasChangesAfter(
+                chatId = chat.id,
+                timestamp = UtcTimestamp.parse(request.lastChatSyncTimestamp)
+            )
 
             if (syncRequired) {
                 return@post call.respondSuccess(SendMessageResponse(syncRequired = true))
@@ -456,9 +496,9 @@ fun Route.configureChatRouting(
         post("/{chatId}/messages/{messageId}/regenerate") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
             val messageId = call.parameters["messageId"]
-                ?: throw ValidationException("Message ID is required")
+                ?: throw BadRequestException("Message ID is required")
 
             val chat = chatRepository.getChatByClientId(chatId)
                 ?: throw ChatNotFoundException(chatId)
@@ -468,15 +508,27 @@ fun Route.configureChatRouting(
             }
 
             val message = messageRepository.findByClientId(messageId)
-                ?: throw ValidationException("Message not found")
+                ?: throw BadRequestException("Message not found")
+
 
             if (message.isSentByUser) {
-                throw ValidationException("Can only regenerate AI messages")
+                throw BadRequestException("Can only regenerate AI messages")
+            }
+
+            val request = call.receive<ReloadMessageRequest>()
+
+            val syncRequired = messageRepository.hasChangesAfter(
+                chatId = chat.id,
+                timestamp = UtcTimestamp.parse(request.lastChatSyncTimestamp)
+            )
+
+            if (syncRequired) {
+                return@post call.respondSuccess(ReloadMessageResponse(syncRequired = true))
             }
 
             messageFinisher.finishMessageAsync(message.id)
 
-            call.respondSuccess()
+            call.respondSuccess(ReloadMessageResponse(syncRequired = false))
         }
 
         /**
@@ -486,7 +538,7 @@ fun Route.configureChatRouting(
         put("/{chatId}/messages/read") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
             val request = call.receive<MarkAsReadRequest>()
 
             val chat = chatRepository.getChatByClientId(chatId)
@@ -516,18 +568,50 @@ fun Route.configureChatRouting(
             )
         }
 
+        /**
+         * DELETE /chats/{chatId}/messages
+         * Удаление сообщений
+         */
+        post("/messages/delete") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val request = call.receive<DeleteMessagesRequest>()
+
+            val messageIds = request.messageIds.distinct()
+            val messageDbos = messageRepository.getMessagesByClientIds(messageIds)
+
+            val chatIds = messageDbos.map { it.chatId }.toSet().toList()
+
+            if (!chatRepository.doAllChatsBelongToUser(chatIds, userId)) {
+                throw ForbiddenException("Some of messages are not from your chats")
+            }
+
+            messageRepository.deleteMessagesByIds(
+                messageIds = messageDbos.map { it.id }
+            )
+
+            call.respondSuccess(DeleteMessagesResponse(isSuccess = true))
+        }
+
         // ========== SSE СТРИМИНГ ==========
 
         /**
          * GET /chats/{chatId}/messages/{messageId}/stream
          * Подписка на стрим обновлений сообщения через SSE
          */
-        get("/{chatId}/messages/{messageId}/stream") {
+// ========== SSE СТРИМИНГ ==========
+
+        /**
+         * POST /chats/{chatId}/messages/{messageId}/stream
+         * Подписка на стрим обновлений сообщения через SSE с поддержкой синхронизации
+         */
+        post("/{chatId}/messages/{messageId}/stream") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
-                ?: throw ValidationException("Chat ID is required")
+                ?: throw BadRequestException("Chat ID is required")
             val messageId = call.parameters["messageId"]
-                ?: throw ValidationException("Message ID is required")
+                ?: throw BadRequestException("Message ID is required")
+
+            val request = call.receive<StreamMessageRequest>()
 
             val chat = chatRepository.getChatByClientId(chatId)
                 ?: throw ChatNotFoundException(chatId)
@@ -537,14 +621,14 @@ fun Route.configureChatRouting(
             }
 
             val message = messageRepository.findByClientId(messageId)
-                ?: throw ValidationException("Message not found")
+                ?: throw BadRequestException("Message not found")
 
             if (message.chatId != chat.id) {
-                throw ValidationException("Message does not belong to this chat")
+                throw BadRequestException("Message does not belong to this chat")
             }
 
             if (message.isSentByUser) {
-                throw ValidationException("Cannot stream user messages")
+                throw BadRequestException("Cannot stream user messages")
             }
 
             // Устанавливаем заголовки для SSE
@@ -558,42 +642,78 @@ fun Route.configureChatRouting(
                 try {
                     // Отправляем текущее состояние сообщения сразу
                     val currentMessage = messageRepository.getMessageById(message.id)
-                    if (currentMessage != null) {
-                        val initialChunk = MessageStreamChunk(
-                            chunk = currentMessage.text,
-                            isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
-                            status = when (currentMessage.status) {
-                                MessageStatus.COMPLETED.value -> MessageStatus.COMPLETED.value
-                                MessageStatus.FAILED.value -> MessageStatus.FAILED.value
-                                else -> MessageStatus.STREAMING.value
-                            }
+                        ?: return@respondTextWriter
+
+                    val initialChunk = StreamMessageChunk(
+                        chunk = currentMessage.text,
+                        isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
+                        isFailed = currentMessage.status == MessageStatus.FAILED.value,
+                        nsfw = false
+                    )
+
+                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
+                    flush()
+
+                    // Если сообщение уже завершено, отправляем финальный чанк с синхронизацией и закрываем
+                    if (currentMessage.textVersion == request.version &&
+                        currentMessage.status == MessageStatus.COMPLETED.value
+                    ) {
+                        val finalSyncResponse = generateChatSyncResponse(
+                            chat = chat,
+                            chatSyncRequest = request.chatSyncRequest,
+                            chatRepository = chatRepository,
+                            messageRepository = messageRepository,
+                            mapper = mapper
                         )
 
-                        write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
+                        val finalChunk = StreamMessageChunk(
+                            chunk = "",
+                            isComplete = true,
+                            isFailed = false,
+                            nsfw = false,
+                            chatSyncResponse = finalSyncResponse
+                        )
+
+                        write("data: ${defaultJson.encodeToString(finalChunk)}\n\n")
                         flush()
+                        return@respondTextWriter
                     }
 
-                    // Если сообщение уже завершено, закрываем стрим
-                    if (currentMessage?.status == MessageStatus.COMPLETED.value ||
-                        currentMessage?.status == MessageStatus.FAILED.value
+                    if (currentMessage.textVersion != request.version ||
+                        currentMessage.status == MessageStatus.FAILED.value
                     ) {
-                        return@respondTextWriter
+                        messageFinisher.finishMessageAsync(message.id)
                     }
 
                     // Подписываемся на обновления сообщения
                     messageRepository.streamMessageUpdates(message.id)
-                        .takeWhile { !it.isComplete && !it.isFailed }
                         .collect { update ->
-                            val chunk = MessageStreamChunk(
-                                chunk = update.newText,
-                                isComplete = update.isComplete,
-                                status = when {
-                                    update.isFailed -> MessageStatus.FAILED.value
-                                    update.isComplete -> MessageStatus.COMPLETED.value
-                                    else -> MessageStatus.STREAMING.value
-                                },
-                                error = if (update.isFailed) "Generation failed" else null
-                            )
+                            val chunk = if (update.isComplete || update.isFailed) {
+                                // Финальный чанк с синхронизацией
+                                val finalSyncResponse = generateChatSyncResponse(
+                                    chat = chat,
+                                    chatSyncRequest = request.chatSyncRequest,
+                                    chatRepository = chatRepository,
+                                    messageRepository = messageRepository,
+                                    mapper = mapper
+                                )
+
+                                StreamMessageChunk(
+                                    chunk = update.newText,
+                                    isComplete = update.isComplete,
+                                    isFailed = update.isFailed,
+                                    nsfw = false,
+                                    chatSyncResponse = finalSyncResponse
+                                )
+                            } else {
+                                // Обычный чанк без синхронизации
+                                StreamMessageChunk(
+                                    chunk = update.newText,
+                                    isComplete = false,
+                                    isFailed = false,
+                                    nsfw = false
+                                )
+                            }
 
                             withContext(Dispatchers.IO) {
                                 write("data: ${defaultJson.encodeToString(chunk)}\n\n")
@@ -607,11 +727,11 @@ fun Route.configureChatRouting(
                         }
                 } catch (e: Exception) {
                     // Отправляем ошибку и закрываем соединение
-                    val errorChunk = MessageStreamChunk(
+                    val errorChunk = StreamMessageChunk(
                         chunk = "",
-                        isComplete = true,
-                        status = MessageStatus.FAILED.value,
-                        error = "Streaming error: ${e.message}"
+                        isComplete = false,
+                        isFailed = true,
+                        nsfw = false
                     )
 
                     try {
@@ -626,4 +746,64 @@ fun Route.configureChatRouting(
             }
         }
     }
+}
+
+
+
+
+// Вспомогательная функция для генерации ChatSyncResponse
+suspend fun generateChatSyncResponse(
+    chat: ChatDbo,
+    chatSyncRequest: ChatSyncRequest,
+    chatRepository: ChatRepository,
+    messageRepository: MessageRepository,
+    mapper: Mapper
+): ChatSyncResponse {
+    // Логика синхронизации чата (аналогично batch sync)
+    val syncTimestamp = chatSyncRequest.lastSyncTimestamp?.let {
+        UtcTimestamp.parse(it)
+    } ?: UtcTimestamp.now().subtractYears(100)
+
+    val oldestLoaded = chatSyncRequest.oldestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
+    val newestLoaded = chatSyncRequest.newestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
+
+    // Новые сообщения
+    val newMessages = if (newestLoaded != null) {
+        messageRepository.getMessagesCreatedAfter(chat.id, newestLoaded)
+    } else {
+        messageRepository.getMessagesCreatedAfter(chat.id, syncTimestamp)
+    }
+
+    // Обновленные сообщения в загруженном диапазоне
+    val updatedMessages = if (oldestLoaded != null && newestLoaded != null) {
+        messageRepository.getMessagesUpdatedInRange(
+            chatId = chat.id,
+            afterTimestamp = syncTimestamp,
+            oldestTime = oldestLoaded,
+            newestTime = newestLoaded
+        )
+    } else {
+        messageRepository.getMessagesUpdatedAfter(chat.id, syncTimestamp)
+    }
+
+    // Удаленные сообщения в загруженном диапазоне
+    val deletedMessageIds = if (oldestLoaded != null && newestLoaded != null) {
+        messageRepository.getDeletedMessageIdsInRange(
+            chatId = chat.id,
+            afterTimestamp = syncTimestamp,
+            oldestTime = oldestLoaded,
+            newestTime = newestLoaded
+        )
+    } else {
+        messageRepository.getDeletedMessageIdsAfter(chat.id, syncTimestamp)
+    }
+
+    return ChatSyncResponse(
+        chatId = chat.clientId,
+        chat = chat.toChatDto(mapper),
+        newMessages = newMessages.map { it.toMessageDto(mapper) },
+        updatedMessages = updatedMessages.map { it.toMessageDto(mapper) },
+        deletedMessageIds = deletedMessageIds,
+        isDeleted = false
+    )
 }

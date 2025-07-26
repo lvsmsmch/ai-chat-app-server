@@ -1,7 +1,7 @@
 package com.lvsmsmch.aichat._common
 
 import com.lvsmsmch.aichat.user.database.UserRepository
-import com.lvsmsmch.aichat.utils.ValidationException
+import com.lvsmsmch.aichat.utils.InternalServerErrorException
 
 class UsernameGenerator(
     private val userRepository: UserRepository
@@ -86,7 +86,7 @@ class UsernameGenerator(
             }
         }
 
-        throw ValidationException("Failed to generate unique username after ${MAX_STANDARD_ATTEMPTS + MAX_FALLBACK_ATTEMPTS} attempts")
+        throw InternalServerErrorException("Failed to generate unique username after ${MAX_STANDARD_ATTEMPTS + MAX_FALLBACK_ATTEMPTS} attempts")
     }
 
     /**

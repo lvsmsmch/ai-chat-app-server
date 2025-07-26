@@ -8,6 +8,14 @@ abstract class ApiException(
     val errorMessage: String = ""
 ) : RuntimeException(errorMessage)
 
+class BadRequestException(
+    errorMessage: String = "Bad Request"
+) : ApiException(
+    httpStatus = HttpStatusCode.BadRequest,
+    errorCode = "bad_request",
+    errorMessage = errorMessage
+)
+
 class OAuthException(
     errorMessage: String = "OAuth failed"
 ) : ApiException(

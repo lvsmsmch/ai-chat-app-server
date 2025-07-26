@@ -12,10 +12,11 @@ data class ChatDbo(
     val clientId: String = UUID.randomUUID().toString(),
     val lastModifiedAt: UtcTimestamp = UtcTimestamp.now(),
     val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val chatType: ChatType = ChatType.DIRECT,
+    val type: ChatType = ChatType.DIRECT,
     val userId: String,
     val characterIds: List<String> = listOf(),
-    val isChatMuted: Boolean = false,
+    val isMuted: Boolean = false,
+    val customName: String? = null,
     val isDeleted: Boolean = false,
     val deletedAt: UtcTimestamp = UtcTimestamp.now(),
 )

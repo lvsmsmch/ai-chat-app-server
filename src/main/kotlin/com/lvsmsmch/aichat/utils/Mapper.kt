@@ -164,22 +164,14 @@ suspend fun ChatDbo.toChatDto(
 
     return ChatDto(
         id = clientId,
-        chatType = chatType.code,
+        chatType = type.code,
         characters = characters,
-        isMuted = isChatMuted,
         createdAt = createdAt.toString(),
-        updatedAt = lastModifiedAt.toString(),
+        lastSyncTimestamp = UtcTimestamp.now().toString()
     )
 }
 
 suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
-    val status = when (status) {
-        MessageStatus.COMPLETED.value -> MessageStatus.COMPLETED.value
-        MessageStatus.FAILED.value -> MessageStatus.FAILED.value
-        MessageStatus.STREAMING.value -> MessageStatus.STREAMING.value
-        else -> MessageStatus.COMPLETED.value
-    }
-
     return MessageDto(
         id = clientId,
         chatId = chatClientId,
@@ -188,6 +180,7 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         isFromUser = isSentByUser,
         createdAt = createdAt.toString(),
         isRead = isRead,
-        status = status
+        status = status,
+        nsfw = nsfw
     )
 }

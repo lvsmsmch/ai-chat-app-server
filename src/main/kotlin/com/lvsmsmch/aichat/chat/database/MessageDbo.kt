@@ -17,9 +17,11 @@ data class MessageDbo(
     val senderId: String,
     val isSentByUser: Boolean = false,
     val text: String,
+    val textVersion: Int = 0,
     val imageUrl: String? = null,
     val isRead: Boolean = false,
     val status: String,
+    val nsfw: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: UtcTimestamp = UtcTimestamp.now(),
 )

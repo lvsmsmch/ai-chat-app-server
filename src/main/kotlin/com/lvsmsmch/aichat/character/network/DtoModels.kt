@@ -19,7 +19,7 @@ data class CharacterDto(
     @SerialName("totalChats") val totalChats: Int,
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,
-    @SerialName("averageRating") val averageRating: Float
+    @SerialName("averageRating") val averageRating: Float,
 )
 
 @Serializable

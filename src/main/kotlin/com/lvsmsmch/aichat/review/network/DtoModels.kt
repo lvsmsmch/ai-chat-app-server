@@ -50,8 +50,8 @@ data class GetReviewsRequest(
 
 @Serializable
 data class UpdateReviewRequest(
-    @SerialName("rating") val rating: Int,
-    @SerialName("text") val text: String
+    @SerialName("rating") val rating: Int? = null,
+    @SerialName("text") val text: String? = null
 )
 
 @Serializable

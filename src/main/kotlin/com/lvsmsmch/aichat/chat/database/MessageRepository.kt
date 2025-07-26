@@ -305,6 +305,7 @@ class MessageRepository(
         isRead: Boolean? = null,
         status: String? = null,
         text: String? = null,
+        nsfw: Boolean? = null,
     ) {
         collection.findOneById(messageId) ?: return
         val updates = mutableListOf<Bson>()
@@ -312,6 +313,7 @@ class MessageRepository(
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
         status?.let { updates.add(setValue(MessageDbo::status, it)) }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
+        nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
         if (updates.isEmpty()) return // Nothing to update
         collection.updateOneById(
             messageId,

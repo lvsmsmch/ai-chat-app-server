@@ -41,7 +41,7 @@ class ChatRepository(
             collection.ensureIndex(
                 ascending(
                     ChatDbo::userId,
-                    ChatDbo::chatType,
+                    ChatDbo::type,
                     ChatDbo::characterIds
                 )
             )
@@ -89,6 +89,10 @@ class ChatRepository(
 
     suspend fun getChatByClientId(clientId: String): ChatDbo? {
         return collection.findOne(ChatDbo::clientId eq clientId)
+    }
+
+    suspend fun getChatsByClientIds(clientIds: List<String>): List<ChatDbo> {
+        return collection.find(ChatDbo::clientId `in` clientIds).toList()
     }
 
     suspend fun getChatsByUserId(userId: String): List<ChatDbo> {
@@ -171,7 +175,7 @@ class ChatRepository(
             and(
                 ChatDbo::userId eq userId,
                 if (includeDeleted) EMPTY_BSON else ChatDbo::isDeleted eq false,
-                ChatDbo::chatType eq ChatType.DIRECT,
+                ChatDbo::type eq ChatType.DIRECT,
                 ChatDbo::characterIds eq listOf(characterId)
             )
         )
@@ -186,7 +190,7 @@ class ChatRepository(
         return collection.find(
             and(
                 ChatDbo::userId eq userId,
-                ChatDbo::chatType eq ChatType.GROUP,
+                ChatDbo::type eq ChatType.GROUP,
                 ChatDbo::isDeleted eq false
             )
         ).toList().find { chat ->
@@ -226,11 +230,13 @@ class ChatRepository(
      */
     suspend fun updateChat(
         chatId: String,
-        isChatMuted: Boolean? = null,
+        isMuted: Boolean? = null,
+        customName: String? = null
     ) {
         collection.findOneById(chatId) ?: return
         val updates = mutableListOf<Bson>()
-        isChatMuted?.let { updates.add(setValue(ChatDbo::isChatMuted, it)) }
+        isMuted?.let { updates.add(setValue(ChatDbo::isMuted, it)) }
+        customName?.let { updates.add(setValue(ChatDbo::customName, it)) }
         if (updates.isEmpty()) return // Nothing to update
         collection.updateOneById(
             chatId,
