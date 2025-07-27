@@ -2,9 +2,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    kotlin("jvm") version "1.9.22"
+    kotlin("jvm") version "2.0.20"
     id("io.ktor.plugin") version "2.3.10"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.20"
     application
 }
 
@@ -52,7 +52,7 @@ dependencies {
     implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
 
     // Tests
-    testImplementation("org.jetbrains.kotlin:kotlin-test:1.9.22") // Match Kotlin version
+    testImplementation("org.jetbrains.kotlin:kotlin-test:2.0.20")
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("io.mockk:mockk:1.13.7")
 

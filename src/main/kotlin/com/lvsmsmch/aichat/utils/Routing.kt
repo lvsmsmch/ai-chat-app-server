@@ -86,6 +86,7 @@ fun Application.configureRouting(
                 characterActivityLogRepository = characterActivityLogRepository,
                 idGenerator = idGenerator,
                 messageFinisher = messageFinisher,
+                reportRepository = reportRepository,
                 mapper = mapper
             )
 
