@@ -165,9 +165,9 @@ suspend fun ChatDbo.toChatDto(
     return ChatDto(
         id = clientId,
         chatType = type.code,
+        customName = customName,
         characters = characters,
-        createdAt = createdAt.toString(),
-        lastSyncTimestamp = UtcTimestamp.now().toString()
+        createdAt = createdAt.toString()
     )
 }
 
@@ -180,7 +180,8 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         isFromUser = isSentByUser,
         createdAt = createdAt.toString(),
         isRead = isRead,
-        status = status,
+        isCompleted = status == MessageStatus.COMPLETED.value,
+        isFailedCompleting = status == MessageStatus.FAILED.value,
         nsfw = nsfw
     )
 }

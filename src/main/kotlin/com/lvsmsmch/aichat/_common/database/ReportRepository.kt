@@ -10,7 +10,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 
 
 @Serializable enum class ReportEntity(val code: String) {
-    User("user"), Character("character"), Review("review");
+    User("user"), Character("character"), Review("review"), Message("message");
 }
 
 @Serializable
