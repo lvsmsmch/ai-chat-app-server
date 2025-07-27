@@ -82,8 +82,9 @@ fun Application.module() {
 
     val databaseScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val database = KMongo.createClient("mongodb://localhost:27017").coroutine
-        .getDatabase("ai_chat_app_database")
+    val database = KMongo.createClient(
+        System.getenv("MONGODB_URI") ?: "mongodb://localhost:27017"
+    ).coroutine.getDatabase("ai_chat_app_database")
 
     val sessionRepository = SessionRepository(
         database.getCollection<SessionDbo>("sessions")
