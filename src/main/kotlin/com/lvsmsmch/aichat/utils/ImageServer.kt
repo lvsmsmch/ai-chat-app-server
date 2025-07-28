@@ -23,7 +23,6 @@ object ImageServer {
      */
     suspend fun uploadImageOnServer(image: File): String {
 
-
         // test configuration >>>>>>>>>
         delay(2000L + Random.nextLong(1000L)) // 2-3 секунды
         return "https://picsum.photos/800/600?random=${Random.nextInt(100_000)}"
@@ -32,10 +31,10 @@ object ImageServer {
 
         // S3 configuration
 
-        val bucketName = loadConfig().getProperty("AWS_S3_BUCKET_NAME")
-        val region = loadConfig().getProperty("AWS_REGION")
-        val accessKey = loadConfig().getProperty("AWS_ACCESS_KEY")
-        val secretKey = loadConfig().getProperty("AWS_SECRET_KEY")
+        val accessKey = System.getenv("AWS_ACCESS_KEY") ?: throw Exception("Missing AWS_ACCESS_KEY key")
+        val secretKey = System.getenv("AWS_SECRET_KEY") ?: throw Exception("Missing AWS_SECRET_KEY key")
+        val bucketName = System.getenv("AWS_S3_BUCKET_NAME") ?: throw Exception("Missing AWS_S3_BUCKET_NAME key")
+        val region = System.getenv("AWS_REGION") ?: throw Exception("Missing AWS_REGION key")
 
         // Generate a unique file name for the image
         val uniqueFileName = UUID.randomUUID().toString() + ".jpg"

@@ -2,13 +2,12 @@ package com.lvsmsmch.aichat.utils.updaters
 
 import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.character.database.CharacterRepository
-import io.ktor.util.logging.*
+import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
 
 fun configureCharacterRecommendationScoreUpdater(
-    logger: Logger,
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     updateIntervalMinutes: Long = 12 * 60 // раз в 12 часов

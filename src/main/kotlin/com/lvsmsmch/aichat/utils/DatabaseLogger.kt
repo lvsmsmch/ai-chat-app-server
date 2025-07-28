@@ -1,9 +1,6 @@
 package com.lvsmsmch.aichat.utils
 
-import org.slf4j.LoggerFactory
-
 inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectionName: String) {
-    val logger = LoggerFactory.getLogger("DatabaseLogger")
     val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(java.util.Date())
 
     // Extract ID
@@ -34,9 +31,7 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
         appendLine("+------------------------------------------------+")
         appendLine("|                 DATABASE EVENT                 |")
         appendLine("+------------------------------------------------+")
-        appendLine("| Operation: $operationType")
-        appendLine("| Collection: $collectionName")
-        appendLine("| Type: $entityType")
+        appendLine("| Operation: $operationType | Collection: $collectionName | Type: $entityType")
 //        appendLine("| ID: $extractedId")
 //        appendLine("| Time: $timestamp")
         appendLine("+------------------------------------------------+")

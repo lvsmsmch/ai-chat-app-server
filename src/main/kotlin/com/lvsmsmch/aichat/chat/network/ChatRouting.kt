@@ -11,7 +11,6 @@ import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.*
-import com.lvsmsmch.aichat.review.network.ReportReviewRequest
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -19,7 +18,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
@@ -699,7 +697,7 @@ fun Route.configureChatRouting(
                         // Игнорируем ошибки записи при закрытии соединения
                     }
 
-                    call.application.log.error("Error in SSE stream for message $messageId", e)
+                    logger.error("Error in SSE stream for message $messageId", e)
                 }
             }
         }

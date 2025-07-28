@@ -2,8 +2,6 @@ package com.lvsmsmch.aichat.utils
 
 import com.lvsmsmch.aichat._common.database.EntityIdStatsRepository
 import com.lvsmsmch.aichat._common.database.EntityType
-import com.lvsmsmch.aichat._common.database.ReportRepository
-import com.lvsmsmch.aichat.cache.database.DefaultRecommendationsCacheRepository
 import com.lvsmsmch.aichat.character.database.*
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
@@ -11,7 +9,6 @@ import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.FollowRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
-import io.ktor.util.logging.*
 import kotlinx.coroutines.*
 
 /**
@@ -19,7 +16,6 @@ import kotlinx.coroutines.*
  * Returns a Job that can be cancelled to stop all repository connections.
  */
 fun configureRepositoriesConnections(
-    logger: Logger,
     databaseScope: CoroutineScope,
     entityIdStatsRepository: EntityIdStatsRepository,
     userRepository: UserRepository,

@@ -16,8 +16,8 @@ import kotlinx.serialization.json.*
 
 object AiMessageGeneratorUtil {
 
-    private val openAiApiUrl = loadConfig().getProperty("OPEN_AI_API_URL")
-    private val openAiApiKey = loadConfig().getProperty("OPEN_AI_API_KEY")
+    private val openAiApiUrl = System.getenv("OPEN_AI_API_URL") ?: throw Exception("Missing OPEN_AI_API_URL key")
+    private val openAiApiKey = System.getenv("OPEN_AI_API_KEY") ?: throw Exception("Missing OPEN_AI_API_KEY key")
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(defaultJson)

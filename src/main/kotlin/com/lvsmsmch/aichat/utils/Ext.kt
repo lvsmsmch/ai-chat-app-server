@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.litote.kmongo.coroutine.CoroutineCollection
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.*
@@ -89,35 +91,37 @@ fun generateHash(hashSize: Int, vararg values: String): String {
         .take(hashSize)
 }
 
-fun Application.logStructuredError(
-    call: ApplicationCall,
-    errorCode: String,
-    statusCode: Int,
-    message: String,
-    userId: String? = null,
-    exception: Throwable? = null
-) {
-    data class ErrorLogEntry(
-        val errorCode: String,
-        val statusCode: Int,
-        val uri: String,
-        val method: String,
-        val message: String,
-        val correlationId: String? = null,
-        val userId: String? = null,
-        val stackTrace: String? = null
-    )
+//fun Application.logStructuredError(
+//    call: ApplicationCall,
+//    errorCode: String,
+//    statusCode: Int,
+//    message: String,
+//    userId: String? = null,
+//    exception: Throwable? = null
+//) {
+//    data class ErrorLogEntry(
+//        val errorCode: String,
+//        val statusCode: Int,
+//        val uri: String,
+//        val method: String,
+//        val message: String,
+//        val correlationId: String? = null,
+//        val userId: String? = null,
+//        val stackTrace: String? = null
+//    )
+//
+//    val entry = ErrorLogEntry(
+//        errorCode = errorCode,
+//        statusCode = statusCode,
+//        uri = call.request.path(),
+//        method = call.request.httpMethod.value,
+//        message = message,
+//        correlationId = call.request.header("X-Correlation-ID"),
+//        userId = userId,
+//        stackTrace = exception?.stackTraceToString()
+//    )
+//
+//    logger.error(Json.encodeToString(entry))
+//}
 
-    val entry = ErrorLogEntry(
-        errorCode = errorCode,
-        statusCode = statusCode,
-        uri = call.request.path(),
-        method = call.request.httpMethod.value,
-        message = message,
-        correlationId = call.request.header("X-Correlation-ID"),
-        userId = userId,
-        stackTrace = exception?.stackTraceToString()
-    )
-
-    this.log.error(Json.encodeToString(entry))
-}
+val logger: Logger get() = LoggerFactory.getLogger("default")

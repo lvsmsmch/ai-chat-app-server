@@ -46,12 +46,8 @@ fun Application.configureRouting(
     messageFinisher: MessageFinisher
 ) {
     routing {
-        // Базовые тестовые эндпоинты
-        post("/test") {
-            call.respond(HttpStatusCode.OK, "Test successful")
-        }
-
-        post("/test111") {
+        get("/test") {
+            logger.info("\"test\" called!")
             call.respond(HttpStatusCode.OK, "Test successful")
         }
 

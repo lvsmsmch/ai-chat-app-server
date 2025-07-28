@@ -1,12 +1,11 @@
 package com.lvsmsmch.aichat.utils.workers
 
-import io.ktor.util.logging.*
 import kotlinx.coroutines.*
 
 import com.lvsmsmch.aichat.character.database.SearchSuggestionsRepository
+import com.lvsmsmch.aichat.utils.logger
 
 fun fillDefaultSuggestions(
-    logger: Logger,
     databaseScope: CoroutineScope,
     searchSuggestionsRepository: SearchSuggestionsRepository
 ): Job {

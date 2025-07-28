@@ -42,8 +42,11 @@ import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 fun main() {
+    logger.info("Application started...")
     embeddedServer(Netty, port = 8080) {
+        logger.info("Server started...")
         module()
+        logger.info("Module configured...")
     }.start(wait = true)
 }
 
@@ -171,7 +174,6 @@ fun Application.module() {
     )
 
     val repositoriesConnectionsJob = configureRepositoriesConnections(
-        logger = log,
         databaseScope = databaseScope,
         entityIdStatsRepository = entityIdStatsRepository,
         userRepository = userRepository,
@@ -185,7 +187,6 @@ fun Application.module() {
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
-        logger = log,
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         characterActivityLogRepository = characterActivityLogRepository,
@@ -194,14 +195,12 @@ fun Application.module() {
     )
 
     val recommendationScoreUpdaterJob = configureCharacterRecommendationScoreUpdater(
-        logger = log,
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         updateIntervalMinutes = 60
     )
 
     val coOccurrenceScoreUpdaterJob = configureCharacterCoOccurrenceUpdater(
-        logger = log,
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         chatRepository = chatRepository,
@@ -209,7 +208,6 @@ fun Application.module() {
     )
 
     val userRecommendationsUpdaterJob = configureUserRecommendationsUpdater(
-        logger = log,
         databaseScope = databaseScope,
         userRepository = userRepository,
         characterRepository = characterRepository,
@@ -219,7 +217,6 @@ fun Application.module() {
     )
 
     val categoryCacheUpdaterJob = configureCategoryRecommendationsUpdater(
-        logger = log,
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         categoryRecommendationsCacheRepository = categoryRecommendationsCacheRepository,
@@ -227,7 +224,6 @@ fun Application.module() {
     )
 
     val defaultPersonalizedUpdaterJob = configureDefaultRecommendationsUpdater(
-        logger = log,
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         defaultRecommendationsCacheRepository = defaultRecommendationsCacheRepository,
@@ -235,7 +231,6 @@ fun Application.module() {
     )
 
     fillDefaultSuggestions(
-        logger = log,
         databaseScope = databaseScope,
         searchSuggestionsRepository = searchSuggestionsRepository
     )
@@ -261,7 +256,7 @@ fun Application.module() {
 
     environment.monitor.subscribe(ApplicationStopping) {
         runBlocking {
-            log.info("Application stopping, cancelling repository connections...")
+            logger.info("Application stopping, cancelling repository connections...")
             repositoriesConnectionsJob.cancelAndJoin()
             characterTrendingScoreUpdaterJob.cancelAndJoin()
             recommendationScoreUpdaterJob.cancelAndJoin()
@@ -271,7 +266,7 @@ fun Application.module() {
             defaultPersonalizedUpdaterJob.cancelAndJoin()
 
             databaseScope.cancel()
-            log.info("All repository connections have been cancelled")
+            logger.info("All repository connections have been cancelled")
         }
     }
 }

@@ -38,11 +38,12 @@ fun Route.configureAuthRouting(
             validateDeviceId(request.deviceId)
 
             val oauthUserData = HttpClient().use { client ->
-                val googleOauthTokenInfoUrl = loadConfig().getProperty("GOOGLE_OAUTH_TOKEN_INFO_URL")
+                val googleOauthTokenInfoUrl = System.getenv("GOOGLE_OAUTH_TOKEN_INFO_URL")
+                    ?: throw Exception("Missing GOOGLE_OAUTH_TOKEN_INFO_URL key")
                 val apiUrl = "$googleOauthTokenInfoUrl?id_token=${request.googleToken}"
                 val response = client.get(apiUrl)
                 if (response.status != HttpStatusCode.OK) {
-                    application.log.error(
+                    logger.error(
                         "OAuth response error occurred, " +
                                 "status: ${response.status}, " +
                                 "body: ${response.bodyAsText()}"

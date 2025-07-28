@@ -4,12 +4,11 @@ import com.lvsmsmch.aichat.character.database.ActivityType
 import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import io.ktor.util.logging.*
+import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 
 fun configureCharacterTrendingScoreUpdater(
-    logger: Logger,
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     characterActivityLogRepository: CharacterActivityLogRepository,

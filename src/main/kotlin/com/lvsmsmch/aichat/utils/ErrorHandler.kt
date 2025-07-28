@@ -9,7 +9,7 @@ fun Application.configureErrorHandling() {
         // Handle our custom application exceptions
         exception<ApiException> { call, exception ->
             // Log the error with context
-            call.application.log.error(
+            logger.error(
                 "Application exception: ${exception.errorCode} (${exception.httpStatus}) - " +
                         "Path: ${call.request.path()}, Message: ${exception.errorMessage}"
             )
@@ -24,7 +24,7 @@ fun Application.configureErrorHandling() {
 
         // General catch-all for unexpected exceptions
         exception<Throwable> { call, exception ->
-            call.application.log.error(
+            logger.error(
                 "Unhandled exception for ${call.request.path()}: ${exception.message}",
                 exception
             )

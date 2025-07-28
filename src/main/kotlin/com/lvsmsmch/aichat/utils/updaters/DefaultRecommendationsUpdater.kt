@@ -2,12 +2,11 @@ package com.lvsmsmch.aichat.utils.updaters
 
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.cache.database.DefaultRecommendationsCacheRepository
-import io.ktor.util.logging.*
+import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 
 fun configureDefaultRecommendationsUpdater(
-    logger: Logger,
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     defaultRecommendationsCacheRepository: DefaultRecommendationsCacheRepository,

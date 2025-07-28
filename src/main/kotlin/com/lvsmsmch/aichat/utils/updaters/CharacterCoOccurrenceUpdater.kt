@@ -2,12 +2,11 @@ package com.lvsmsmch.aichat.utils.updaters
 
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
-import io.ktor.util.logging.*
+import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 
 fun configureCharacterCoOccurrenceUpdater(
-    logger: Logger,
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     chatRepository: ChatRepository,

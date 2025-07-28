@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.utils.updaters
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
-import io.ktor.util.logging.*
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
 
@@ -11,9 +10,9 @@ import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.cache.database.UserRecommendationsCacheRepository
 import com.lvsmsmch.aichat.user.database.UserDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
+import com.lvsmsmch.aichat.utils.logger
 
 fun configureUserRecommendationsUpdater(
-    logger: Logger,
     databaseScope: CoroutineScope,
     userRepository: UserRepository,
     characterRepository: CharacterRepository,
