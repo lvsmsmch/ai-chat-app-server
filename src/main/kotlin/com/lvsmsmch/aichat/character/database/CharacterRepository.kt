@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.character.database
 
 import com.lvsmsmch.aichat.utils.*
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -70,8 +71,8 @@ class CharacterRepository(
      * CREATE
      */
 
-    suspend fun addCharacter(character: CharacterDbo) {
-        collection.insertOne(character)
+    suspend fun addCharacter(session: ClientSession, character: CharacterDbo) {
+        collection.insertOne(session, character)
     }
 
     /**
@@ -165,6 +166,23 @@ class CharacterRepository(
         )
 
         return collection.find(filters).toList()
+    }
+
+    suspend fun getCharactersByUserId(
+        session: ClientSession,
+        userId: String,
+        includePrivate: Boolean = false
+    ): List<CharacterDbo> {
+        val filters = and(
+            CharacterDbo::authorId eq userId,
+            if (includePrivate) {
+                EMPTY_BSON
+            } else {
+                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
+            }
+        )
+
+        return collection.find(session, filters).toList()
     }
 
     suspend fun getUserCharactersWithCursor(
@@ -287,10 +305,16 @@ class CharacterRepository(
         return collection.findOneById(characterId)
     }
 
+    suspend fun getCharacter(session: ClientSession, characterId: String): CharacterDbo? {
+        return collection.findOneById(characterId, session)
+    }
+
+
     /**
      * UPDATE
      */
     suspend fun updateCharacter(
+        session: ClientSession,
         characterId: String,
         name: String? = null,
         description: String? = null,
@@ -316,11 +340,11 @@ class CharacterRepository(
             return
         }
 
-        collection.updateOneById(characterId, combine(*updates.toTypedArray()))
+        collection.updateOneById(session, characterId, combine(*updates.toTypedArray()))
     }
 
-    suspend fun updateAvgRating(characterId: String, newRating: Float) {
-        collection.updateOneById(characterId, setValue(CharacterDbo::averageRating, newRating))
+    suspend fun updateAvgRating(session: ClientSession, characterId: String, newRating: Float) {
+        collection.updateOneById(session, characterId, setValue(CharacterDbo::averageRating, newRating))
     }
 
     suspend fun updateTrendingScore(characterId: String, trendingScore: Float) {
@@ -348,30 +372,31 @@ class CharacterRepository(
         )
     }
 
-    suspend fun incrementReviewsCount(characterId: String, increment: Int) {
-        collection.updateOneById(characterId, inc(CharacterDbo::totalReviews, increment))
+    suspend fun incrementReviewsCount(session: ClientSession, characterId: String, increment: Int) {
+        collection.updateOneById(session, characterId, inc(CharacterDbo::totalReviews, increment))
     }
 
-    suspend fun incrementChatsCount(characterId: String, increment: Int) {
-        collection.updateOneById(characterId, inc(CharacterDbo::totalChats, increment))
+    suspend fun incrementChatsCount(session: ClientSession, characterId: String, increment: Int) {
+        collection.updateOneById(session, characterId, inc(CharacterDbo::totalChats, increment))
     }
 
-    suspend fun incrementMessagesCount(characterId: String, increment: Int) {
-        collection.updateOneById(characterId, inc(CharacterDbo::totalMessages, increment))
+    suspend fun incrementMessagesCount(session: ClientSession, characterId: String, increment: Int) {
+        collection.updateOneById(session, characterId, inc(CharacterDbo::totalMessages, increment))
     }
 
     /**
      * DELETE
      */
-    suspend fun deleteCharacter(characterId: String) {
-        collection.deleteOneById(characterId)
+    suspend fun deleteCharacter(session: ClientSession, characterId: String) {
+        collection.deleteOneById(session, characterId)
     }
 
-    suspend fun deleteAllCharacterByUserId(userId: String) {
+    suspend fun deleteCharactersByIds(session: ClientSession, characterIds: List<String>) {
+        if (characterIds.isEmpty()) return
+
         collection.deleteMany(
-            and(
-                CharacterDbo::authorId eq userId
-            )
+            session,
+            CharacterDbo::id `in` characterIds
         )
     }
 }

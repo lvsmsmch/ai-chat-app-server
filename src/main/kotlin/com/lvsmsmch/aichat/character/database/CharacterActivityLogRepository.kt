@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.character.database
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.client.model.Aggregates.count
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -40,6 +41,7 @@ class CharacterActivityLogRepository(
      * CREATE
      */
     suspend fun logActivity(
+        session: ClientSession,
         activityType: ActivityType,
         characterId: String,
         userId: String
@@ -49,7 +51,7 @@ class CharacterActivityLogRepository(
             activityType = activityType.code,
             userId = userId
         )
-        collection.insertOne(log)
+        collection.insertOne(session, log)
     }
 
 

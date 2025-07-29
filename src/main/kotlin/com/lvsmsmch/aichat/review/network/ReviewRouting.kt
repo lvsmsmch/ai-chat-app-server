@@ -1,13 +1,8 @@
 package com.lvsmsmch.aichat.review.network
 
 import com.lvsmsmch.aichat._common.IdGenerator
-import com.lvsmsmch.aichat._common.database.EntityType
-import com.lvsmsmch.aichat._common.database.ReportDbo
-import com.lvsmsmch.aichat._common.database.ReportEntity
-import com.lvsmsmch.aichat._common.database.ReportRepository
+import com.lvsmsmch.aichat._common.database.*
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.character.database.ActivityType
-import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
@@ -23,10 +18,10 @@ fun Route.configureReviewRouting(
     reviewRepository: ReviewRepository,
     reviewLikeRepository: ReviewLikeRepository,
     characterRepository: CharacterRepository,
-    characterActivityLogRepository: CharacterActivityLogRepository,
     reportRepository: ReportRepository,
     userRepository: UserRepository,
     idGenerator: IdGenerator,
+    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper
 ) {
     route("/reviews") {
@@ -57,13 +52,25 @@ fun Route.configureReviewRouting(
                 authorId = sessionDbo.userId,
                 rating = request.rating,
                 text = request.text
-            ).also { reviewRepository.addReview(it) }
-
-            characterActivityLogRepository.logActivity(
-                activityType = ActivityType.REVIEW_ADDED,
-                characterId = request.characterId,
-                userId = sessionDbo.userId
             )
+
+            complexQueryHelper.addReview(reviewDbo)
+
+//            transactionHelper.withTransaction { session ->
+//                reviewRepository.addReview(session, reviewDbo)
+//                characterRepository.incrementReviewsCount(session, reviewDbo.characterId, 1)
+//                characterRepository.updateAvgRating(
+//                    session = session,
+//                    characterId = reviewDbo.characterId,
+//                    newRating = reviewRepository.getAvgRatingForCharacter(reviewDbo.characterId)
+//                )
+//                characterActivityLogRepository.logActivity(
+//                    session = session,
+//                    activityType = ActivityType.REVIEW_ADDED,
+//                    characterId = request.characterId,
+//                    userId = sessionDbo.userId
+//                )
+//            }
 
             call.respondSuccess(data = reviewDbo.toReviewDto(mapper))
         }
@@ -124,13 +131,18 @@ fun Route.configureReviewRouting(
             if (reviewDbo.authorId != sessionDbo.userId) {
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this review")
             }
-            request.rating?.let { validateReviewRating(it)}
-            request.text?.let { validateReviewText(it)}
+            request.rating?.let { validateReviewRating(it) }
+            request.text?.let { validateReviewText(it) }
 
-            reviewRepository.updateReview(
-                id = reviewId,
-                rating = request.rating,
-                text = request.text
+            val oldRating = reviewDbo.rating
+            val newRating = request.rating
+
+            complexQueryHelper.updateReview(
+                reviewId = reviewId,
+                characterId = reviewDbo.characterId,
+                rating = newRating,
+                text = request.text,
+                oldRating = oldRating
             )
 
             call.respondSuccess()
@@ -152,7 +164,8 @@ fun Route.configureReviewRouting(
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this review")
             }
 
-            reviewRepository.deleteReviewById(reviewId)
+
+            complexQueryHelper.deleteReview(reviewId)
 
             call.respondSuccess()
         }
@@ -192,7 +205,7 @@ fun Route.configureReviewRouting(
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
 
-            reviewLikeRepository.likeReview(sessionDbo.userId, reviewId)
+            complexQueryHelper.likeReview(reviewId, sessionDbo.userId)
 
             call.respondSuccess()
         }
@@ -209,7 +222,7 @@ fun Route.configureReviewRouting(
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
 
-            reviewLikeRepository.unlikeReview(sessionDbo.userId, reviewId)
+            complexQueryHelper.unlikeReview(reviewId, sessionDbo.userId)
 
             call.respondSuccess()
         }

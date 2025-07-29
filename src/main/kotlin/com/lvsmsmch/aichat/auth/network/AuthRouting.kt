@@ -24,6 +24,7 @@ fun Route.configureAuthRouting(
     sessionRepository: SessionRepository,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
+    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper
 ) {
     route("/auth") {
@@ -79,7 +80,9 @@ fun Route.configureAuthRouting(
                     name = oauthUserData.name,
                     profilePictureUrl = oauthUserData.profilePictureUrl,
                     accountType = AccountType.REGISTERED
-                ).also { userRepository.addUser(it) }
+                ).also {
+                    complexQueryHelper.addUser(it)
+                }
 
             val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
 
@@ -107,7 +110,9 @@ fun Route.configureAuthRouting(
                     id = idGenerator.generateId(EntityType.USER),
                     username = usernameGenerator.generateUniqueUsername(),
                     deviceId = request.deviceId
-                ).also { userRepository.addUser(it) }
+                ).also {
+                    complexQueryHelper.addUser(it)
+                }
 
             val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
 

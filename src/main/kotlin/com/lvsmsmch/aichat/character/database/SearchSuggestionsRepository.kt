@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.character.database
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.client.model.Indexes.compoundIndex
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -43,7 +44,7 @@ class SearchSuggestionsRepository(
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    suspend fun addSuggestion(originalText: String, isCharacterName: Boolean = false) {
+    suspend fun addSuggestion(session: ClientSession, originalText: String, isCharacterName: Boolean = false) {
         val normalizedTerm = originalText.trim().lowercase()
         val existing = collection.findOneById(normalizedTerm)
         if (existing == null) {
@@ -54,7 +55,42 @@ class SearchSuggestionsRepository(
                 isCharacterName = isCharacterName,
                 lastSearchedAt = UtcTimestamp.now()
             )
-            collection.insertOne(suggestion)
+            collection.insertOne(session, suggestion)
+        }
+    }
+
+    suspend fun updateSuggestion(session: ClientSession, oldText: String, newText: String, isCharacterName: Boolean = false) {
+        val oldNormalizedTerm = oldText.trim().lowercase()
+        val newNormalizedTerm = newText.trim().lowercase()
+
+        // Если термины одинаковые, ничего не делаем
+        if (oldNormalizedTerm == newNormalizedTerm) return
+
+        // Удаляем старое предложение
+        collection.deleteOneById(session, oldNormalizedTerm)
+
+        // Добавляем новое предложение
+        val existing = collection.findOneById(newNormalizedTerm)
+        if (existing == null) {
+            val suggestion = SearchSuggestionDbo(
+                term = newNormalizedTerm,
+                displayText = newText.trim(), // Сохраняем оригинальный регистр для отображения
+                searchCount = 1,
+                isCharacterName = isCharacterName,
+                lastSearchedAt = UtcTimestamp.now()
+            )
+            collection.insertOne(session, suggestion)
+        } else {
+            // Если новое предложение уже существует, просто обновляем его
+            collection.replaceOneById(
+                session,
+                newNormalizedTerm,
+                existing.copy(
+                    displayText = newText.trim(),
+                    isCharacterName = isCharacterName,
+                    lastSearchedAt = UtcTimestamp.now()
+                )
+            )
         }
     }
     

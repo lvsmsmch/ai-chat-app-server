@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.review.database
 
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.ascending
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -40,12 +41,13 @@ class ReviewLikeRepository(
      * CREATE
      */
 
-    suspend fun likeReview(userId: String, reviewId: String) {
+    suspend fun likeReview(session: ClientSession, userId: String, reviewId: String) {
         val likeId = "${userId}_${reviewId}"
         val existing = collection.findOneById(likeId)
         
         if (existing == null) {
             collection.insertOne(
+                session,
                 ReviewLikeDbo(
                     id = likeId,
                     userId = userId,
@@ -97,17 +99,21 @@ class ReviewLikeRepository(
      * DELETE
      */
 
-    suspend fun unlikeReview(userId: String, reviewId: String) {
+    suspend fun unlikeReview(session: ClientSession, userId: String, reviewId: String) {
         val likeId = "${userId}_${reviewId}"
-        collection.deleteOneById(likeId)
+        collection.deleteOneById(session, likeId)
     }
 
-    suspend fun removeAllLikesForReview(reviewId: String) {
-        collection.deleteMany(ReviewLikeDbo::reviewId eq reviewId)
+    suspend fun removeAllLikesForReview(session: ClientSession, reviewId: String) {
+        collection.deleteMany(session, ReviewLikeDbo::reviewId eq reviewId)
     }
 
-    suspend fun removeAllLikesByUserId(userId: String) {
-        collection.deleteMany(ReviewLikeDbo::userId eq userId)
-    }
+    suspend fun removeAllLikesForReviews(session: ClientSession, reviewIds: List<String>) {
+        if (reviewIds.isEmpty()) return
 
+        collection.deleteMany(
+            session,
+            ReviewLikeDbo::reviewId `in` reviewIds
+        )
+    }
 }

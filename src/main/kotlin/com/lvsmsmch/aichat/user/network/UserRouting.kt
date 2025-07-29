@@ -1,8 +1,6 @@
 package com.lvsmsmch.aichat.user.network
 
-import com.lvsmsmch.aichat._common.database.ReportDbo
-import com.lvsmsmch.aichat._common.database.ReportEntity
-import com.lvsmsmch.aichat._common.database.ReportRepository
+import com.lvsmsmch.aichat._common.database.*
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.character.database.CharacterVisibility
@@ -22,6 +20,7 @@ fun Route.configureUserRouting(
     followRepository: FollowRepository,
     characterRepository: CharacterRepository,
     reportRepository: ReportRepository,
+    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper
 ) {
     route("/users") {
@@ -262,7 +261,7 @@ fun Route.configureUserRouting(
                 ImageServer.uploadImageOnServer(it)
             }
 
-            userRepository.updateUser(
+            complexQueryHelper.updateUser(
                 userId = userId,
                 username = username?.lowercase(),
                 name = name,
@@ -283,16 +282,19 @@ fun Route.configureUserRouting(
         post("/{userId}/follow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
-            val userId = call.parameters["userId"]
+            val targetUserId = call.parameters["userId"]
                 ?: throw BadRequestException("Missing userId parameter")
 
-            userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
+            userRepository.getUserById(targetUserId) ?: throw throw UserNotFoundException(id = targetUserId)
 
-            if (currentUserId == userId) {
+            if (currentUserId == targetUserId) {
                 throw BadRequestException("Cannot follow yourself")
             }
 
-            followRepository.addConnection(followerId = currentUserId, followeeId = userId)
+            complexQueryHelper.followUser(
+                currentUserId = currentUserId,
+                targetUserId = targetUserId
+            )
 
             call.respondSuccess()
         }
@@ -304,16 +306,19 @@ fun Route.configureUserRouting(
         post("/{userId}/unfollow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
-            val userId = call.parameters["userId"]
+            val targetUserId = call.parameters["userId"]
                 ?: throw BadRequestException("Missing userId parameter")
 
-            userRepository.getUserById(userId) ?: throw throw UserNotFoundException(id = userId)
+            userRepository.getUserById(targetUserId) ?: throw throw UserNotFoundException(id = targetUserId)
 
-            if (currentUserId == userId) {
+            if (currentUserId == targetUserId) {
                 throw BadRequestException("Cannot unfollow yourself")
             }
 
-            followRepository.removeConnection(followerId = currentUserId, followeeId = userId)
+            complexQueryHelper.unfollowUser(
+                currentUserId = currentUserId,
+                targetUserId = targetUserId
+            )
 
             call.respondSuccess()
         }
@@ -332,7 +337,7 @@ fun Route.configureUserRouting(
                 throw BadRequestException("You can only edit your own profile")
             }
 
-            userRepository.deleteUser(userId = userId)
+            complexQueryHelper.deleteUser(sessionDbo.userId)
 
             call.respondSuccess()
         }

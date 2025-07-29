@@ -1,14 +1,14 @@
 package com.lvsmsmch.aichat.character.network
 
 import com.lvsmsmch.aichat._common.IdGenerator
-import com.lvsmsmch.aichat._common.database.EntityType
-import com.lvsmsmch.aichat._common.database.ReportDbo
-import com.lvsmsmch.aichat._common.database.ReportEntity
-import com.lvsmsmch.aichat._common.database.ReportRepository
+import com.lvsmsmch.aichat._common.database.*
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.cache.CacheListType
 import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.character.database.*
+import com.lvsmsmch.aichat.chat.database.ChatRepository
+import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
+import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
@@ -26,6 +26,7 @@ fun Route.configureCharacterRouting(
     searchSuggestionsRepository: SearchSuggestionsRepository,
     idGenerator: IdGenerator,
     cacheManager: CacheManager,
+    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper
 ) {
 
@@ -110,9 +111,11 @@ fun Route.configureCharacterRouting(
 
             val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) } ?: ""
 
+            val userId = sessionDbo.userId
+
             val characterDbo = CharacterDbo(
                 id = idGenerator.generateId(EntityType.CHARACTER),
-                authorId = sessionDbo.userId,
+                authorId = userId,
                 name = name!!,
                 description = description!!,
                 prompt = prompt!!,
@@ -121,7 +124,9 @@ fun Route.configureCharacterRouting(
                 category = category!!,
                 tags = tags!!.split(","),
                 initialMessage = initialMessage!!,
-            ).also { characterRepository.addCharacter(it) }
+            )
+
+            complexQueryHelper.addCharacter(characterDbo)
 
             call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper))
         }
@@ -417,19 +422,21 @@ fun Route.configureCharacterRouting(
 
             val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
-            characterRepository.updateCharacter(
+            val updatedCharacter = complexQueryHelper.updateCharacter(
                 characterId = characterId,
+                userId = character.authorId,
                 name = name,
                 description = description,
                 prompt = prompt,
                 initialMessage = initialMessage,
                 visibility = visibility,
                 pictureUrl = pictureUrl,
-                category = category?.let { CharacterCategory.getByCode(it) },
-                tags = tags?.split(",")?.map { tagCode -> CharacterTag.getByCode(tagCode) }
+                category = category,
+                tags = tags,
+                oldName = character.name,
+                oldVisibility = character.visibility,
             )
 
-            val updatedCharacter = characterRepository.getCharacter(characterId)!!
             call.respondSuccess(data = updatedCharacter.toCharacterFullInfoDto(mapper))
         }
 
@@ -450,7 +457,8 @@ fun Route.configureCharacterRouting(
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this character")
             }
 
-            characterRepository.deleteCharacter(characterId = characterId)
+            complexQueryHelper.deleteCharacter(characterId)
+
             call.respondSuccess()
         }
 

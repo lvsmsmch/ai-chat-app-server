@@ -26,10 +26,10 @@ fun Route.configureChatRouting(
     messageRepository: MessageRepository,
     characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
-    characterActivityLogRepository: CharacterActivityLogRepository,
     reportRepository: ReportRepository,
     idGenerator: IdGenerator,
     messageFinisher: MessageFinisher,
+    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper
 ) {
 
@@ -163,29 +163,23 @@ fun Route.configureChatRouting(
                 type = if (isDirect) ChatType.DIRECT else ChatType.GROUP
             )
 
-            chatRepository.insertChat(chatDbo)
 
-            request.characterIds.forEach { characterId ->
-                characterActivityLogRepository.logActivity(
-                    activityType = ActivityType.CHAT_CREATED,
-                    characterId = characterId,
-                    userId = userId
-                )
-            }
+            complexQueryHelper.addChat(chatDbo)
 
             // Создаем начальное сообщение если указано
             if (request.initialMessageId != null) {
+                val characterId = request.characterIds.first()
                 MessageDbo(
                     id = idGenerator.generateId(EntityType.MESSAGE),
                     chatId = chatDbo.id,
                     chatClientId = chatDbo.clientId,
                     clientId = request.initialMessageId,
-                    senderId = request.characterIds.first(),
+                    senderId = characterId,
                     isSentByUser = false,
                     text = "",
                     status = MessageStatus.STREAMING.value,
                 ).also {
-                    messageRepository.insertMessage(it)
+                    complexQueryHelper.addMessage(it)
                     messageFinisher.finishMessageAsync(it.id)
                 }
             }
@@ -294,6 +288,7 @@ fun Route.configureChatRouting(
             }
 
             chatRepository.deleteChat(chat.id)
+
             call.respondSuccess()
         }
 
@@ -440,30 +435,25 @@ fun Route.configureChatRouting(
                     status = MessageStatus.COMPLETED.value,
                     chatClientId = chat.clientId,
                 ).also {
-                    messageRepository.insertMessage(it)
+                    complexQueryHelper.addMessage(it)
                 }
             }
 
             // Создаем сообщение персонажа
             request.characterMessage?.let { characterMessage ->
+                val characterId = characterMessage.characterId
                 MessageDbo(
                     id = idGenerator.generateId(EntityType.MESSAGE),
                     chatId = chat.id,
                     clientId = characterMessage.id,
-                    senderId = characterMessage.characterId,
+                    senderId = characterId,
                     isSentByUser = false,
                     text = "",
                     status = MessageStatus.STREAMING.value,
                     chatClientId = chat.clientId,
                 ).also {
-                    messageRepository.insertMessage(it)
+                    complexQueryHelper.addMessage(it)
                     messageFinisher.finishMessageAsync(it.id)
-
-                    characterActivityLogRepository.logActivity(
-                        activityType = ActivityType.MESSAGE_SENT,
-                        characterId = characterMessage.characterId,
-                        userId = userId
-                    )
                 }
             }
 

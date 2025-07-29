@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat.review.database
 
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.bson.conversions.Bson
@@ -65,8 +66,8 @@ class ReviewRepository(
     /**
      * CREATE
      */
-    suspend fun addReview(reviewDbo: ReviewDbo) {
-        collection.insertOne(reviewDbo)
+    suspend fun addReview(session: ClientSession, reviewDbo: ReviewDbo) {
+        collection.insertOne(session, reviewDbo)
     }
 
     /**
@@ -102,6 +103,36 @@ class ReviewRepository(
         return collection.findOneById(reviewId)
     }
 
+    suspend fun getReviewIdsByUserId(session: ClientSession, userId: String): List<String> {
+        return collection.find(
+            session,
+            ReviewDbo::authorId eq userId
+        ).projection(ReviewDbo::id)
+            .toList()
+            .map { it.id }
+    }
+
+    suspend fun getReviewIdsByCharacterId(session: ClientSession, characterId: String): List<String> {
+        return collection.find(
+            session,
+            ReviewDbo::characterId eq characterId
+        ).projection(ReviewDbo::id)
+            .toList()
+            .map { it.id }
+    }
+
+    suspend fun getReviewIdsByCharacterIds(session: ClientSession, characterIds: List<String>): List<String> {
+        if (characterIds.isEmpty()) return emptyList()
+
+        return collection.find(
+            session,
+            ReviewDbo::characterId `in` characterIds
+        ).projection(ReviewDbo::id)
+            .toList()
+            .map { it.id }
+    }
+
+
     suspend fun getReview(userId: String, characterId: String): ReviewDbo? {
         return collection.findOne(
             and(
@@ -130,6 +161,7 @@ class ReviewRepository(
      * UPDATE
      */
     suspend fun updateReview(
+        session: ClientSession,
         id: String,
         rating: Int? = null,
         text: String? = null,
@@ -149,34 +181,35 @@ class ReviewRepository(
         }
         updates.add(setValue(ReviewDbo::editedAt, UtcTimestamp.now()))
 
-        collection.updateOneById(id, combine(updates))
+        collection.updateOneById(session, id, combine(updates))
         // No need to manually emit updates - the changeEventsFlow will handle it
     }
 
-    suspend fun incrementLikesCount(reviewId: String, increment: Int) {
-        collection.updateOneById(reviewId, inc(ReviewDbo::likesCount, increment))
+    suspend fun incrementLikesCount(session: ClientSession, reviewId: String, increment: Int) {
+        collection.updateOneById(session, reviewId, inc(ReviewDbo::likesCount, increment))
     }
 
 
     /**
      * DELETE
      */
-    suspend fun deleteReview(userId: String, characterId: String) {
-        val review = getReview(userId, characterId) ?: return
-        deleteReviewById(review.id)
+
+    suspend fun deleteReviewById(session: ClientSession, reviewId: String) {
+        collection.deleteOneById(session, reviewId)
     }
 
-    suspend fun deleteReviewById(reviewId: String) {
-        val reviewDbo = getReviewById(reviewId) ?: return
-        collection.deleteOneById(reviewId)
-        // No need to manually emit updates - the changeEventsFlow will handle it
+    suspend fun deleteReviewsByIds(session: ClientSession, reviewIds: List<String>) {
+        collection.deleteMany(
+            session,
+            ReviewDbo::id `in` reviewIds
+        )
     }
 
-    suspend fun deleteAllReviewsByUserId(userId: String) {
+    suspend fun deleteAllReviewsByUserId(session: ClientSession, userId: String) {
         collection.deleteMany(ReviewDbo::authorId eq userId)
     }
 
-    suspend fun deleteAllReviewsByCharacterId(characterId: String) {
+    suspend fun deleteAllReviewsByCharacterId(session: ClientSession, characterId: String) {
         collection.deleteMany(ReviewDbo::characterId eq characterId)
     }
 

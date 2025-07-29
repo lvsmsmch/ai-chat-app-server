@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat.utils
 
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.UsernameGenerator
+import com.lvsmsmch.aichat._common.database.DeletedIdsStatsRepository
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.app_data.network.configureAppDataRouting
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
@@ -38,12 +39,12 @@ fun Application.configureRouting(
     followRepository: FollowRepository,
     reportRepository: ReportRepository,
     reviewLikeRepository: ReviewLikeRepository,
-    characterActivityLogRepository: CharacterActivityLogRepository,
     searchSuggestionsRepository: SearchSuggestionsRepository,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
     cacheManager: CacheManager,
-    messageFinisher: MessageFinisher
+    messageFinisher: MessageFinisher,
+    complexQueryHelper: ComplexQueryHelper,
 ) {
     routing {
         get("/test") {
@@ -57,12 +58,24 @@ fun Application.configureRouting(
                 sessionRepository = sessionRepository,
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
-                mapper = mapper
+                mapper = mapper,
+                complexQueryHelper = complexQueryHelper
             )
         }
 
         rateLimit(RateLimitName("ip-based")) {
             configureAppDataRouting()
+
+            configureUserRouting(
+                userRepository = userRepository,
+                sessionRepository = sessionRepository,
+                followRepository = followRepository,
+                characterRepository = characterRepository,
+                reportRepository = reportRepository,
+                mapper = mapper,
+                complexQueryHelper = complexQueryHelper,
+            )
+
             configureCharacterRouting(
                 characterRepository = characterRepository,
                 sessionRepository = sessionRepository,
@@ -71,19 +84,8 @@ fun Application.configureRouting(
                 searchSuggestionsRepository = searchSuggestionsRepository,
                 idGenerator = idGenerator,
                 cacheManager = cacheManager,
-                mapper = mapper
-            )
-
-            configureChatRouting(
-                chatRepository = chatRepository,
-                messageRepository = messageRepository,
-                characterRepository = characterRepository,
-                sessionRepository = sessionRepository,
-                characterActivityLogRepository = characterActivityLogRepository,
-                idGenerator = idGenerator,
-                messageFinisher = messageFinisher,
-                reportRepository = reportRepository,
-                mapper = mapper
+                mapper = mapper,
+                complexQueryHelper = complexQueryHelper
             )
 
             configureReviewRouting(
@@ -91,20 +93,23 @@ fun Application.configureRouting(
                 reviewRepository = reviewRepository,
                 reviewLikeRepository = reviewLikeRepository,
                 characterRepository = characterRepository,
-                characterActivityLogRepository = characterActivityLogRepository,
                 reportRepository = reportRepository,
                 userRepository = userRepository,
                 idGenerator = idGenerator,
-                mapper = mapper
+                mapper = mapper,
+                complexQueryHelper = complexQueryHelper,
             )
 
-            configureUserRouting(
-                userRepository = userRepository,
-                sessionRepository = sessionRepository,
-                followRepository = followRepository,
+            configureChatRouting(
+                chatRepository = chatRepository,
+                messageRepository = messageRepository,
                 characterRepository = characterRepository,
+                sessionRepository = sessionRepository,
+                idGenerator = idGenerator,
+                messageFinisher = messageFinisher,
                 reportRepository = reportRepository,
-                mapper = mapper
+                mapper = mapper,
+                complexQueryHelper = complexQueryHelper,
             )
         }
     }

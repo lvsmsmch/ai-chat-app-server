@@ -2,8 +2,8 @@ package com.lvsmsmch.aichat
 
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.UsernameGenerator
-import com.lvsmsmch.aichat._common.database.EntityIdStatsDbo
-import com.lvsmsmch.aichat._common.database.EntityIdStatsRepository
+import com.lvsmsmch.aichat._common.database.DeletedIdsStatsDbo
+import com.lvsmsmch.aichat._common.database.DeletedIdsStatsRepository
 import com.lvsmsmch.aichat._common.database.ReportDbo
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionDbo
@@ -27,6 +27,7 @@ import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import com.lvsmsmch.aichat.utils.updaters.*
 import com.lvsmsmch.aichat.utils.workers.fillDefaultSuggestions
+import com.lvsmsmch.aichat.utils.workers.fillInitialData
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
@@ -85,15 +86,19 @@ fun Application.module() {
 
     val databaseScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val database = KMongo.createClient(
+    val mongoClient = KMongo.createClient(
         System.getenv("MONGODB_URI") ?: "mongodb://localhost:27017"
-    ).coroutine.getDatabase("ai_chat_app_database")
+    ).coroutine
+
+    val database = mongoClient.getDatabase("ai_chat_app_database")
+
+    val transactionHelper = TransactionHelper(mongoClient)
 
     val sessionRepository = SessionRepository(
         database.getCollection<SessionDbo>("sessions")
     )
-    val entityIdStatsRepository = EntityIdStatsRepository(
-        database.getCollection<EntityIdStatsDbo>("entity_id_stats")
+    val deletedIdsStatsRepository = DeletedIdsStatsRepository(
+        database.getCollection<DeletedIdsStatsDbo>("entity_id_stats")
     )
     val categoryRecommendationsCacheRepository = CategoryRecommendationsCacheRepository(
         database.getCollection<CategoryRecommendationsCacheDbo>("category_cache")
@@ -153,7 +158,7 @@ fun Application.module() {
     )
 
     val idGenerator = IdGenerator(
-        entityIdStatsRepository = entityIdStatsRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
         userRepository = userRepository,
         characterRepository = characterRepository,
         chatRepository = chatRepository,
@@ -173,17 +178,18 @@ fun Application.module() {
         followRepository = followRepository,
     )
 
-    val repositoriesConnectionsJob = configureRepositoriesConnections(
-        databaseScope = databaseScope,
-        entityIdStatsRepository = entityIdStatsRepository,
+    val complexQueryHelper = ComplexQueryHelper(
+        transactionHelper = transactionHelper,
         userRepository = userRepository,
-        followRepository = followRepository,
         characterRepository = characterRepository,
+        reviewRepository = reviewRepository,
         chatRepository = chatRepository,
         messageRepository = messageRepository,
-        reviewRepository = reviewRepository,
+        followRepository = followRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
-        reviewLikeRepository = reviewLikeRepository
+        reviewLikeRepository = reviewLikeRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        characterActivityLogRepository = characterActivityLogRepository
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
@@ -230,9 +236,17 @@ fun Application.module() {
         updateIntervalMinutes = 60 // каждый час
     )
 
-    fillDefaultSuggestions(
+    val fillDefaultSuggestionsJob = fillDefaultSuggestions(
         databaseScope = databaseScope,
         searchSuggestionsRepository = searchSuggestionsRepository
+    )
+
+    val fillInitialDataJob = fillInitialData(
+        databaseScope = databaseScope,
+        userRepository = userRepository,
+        idGenerator = idGenerator,
+        usernameGenerator = usernameGenerator,
+        complexQueryHelper = complexQueryHelper
     )
 
     configureRouting(
@@ -246,24 +260,25 @@ fun Application.module() {
         followRepository = followRepository,
         reportRepository = reportRepository,
         reviewLikeRepository = reviewLikeRepository,
-        characterActivityLogRepository = characterActivityLogRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         idGenerator = idGenerator,
         usernameGenerator = usernameGenerator,
         cacheManager = cacheManager,
-        messageFinisher = messageFinisher
+        messageFinisher = messageFinisher,
+        complexQueryHelper = complexQueryHelper
     )
 
     environment.monitor.subscribe(ApplicationStopping) {
         runBlocking {
             logger.info("Application stopping, cancelling repository connections...")
-            repositoriesConnectionsJob.cancelAndJoin()
             characterTrendingScoreUpdaterJob.cancelAndJoin()
             recommendationScoreUpdaterJob.cancelAndJoin()
             coOccurrenceScoreUpdaterJob.cancelAndJoin()
             userRecommendationsUpdaterJob.cancelAndJoin()
             categoryCacheUpdaterJob.cancelAndJoin()
             defaultPersonalizedUpdaterJob.cancelAndJoin()
+            fillDefaultSuggestionsJob.cancelAndJoin()
+            fillInitialDataJob.cancelAndJoin()
 
             databaseScope.cancel()
             logger.info("All repository connections have been cancelled")

@@ -7,6 +7,7 @@ import com.lvsmsmch.aichat.character.database.CharacterVisibility
 import com.lvsmsmch.aichat.utils.DatabaseEvent
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.bson.conversions.Bson
@@ -76,8 +77,8 @@ class ChatRepository(
     /**
      * CREATE
      */
-    suspend fun insertChat(chatDbo: ChatDbo) {
-        collection.insertOne(chatDbo)
+    suspend fun insertChat(session: ClientSession, chatDbo: ChatDbo) {
+        collection.insertOne(session, chatDbo)
     }
 
     /**
@@ -221,6 +222,28 @@ class ChatRepository(
         return collection.find(ChatDbo::id.`in`(chatIds)).toList()
     }
 
+    suspend fun getChatsByCharacterIds(session: ClientSession, characterIds: List<String>): List<ChatDbo> {
+        if (characterIds.isEmpty()) return emptyList()
+
+        return collection.find(
+            session,
+            and(
+                ChatDbo::characterIds `in` characterIds,
+                ChatDbo::isDeleted eq false
+            )
+        ).toList()
+    }
+
+    suspend fun getChatsByCharacterId(session: ClientSession, characterId: String): List<ChatDbo> {
+        return collection.find(
+            session,
+            and(
+                ChatDbo::characterIds contains characterId,
+                ChatDbo::isDeleted eq false
+            )
+        ).toList()
+    }
+
     suspend fun getAllNonDeletedChats(): List<ChatDbo> {
         return collection.find(ChatDbo::isDeleted eq false).toList()
     }
@@ -247,12 +270,12 @@ class ChatRepository(
         )
     }
 
-    suspend fun updateChatsAfterCharacterVisibilityWasChanged(characterDbo: CharacterDbo) {
-        if (characterDbo.visibility == CharacterVisibility.PRIVATE.code) {
+    suspend fun deleteChatsForWhoIsNotAuthor(session: ClientSession, characterId: String, authorId: String) {
             collection.updateMany(
+                session,
                 and(
-                    ChatDbo::characterIds contains characterDbo.id,
-                    ChatDbo::userId ne characterDbo.authorId,
+                    ChatDbo::characterIds contains characterId,
+                    ChatDbo::userId ne authorId,
                     ChatDbo::isDeleted eq false
                 ),
                 combine(
@@ -261,7 +284,6 @@ class ChatRepository(
                     setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
                 )
             )
-        }
     }
 
     /**
@@ -283,10 +305,29 @@ class ChatRepository(
         )
     }
 
-    suspend fun deleteAllChatsByCharacterId(characterId: String) {
+
+    suspend fun deleteAllChatsByCharacterId(session: ClientSession, characterId: String) {
         collection.updateMany(
+            session,
             and(
                 ChatDbo::characterIds contains characterId,
+                ChatDbo::isDeleted eq false
+            ),
+            combine(
+                setValue(ChatDbo::isDeleted, true),
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now()),
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
+            )
+        )
+    }
+
+    suspend fun deleteAllChatsByCharacterIds(session: ClientSession, characterIds: List<String>) {
+        if (characterIds.isEmpty()) return
+
+        collection.updateMany(
+            session,
+            and(
+                ChatDbo::characterIds `in` characterIds,
                 ChatDbo::isDeleted eq false
             ),
             combine(

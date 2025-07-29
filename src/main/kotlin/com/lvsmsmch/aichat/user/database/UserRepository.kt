@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat.user.database
 
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Updates
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import org.bson.conversions.Bson
 import org.litote.kmongo.*
@@ -46,8 +47,8 @@ class UserRepository(
     /**
      * CREATE
      */
-    suspend fun addUser(userDbo: UserDbo) {
-        collection.insertOne(userDbo)
+    suspend fun addUser(session: ClientSession, userDbo: UserDbo) {
+        collection.insertOne(session, userDbo)
     }
 
     /**
@@ -84,6 +85,7 @@ class UserRepository(
      * UPDATE
      */
     suspend fun updateUser(
+        session: ClientSession,
         userId: String,
         email: String? = null,
         username: String? = null,
@@ -101,7 +103,7 @@ class UserRepository(
         profilePictureUrl?.let { updates.add(setValue(UserDbo::profilePictureUrl, it)) }
         hashedPassword?.let { updates.add(setValue(UserDbo::hashedPassword, it)) }
         if (updates.isEmpty()) return // Nothing to update
-        collection.updateOneById(userId, combine(*updates.toTypedArray()))
+        collection.updateOneById(session, userId, combine(*updates.toTypedArray()))
     }
 
     suspend fun linkGoogleToUser(
@@ -124,29 +126,49 @@ class UserRepository(
         )
     }
 
-    suspend fun incrementFollowingCount(userId: String, increment: Int) {
+    suspend fun incrementFollowingCount(session: ClientSession, userId: String, increment: Int) {
         collection.updateOneById(
+            session,
             userId,
             inc(UserDbo::followingCount, increment)
         )
     }
 
-    suspend fun incrementFollowerCount(userId: String, increment: Int) {
+    suspend fun incrementFollowerCount(session: ClientSession, userId: String, increment: Int) {
         collection.updateOneById(
+            session,
             userId,
             inc(UserDbo::followerCount, increment)
         )
     }
 
-    suspend fun incrementPublicCharacterCount(userId: String, increment: Int) {
+    suspend fun incrementFollowerCountForUsers(session: ClientSession, userIds: List<String>, increment: Int) {
+        collection.updateMany(
+            session,
+            UserDbo::id `in` userIds,
+            inc(UserDbo::followerCount, increment)
+        )
+    }
+
+    suspend fun incrementFollowingCountForUsers(session: ClientSession, userIds: List<String>, increment: Int) {
+        collection.updateMany(
+            session,
+            UserDbo::id `in` userIds,  // ← KMongo синтаксис
+            inc(UserDbo::followingCount, increment)
+        )
+    }
+
+    suspend fun incrementPublicCharacterCount(session: ClientSession, userId: String, increment: Int) {
         collection.updateOneById(
+            session,
             userId,
             inc(UserDbo::publicCharacterCount, increment)
         )
     }
 
-    suspend fun incrementPrivateCharacterCount(userId: String, increment: Int) {
+    suspend fun incrementPrivateCharacterCount(session: ClientSession, userId: String, increment: Int) {
         collection.updateOneById(
+            session,
             userId,
             inc(UserDbo::privateCharacterCount, increment)
         )
@@ -155,8 +177,8 @@ class UserRepository(
     /**
      * DELETE
      */
-    suspend fun deleteUser(userId: String): Boolean {
-        val deleteResult = collection.deleteOneById(userId)
+    suspend fun deleteUser(session: ClientSession, userId: String): Boolean {
+        val deleteResult = collection.deleteOneById(session, userId)
         return deleteResult.deletedCount > 0
     }
 }

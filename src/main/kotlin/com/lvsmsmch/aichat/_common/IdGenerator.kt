@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat._common
 
-import com.lvsmsmch.aichat._common.database.EntityIdStatsRepository
+import com.lvsmsmch.aichat._common.database.DeletedIdsStatsRepository
 import com.lvsmsmch.aichat._common.database.EntityType
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
@@ -9,7 +9,7 @@ import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
 
 class IdGenerator(
-    private val entityIdStatsRepository: EntityIdStatsRepository,
+    private val deletedIdsStatsRepository: DeletedIdsStatsRepository,
     private val userRepository: UserRepository,
     private val characterRepository: CharacterRepository,
     private val chatRepository: ChatRepository,
@@ -33,7 +33,6 @@ class IdGenerator(
                 val newId = generateRandomId(currentLength)
 
                 if (isIdUnique(entityType, newId)) {
-                    entityIdStatsRepository.idWasGenerated(entityType)
                     return newId
                 }
 
@@ -55,7 +54,7 @@ class IdGenerator(
     }
 
     private suspend fun isIdUnique(entityType: EntityType, id: String): Boolean {
-        if (entityIdStatsRepository.isIdDeleted(entityType, id)) {
+        if (deletedIdsStatsRepository.isIdDeleted(entityType, id)) {
             return false
         }
 

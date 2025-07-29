@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.user.database
 
 import com.lvsmsmch.aichat.utils.*
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -43,7 +44,7 @@ class FollowRepository(
     /**
      * CREATE
      */
-    suspend fun addConnection(followerId: String, followeeId: String) {
+    suspend fun addConnection(session: ClientSession, followerId: String, followeeId: String) {
         // Проверяем, что пользователь не подписывается на самого себя
         if (followerId == followeeId) {
             throw IllegalArgumentException("User cannot follow themselves")
@@ -59,6 +60,7 @@ class FollowRepository(
 
         if (existingConnection == null) {
             collection.insertOne(
+                session,
                 FollowDbo(
                     id = "${followerId}_${followeeId}",
                     followerId = followerId,
@@ -94,6 +96,24 @@ class FollowRepository(
             .toList()
     }
 
+    suspend fun getAllFollowerIds(session: ClientSession, userId: String): List<String> {
+        return collection.find(
+            session,
+            FollowDbo::followeeId eq userId
+        ).projection(FollowDbo::followerId)
+            .toList()
+            .map { it.followerId }
+    }
+
+    suspend fun getAllFollowingIds(session: ClientSession, userId: String): List<String> {
+        return collection.find(
+            session,
+            FollowDbo::followerId eq userId
+        ).projection(FollowDbo::followeeId)
+            .toList()
+            .map { it.followeeId }
+    }
+
     suspend fun countFollowers(userId: String): Int {
         return collection.countDocuments(FollowDbo::followeeId eq userId).toInt()
     }
@@ -119,8 +139,9 @@ class FollowRepository(
     /**
      * DELETE
      */
-    suspend fun removeConnection(followerId: String, followeeId: String) {
+    suspend fun removeConnection(session: ClientSession, followerId: String, followeeId: String) {
         collection.deleteOne(
+            session,
             and(
                 FollowDbo::followerId eq followerId,
                 FollowDbo::followeeId eq followeeId
@@ -128,9 +149,10 @@ class FollowRepository(
         )
     }
 
-    suspend fun removeAllConnectionsContainingUserId(userId: String) {
+    suspend fun removeAllConnectionsContainingUserId(session: ClientSession, userId: String) {
         // Удаляем все связи, где пользователь является подписчиком или тем, на кого подписаны
         collection.deleteMany(
+            session,
             or(
                 FollowDbo::followerId eq userId,
                 FollowDbo::followeeId eq userId

@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.chat.database
 
 import com.lvsmsmch.aichat.utils.*
+import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.bson.conversions.Bson
@@ -83,8 +84,8 @@ class MessageRepository(
     /**
      * CREATE
      */
-    suspend fun insertMessage(messageDbo: MessageDbo) {
-        collection.insertOne(messageDbo)
+    suspend fun insertMessage(session: ClientSession, messageDbo: MessageDbo) {
+        collection.insertOne(session, messageDbo)
     }
 
     /**
