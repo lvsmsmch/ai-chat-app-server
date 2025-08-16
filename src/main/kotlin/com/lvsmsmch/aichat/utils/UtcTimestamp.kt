@@ -28,7 +28,6 @@ class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
     fun subtractHours(hours: Long) = UtcTimestamp(instant.minus(hours, ChronoUnit.HOURS))
     fun subtractDays(days: Long) = UtcTimestamp(instant.minus(days, ChronoUnit.DAYS))
     fun subtractMonths(months: Long) = UtcTimestamp(instant.minus(months, ChronoUnit.MONTHS))
-    fun subtractYears(years: Long) = UtcTimestamp(instant.minus(years, ChronoUnit.YEARS))
     fun isInPast() = instant.isBefore(Instant.now())
     fun isInFuture() = instant.isAfter(Instant.now())
     fun isBefore(utcTimestamp: UtcTimestamp) = instant.isBefore(utcTimestamp.instant)
@@ -51,6 +50,8 @@ class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
 
     companion object {
         fun now(): UtcTimestamp = UtcTimestamp(Instant.now())
+
+        fun year1900(): UtcTimestamp = UtcTimestamp(Instant.parse("1900-01-01T00:00:00Z"))
 
         // Parse from ISO-8601 string
         fun parse(isoString: String): UtcTimestamp {

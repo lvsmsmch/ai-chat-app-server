@@ -17,10 +17,8 @@ fun fillDefaultSuggestions(
             logger.info("Starting to fill default suggestions")
 
             val initialSuggestions = getInitialSuggestions()
+            searchSuggestionsRepository.addDefaultSuggestions(initialSuggestions)
 
-            initialSuggestions.forEach { term ->
-                searchSuggestionsRepository.addSuggestion(term)
-            }
 
 
             logger.info("Filled database with ${initialSuggestions.size} suggestions")

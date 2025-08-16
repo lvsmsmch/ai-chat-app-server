@@ -6,9 +6,6 @@ import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.cache.CacheListType
 import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.character.database.*
-import com.lvsmsmch.aichat.chat.database.ChatRepository
-import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
-import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
@@ -69,7 +66,23 @@ fun Route.configureCharacterRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
+//                            val originalName = part.originalFileName ?: "image.jpg"
+//                            logger.debug("orig file name: ${originalName}")
+//
+//                            val imageContentType = part.contentType?.toString()
+//                            logger.debug("content type: $imageContentType")
+//
+//                            val extension = when (imageContentType) {
+//                                "image/jpeg" -> "jpg"
+//                                "image/png" -> "png"
+//                                "image/jpg" -> "jpg"
+//                                else -> throw BadRequestException("Unsupported image type: $imageContentType")
+//                            }
+//                            logger.debug("orig file extension: ${extension}")
+
                             val file = File.createTempFile("upload_", ".tmp")
+                            logger.debug("new file name: ${file.name}")
+
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -98,8 +111,10 @@ fun Route.configureCharacterRouting(
             validateCharacterCategory(category!!)
             if (tags == null) throw BadRequestException("Missing tags field")
             validateCharacterTags(tags!!)
-            if (pictureFile == null) throw BadRequestException("Missing pictureFile field")
-            validateCharacterPicture(pictureFile!!)
+//            if (pictureFile == null) throw BadRequestException("Missing pictureFile field")
+//            validateCharacterPicture(pictureFile!!)
+
+            pictureFile?.let { validateCharacterPicture(it) }
 
             val existingCharactersCount = characterRepository.getCharactersByUserId(
                 userId = sessionDbo.userId, includePrivate = true
@@ -109,7 +124,7 @@ fun Route.configureCharacterRouting(
                 throw BadRequestException("Maximum characters limit exceeded (100)")
             }
 
-            val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) } ?: ""
+            val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
             val userId = sessionDbo.userId
 
@@ -122,7 +137,7 @@ fun Route.configureCharacterRouting(
                 picUrl = pictureUrl,
                 visibility = visibility!!,
                 category = category!!,
-                tags = tags!!.split(","),
+                tags = CharacterTag.fromString(tags!!).map { it.code },
                 initialMessage = initialMessage!!,
             )
 
@@ -144,8 +159,7 @@ fun Route.configureCharacterRouting(
                 searchQuery = call.request.queryParameters["searchQuery"] ?: "",
                 sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0,
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
-                cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0,
-                refresh = call.request.queryParameters["refresh"]?.toBooleanStrictOrNull() ?: false
+                cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0
             )
 
             validateCharacterSearchQuery(request.searchQuery)
@@ -162,23 +176,13 @@ fun Route.configureCharacterRouting(
                 sortCriteria = request.sortCriteria
             )
 
-            val result = if (request.refresh) {
-                cacheManager.refreshItems(
-                    userId = currentUserId,
-                    deviceId = request.deviceId,
-                    listType = searchListType,
-                    size = request.size,
-                    moveViewedToEndIfNothingToRefresh = false
-                )
-            } else {
-                cacheManager.getItems(
-                    userId = currentUserId,
-                    deviceId = request.deviceId,
-                    listType = searchListType,
-                    size = request.size,
-                    cursorPosition = request.cursor
-                )
-            }
+            val result = cacheManager.getItems(
+                userId = currentUserId,
+                deviceId = request.deviceId,
+                listType = searchListType,
+                size = request.size,
+                cursorPosition = request.cursor
+            )
 
             call.respondSuccess(data = result.toDto(mapper))
         }
@@ -216,8 +220,6 @@ fun Route.configureCharacterRouting(
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
                 cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0,
                 refresh = call.request.queryParameters["refresh"]?.toBooleanStrictOrNull() ?: false,
-                moveViewedToEndIfNothingToRefresh = call.request.queryParameters["moveViewedToEndIfNothingToRefresh"]
-                    ?.toBooleanStrictOrNull() ?: false
             )
 
             if (category != "personalized") {
@@ -234,12 +236,11 @@ fun Route.configureCharacterRouting(
             }
 
             val result = if (request.refresh) {
-                cacheManager.refreshItems(
+                cacheManager.refreshCategory(
                     userId = currentUserId,
                     deviceId = request.deviceId,
                     listType = listType,
-                    size = request.size,
-                    moveViewedToEndIfNothingToRefresh = request.moveViewedToEndIfNothingToRefresh
+                    size = request.size
                 )
             } else {
                 cacheManager.getItems(
@@ -390,7 +391,10 @@ fun Route.configureCharacterRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
-                            val file = File.createTempFile("upload_", ".tmp")
+                            val originalName = part.originalFileName ?: "image.jpg"
+                            val extension = originalName.substringAfterLast('.', "jpg")
+
+                            val file = File.createTempFile("upload_", ".$extension")
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -405,11 +409,11 @@ fun Route.configureCharacterRouting(
                 part.dispose()
             }
 
-            if (name == null && description == null && prompt == null && initialMessage == null &&
-                visibility == null && pictureFile == null && category == null
-            ) {
-                throw NoUpdateFieldsProvidedException()
-            }
+//            if (name == null && description == null && prompt == null && initialMessage == null &&
+//                visibility == null && pictureFile == null && category == null
+//            ) {
+//                throw NoUpdateFieldsProvidedException()
+//            }
 
             name?.let { validateCharacterName(it) }
             description?.let { validateCharacterDescription(it) }

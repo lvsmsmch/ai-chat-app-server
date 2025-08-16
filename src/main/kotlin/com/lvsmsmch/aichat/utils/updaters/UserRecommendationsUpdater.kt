@@ -90,8 +90,8 @@ private suspend fun getUsersNeedingBaseCacheUpdate(
         if (cache == null) {
             true // Нет кеша - нужно создать
         } else {
-            val ttl = determineTTL(user.lastActiveAt, now)
-            val expirationTime = cache.updatedAt.addHours(ttl)
+            val ttl = determineTTL(UtcTimestamp.parse(user.lastActiveAt), now)
+            val expirationTime = UtcTimestamp.parse(cache.updatedAt).addHours(ttl)
             expirationTime.isBefore(now) // Кеш устарел
         }
     }

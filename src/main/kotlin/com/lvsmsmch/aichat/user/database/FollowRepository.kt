@@ -78,7 +78,7 @@ class FollowRepository(
         return collection.find(
             and(
                 FollowDbo::followeeId eq userId,
-                if (beforeTime != null) FollowDbo::followedAt lt beforeTime else EMPTY_BSON
+                if (beforeTime != null) FollowDbo::followedAt lt beforeTime.toString() else EMPTY_BSON
             )
         ).sort(descending(FollowDbo::followedAt))
             .limit(size)
@@ -89,7 +89,7 @@ class FollowRepository(
         return collection.find(
             and(
                 FollowDbo::followerId eq userId,
-                if (beforeTime != null) FollowDbo::followedAt lt beforeTime else EMPTY_BSON
+                if (beforeTime != null) FollowDbo::followedAt lt beforeTime.toString() else EMPTY_BSON
             )
         ).sort(descending(FollowDbo::followedAt))
             .limit(size)
@@ -100,8 +100,7 @@ class FollowRepository(
         return collection.find(
             session,
             FollowDbo::followeeId eq userId
-        ).projection(FollowDbo::followerId)
-            .toList()
+        ).toList()
             .map { it.followerId }
     }
 
@@ -109,8 +108,7 @@ class FollowRepository(
         return collection.find(
             session,
             FollowDbo::followerId eq userId
-        ).projection(FollowDbo::followeeId)
-            .toList()
+        ).toList()
             .map { it.followeeId }
     }
 

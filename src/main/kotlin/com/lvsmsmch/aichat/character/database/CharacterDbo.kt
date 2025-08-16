@@ -8,13 +8,13 @@ import org.bson.types.ObjectId
 @Serializable
 data class CharacterDbo(
     @BsonId val id: String = ObjectId().toHexString(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val createdAt: String = UtcTimestamp.now().toString(),
     val authorId: String,
     val name: String,
     val description: String,
     val prompt: String,
     val initialMessage: String,
-    val picUrl: String,
+    val picUrl: String? = null,
     val visibility: Int,
     val category: String,
     val tags: List<String>,
@@ -23,9 +23,9 @@ data class CharacterDbo(
     val totalReviews: Int = 0,
     val averageRating: Float = 0f,
     val trendingScore: Float = 0f,
-    val trendingScoreUpdatedAt: UtcTimestamp? = null,
+    val trendingScoreUpdatedAt: String? = null,
     val recommendationScore: Float = 0f,
-    val recommendationScoreUpdatedAt: UtcTimestamp? = null,
+    val recommendationScoreUpdatedAt: String? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
-    val coOccurrenceScoreUpdatedAt: UtcTimestamp? = null
+    val coOccurrenceScoreUpdatedAt: String? = null
 )

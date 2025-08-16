@@ -32,7 +32,6 @@ class ComplexQueryHelper(
     // REVIEWS
 
 
-
     suspend fun addReview(reviewDbo: ReviewDbo) {
         transactionHelper.withTransaction { session ->
             reviewRepository.addReview(session, reviewDbo)
@@ -40,7 +39,7 @@ class ComplexQueryHelper(
             characterRepository.updateAvgRating(
                 session = session,
                 characterId = reviewDbo.characterId,
-                newRating = reviewRepository.getAvgRatingForCharacter(reviewDbo.characterId)
+                newRating = reviewRepository.getAvgRatingForCharacter(session, reviewDbo.characterId)
             )
             characterActivityLogRepository.logActivity(
                 session = session,
@@ -57,8 +56,8 @@ class ComplexQueryHelper(
         rating: Int?,
         text: String?,
         oldRating: Int,
-    ) {
-        transactionHelper.withTransaction { session ->
+    ): ReviewDbo {
+        return transactionHelper.withTransaction { session ->
             reviewRepository.updateReview(
                 session = session,
                 id = reviewId,
@@ -69,9 +68,11 @@ class ComplexQueryHelper(
                 characterRepository.updateAvgRating(
                     session = session,
                     characterId = characterId,
-                    newRating = reviewRepository.getAvgRatingForCharacter(characterId)
+                    newRating = reviewRepository.getAvgRatingForCharacter(session, characterId)
                 )
             }
+
+            return@withTransaction reviewRepository.getReviewById(reviewId)!!
         }
     }
 
@@ -86,7 +87,7 @@ class ComplexQueryHelper(
             characterRepository.updateAvgRating(
                 session = session,
                 characterId = characterId,
-                newRating = reviewRepository.getAvgRatingForCharacter(characterId)
+                newRating = reviewRepository.getAvgRatingForCharacter(session, characterId)
             )
         }
     }
@@ -106,10 +107,7 @@ class ComplexQueryHelper(
     }
 
 
-
     // CHARACTERS
-
-
 
 
     suspend fun addCharacter(characterDbo: CharacterDbo) {
@@ -120,10 +118,9 @@ class ComplexQueryHelper(
             } else {
                 userRepository.incrementPrivateCharacterCount(session, characterDbo.authorId, 1)
             }
-            searchSuggestionsRepository.addSuggestion(
+            searchSuggestionsRepository.addCharacterName(
                 session = session,
                 originalText = characterDbo.name,
-                isCharacterName = true
             )
         }
     }
@@ -153,15 +150,14 @@ class ComplexQueryHelper(
                 visibility = visibility,
                 pictureUrl = pictureUrl,
                 category = category?.let { CharacterCategory.getByCode(it) },
-                tags = tags?.split(",")?.map { tagCode -> CharacterTag.getByCode(tagCode) }
+                tags = tags?.let { CharacterTag.fromString(tags) }
             )
 
             if (name != null && oldName != name) {
-                searchSuggestionsRepository.updateSuggestion(
+                searchSuggestionsRepository.updateCharacterName(
                     session = session,
                     newText = name,
                     oldText = oldName,
-                    isCharacterName = true
                 )
             }
 
@@ -190,39 +186,44 @@ class ComplexQueryHelper(
 
     suspend fun deleteCharacter(characterId: String) {
         transactionHelper.withTransaction { session ->
-            val character = characterRepository.getCharacter(characterId)!!
+            logger.info("1")
+            val character = characterRepository.getCharacter(session, characterId)!!
             val userId = character.authorId
+            logger.info("2")
             characterRepository.deleteCharacter(session, characterId)
+            logger.info("3")
             deletedIdsStatsRepository.entityWasDeleted(session, EntityType.CHARACTER, characterId)
-
+            logger.info("4")
             if (character.visibility == CharacterVisibility.PUBLIC.code) {
                 userRepository.incrementPublicCharacterCount(session, userId, -1)
             } else {
                 userRepository.incrementPrivateCharacterCount(session, userId, -1)
             }
-
+            logger.info("5")
             chatRepository.deleteAllChatsByCharacterId(session, characterId)
             // we do not delete messages, because we use soft delete for chat and messages
 
+            logger.info("6")
             val reviewIds = reviewRepository.getReviewIdsByCharacterId(session, characterId)
+            logger.info("7")
             reviewRepository.deleteReviewsByIds(session, reviewIds)
+            logger.info("8")
             deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.REVIEW, reviewIds)
+            logger.info("9")
             reviewLikeRepository.removeAllLikesForReviews(session, reviewIds)
+            logger.info("10")
         }
     }
-
-
 
 
     // USERS
 
 
-
-
-
     suspend fun addUser(userDbo: UserDbo) {
         transactionHelper.withTransaction { session ->
             userRepository.addUser(session, userDbo)
+            val userInTransaction = userRepository.getUserById(session, "testUser001")
+            logger.info("User exists in transaction: ${userInTransaction != null}")
         }
     }
 
@@ -293,12 +294,7 @@ class ComplexQueryHelper(
     }
 
 
-
-
     // CHATS & MESSAGES
-
-
-
 
 
     suspend fun addChat(chatDbo: ChatDbo) {
@@ -306,12 +302,7 @@ class ComplexQueryHelper(
             chatRepository.insertChat(session, chatDbo)
             chatDbo.characterIds.forEach { characterId ->
 
-                val isFirstChatWithThisCharacter = chatRepository.findChatByUserAndCharacter(
-                    userId = chatDbo.userId,
-                    characterId = characterId,
-                    includeDeleted = true
-                ) == null
-                if (isFirstChatWithThisCharacter) {
+                if (chatDbo.isFirstChatWithThisCharacter) {
                     characterRepository.incrementChatsCount(session, characterId, 1)
                 }
 
@@ -329,7 +320,7 @@ class ComplexQueryHelper(
         transactionHelper.withTransaction { session ->
             messageRepository.insertMessage(session, messageDbo)
             if (!messageDbo.isSentByUser) {
-                val chat = chatRepository.getChatById(messageDbo.chatId)!!
+                val chat = chatRepository.getChatById(session, messageDbo.chatId)!!
                 characterRepository.incrementMessagesCount(session, messageDbo.senderId, 1)
                 characterActivityLogRepository.logActivity(
                     session = session,

@@ -15,7 +15,7 @@ data class CharacterDto(
     @SerialName("name") val name: String,
     @SerialName("category") val category: String,
     @SerialName("tags") val tags: List<String>,
-    @SerialName("picUrl") val picUrl: String,
+    @SerialName("picUrl") val picUrl: String? = null,
     @SerialName("totalChats") val totalChats: Int,
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,
@@ -85,8 +85,7 @@ data class SearchCharactersRequest(
     @SerialName("searchQuery") val searchQuery: String = "",
     @SerialName("sortCriteria") val sortCriteria: Int = 0,
     @SerialName("size") val size: Int = 10,
-    @SerialName("cursor") val cursor: Int = 0,
-    @SerialName("refresh") val refresh: Boolean = false
+    @SerialName("cursor") val cursor: Int = 0
 )
 
 @Serializable
@@ -100,8 +99,7 @@ data class GetCharactersByCategoryRequest(
     @SerialName("deviceId") val deviceId: String,
     @SerialName("size") val size: Int = 10,
     @SerialName("cursor") val cursor: Int = 0,
-    @SerialName("refresh") val refresh: Boolean = false,
-    @SerialName("moveViewedToEndIfNothingToRefresh") val moveViewedToEndIfNothingToRefresh: Boolean = false
+    @SerialName("refresh") val refresh: Boolean = false
 )
 
 @Serializable

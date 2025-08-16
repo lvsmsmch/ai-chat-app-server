@@ -1,5 +1,7 @@
 package com.lvsmsmch.aichat.character.database
 
+import com.lvsmsmch.aichat.utils.ValidationException
+
 enum class CharacterTag(val code: String) {
     // Relationship Type
     BOYFRIEND("boyfriend"),
@@ -56,5 +58,21 @@ enum class CharacterTag(val code: String) {
 
     companion object {
         fun getByCode(code: String) = CharacterTag.entries.first { it.code == code }
+        fun fromString(tags: String): List<CharacterTag> {
+            return if (tags.isBlank()) {
+                emptyList()
+            } else {
+                tags.split(",")
+                    .map { it.trim() }  // убираем пробелы
+                    .filter { it.isNotBlank() }  // убираем пустые
+                    .map { tag ->
+                        try {
+                            CharacterTag.getByCode(tag)
+                        } catch (e: IllegalArgumentException) {
+                            throw ValidationException("Unknown tag '$tag'")
+                        }
+                    }
+            }
+        }
     }
 }

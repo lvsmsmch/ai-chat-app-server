@@ -14,7 +14,7 @@ import org.litote.kmongo.coroutine.aggregate
 @Serializable
 data class CharacterActivityLogDbo(
     @BsonId val id: String = ObjectId().toHexString(),
-    val timestamp: UtcTimestamp = UtcTimestamp.now(),
+    val timestamp: String = UtcTimestamp.now().toString(),
     val characterId: String,
     val activityType: Int,
     val userId: String,
@@ -69,7 +69,7 @@ class CharacterActivityLogRepository(
             and(
                 CharacterActivityLogDbo::characterId eq characterId,
                 CharacterActivityLogDbo::activityType eq activityType.code,
-                CharacterActivityLogDbo::timestamp gte since
+                CharacterActivityLogDbo::timestamp gte since.toString()
             )
         ).toInt()
     }
@@ -84,7 +84,7 @@ class CharacterActivityLogRepository(
                 and(
                     CharacterActivityLogDbo::characterId eq characterId,
                     CharacterActivityLogDbo::activityType eq activityType.code,
-                    CharacterActivityLogDbo::timestamp gte since
+                    CharacterActivityLogDbo::timestamp gte since.toString()
                 )
             ),
             group(

@@ -5,6 +5,7 @@ import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.database.MessageStatus
 import com.lvsmsmch.aichat.chat.network.TestAiMessageGeneratorUtil
+import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.withTimeout // ✅ Правильно
 import kotlin.time.Duration.Companion.seconds
@@ -28,7 +29,7 @@ class MessageFinisher(
                 val characterDbo = characterRepository.getCharacter(messageDbo.senderId) ?: return@launch
                 val messageHistory = messageRepository.getMessagesCreatedBefore(
                     chatId = chatDbo.id,
-                    timestamp = messageDbo.createdAt
+                    timestamp = UtcTimestamp.parse(messageDbo.createdAt)
                 ).takeLast(50)
 
                 messageRepository.updateMessage(

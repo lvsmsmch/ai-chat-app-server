@@ -1,6 +1,8 @@
 package com.lvsmsmch.aichat.utils
 
 inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectionName: String) {
+    return
+
     val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(java.util.Date())
 
     // Extract ID
@@ -28,13 +30,14 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
 
     // Build log message without helper functions
     val logMsg = buildString {
-        appendLine("+------------------------------------------------+")
-        appendLine("|                 DATABASE EVENT                 |")
-        appendLine("+------------------------------------------------+")
-        appendLine("| Operation: $operationType | Collection: $collectionName | Type: $entityType")
+        appendLine(".")
+        appendLine("+----------------------------------------------------------------------------------------+")
+        appendLine("|                             DATABASE $operationType                                        |")
+        appendLine("+----------------------------------------------------------------------------------------+")
+        appendLine("| Collection: $collectionName                                                                          |")
 //        appendLine("| ID: $extractedId")
 //        appendLine("| Time: $timestamp")
-        appendLine("+------------------------------------------------+")
+        appendLine("+----------------------------------------------------------------------------------------+")
 
         when (event) {
             is DatabaseEvent.Created -> {
@@ -46,18 +49,6 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
                 appendLine("| $newData")
             }
             is DatabaseEvent.Updated -> {
-                appendLine("| OLD DATA:")
-                val oldData = event.old.toString()
-                    .replaceFirst("${event.old.javaClass.simpleName}(", "")
-                    .removeSuffix(")")
-                appendLine("| $oldData")
-                appendLine("|")
-                appendLine("| NEW DATA:")
-                val newData = event.new.toString()
-                    .replaceFirst("${event.new.javaClass.simpleName}(", "")
-                    .removeSuffix(")")
-                appendLine("| $newData")
-
                 // Show changed fields manually
                 appendLine("|")
                 appendLine("| CHANGED FIELDS:")

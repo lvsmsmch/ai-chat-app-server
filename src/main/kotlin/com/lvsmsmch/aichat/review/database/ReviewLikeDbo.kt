@@ -9,5 +9,5 @@ data class ReviewLikeDbo(
     @BsonId val id: String, // "${userId}_${reviewId}"
     val userId: String,
     val reviewId: String,
-    val likedAt: UtcTimestamp = UtcTimestamp.now()
+    val likedAt: String = UtcTimestamp.now().toString()
 )

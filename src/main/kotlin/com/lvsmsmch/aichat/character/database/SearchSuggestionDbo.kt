@@ -11,6 +11,6 @@ data class SearchSuggestionDbo(
     val searchCount: Long = 0,
     val isCharacterName: Boolean = false,
     val language: String? = null, // "en", "ja", "ru", etc
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val lastSearchedAt: UtcTimestamp? = null
+    val createdAt: String = UtcTimestamp.now().toString(),
+    val lastSearchedAt: String? = null
 )

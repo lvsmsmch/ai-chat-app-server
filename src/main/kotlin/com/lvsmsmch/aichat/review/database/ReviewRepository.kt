@@ -92,7 +92,7 @@ class ReviewRepository(
         return collection.find(
             and(
                 ReviewDbo::characterId eq characterId,
-                if (beforeTime != null) ReviewDbo::createdAt lt beforeTime else EMPTY_BSON
+                if (beforeTime != null) ReviewDbo::createdAt lt beforeTime.toString() else EMPTY_BSON
             )
         ).sort(sort)
             .limit(size)
@@ -107,18 +107,14 @@ class ReviewRepository(
         return collection.find(
             session,
             ReviewDbo::authorId eq userId
-        ).projection(ReviewDbo::id)
-            .toList()
-            .map { it.id }
+        ).toList().map { it.id }
     }
 
     suspend fun getReviewIdsByCharacterId(session: ClientSession, characterId: String): List<String> {
         return collection.find(
             session,
             ReviewDbo::characterId eq characterId
-        ).projection(ReviewDbo::id)
-            .toList()
-            .map { it.id }
+        ).toList().map { it.id }
     }
 
     suspend fun getReviewIdsByCharacterIds(session: ClientSession, characterIds: List<String>): List<String> {
@@ -127,9 +123,7 @@ class ReviewRepository(
         return collection.find(
             session,
             ReviewDbo::characterId `in` characterIds
-        ).projection(ReviewDbo::id)
-            .toList()
-            .map { it.id }
+        ).toList().map { it.id }
     }
 
 
@@ -146,15 +140,12 @@ class ReviewRepository(
         return collection.countDocuments(ReviewDbo::characterId eq characterId).toInt()
     }
 
-    suspend fun getAvgRatingForCharacter(characterId: String): Float {
-        val pipeline = listOf(
-            match(ReviewDbo::characterId eq characterId),
-            group(
-                id = null, ReviewDbo::rating avg "averageRating"
-            )
-        )
-        val result = collection.aggregate<Document>(pipeline).first()
-        return result?.getDouble("averageRating")?.toFloat() ?: 0f
+    suspend fun getAvgRatingForCharacter(session: ClientSession, characterId: String): Float {
+        val reviews = collection.find(session, ReviewDbo::characterId eq characterId).toList()
+        if (reviews.isEmpty()) return 0f
+
+        val totalRating = reviews.sumOf { it.rating }
+        return totalRating.toFloat() / reviews.size
     }
 
     /**
@@ -179,7 +170,7 @@ class ReviewRepository(
         if (isAnonymous != null) {
             updates.add(setValue(ReviewDbo::isAnonymous, isAnonymous))
         }
-        updates.add(setValue(ReviewDbo::editedAt, UtcTimestamp.now()))
+        updates.add(setValue(ReviewDbo::editedAt, UtcTimestamp.now().toString()))
 
         collection.updateOneById(session, id, combine(updates))
         // No need to manually emit updates - the changeEventsFlow will handle it

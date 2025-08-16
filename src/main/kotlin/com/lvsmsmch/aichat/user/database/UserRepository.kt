@@ -47,6 +47,11 @@ class UserRepository(
     /**
      * CREATE
      */
+
+    suspend fun addUser(userDbo: UserDbo) {
+        collection.insertOne(userDbo)
+    }
+
     suspend fun addUser(session: ClientSession, userDbo: UserDbo) {
         collection.insertOne(session, userDbo)
     }
@@ -58,6 +63,11 @@ class UserRepository(
     suspend fun getUserById(userId: String): UserDbo? {
         return collection.findOneById(userId)
     }
+
+    suspend fun getUserById(session: ClientSession, userId: String): UserDbo? {
+        return collection.findOneById(userId, session)
+    }
+
 
     suspend fun findByUsername(username: String): UserDbo? {
         return collection.findOne(UserDbo::username eq username)
@@ -77,7 +87,7 @@ class UserRepository(
 
     suspend fun getActiveUsersSince(since: UtcTimestamp): List<UserDbo> {
         return collection.find(
-            UserDbo::lastActiveAt gte since
+            UserDbo::lastActiveAt gte since.toString()
         ).toList()
     }
 

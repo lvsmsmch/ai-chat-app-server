@@ -6,7 +6,7 @@ import org.litote.kmongo.setValue
 
 interface Lockoutable {
     val lockoutStage: Int
-    val lockoutUntil: UtcTimestamp
+    val lockoutUntil: String
 }
 
 interface LockoutableTokensRepository<T : Lockoutable> {
@@ -14,11 +14,11 @@ interface LockoutableTokensRepository<T : Lockoutable> {
     val collection: CoroutineCollection<T>
 
     suspend fun isLockoutActive(previous: Lockoutable): Boolean {
-        return previous.lockoutUntil.isInFuture()
+        return UtcTimestamp.parse(previous.lockoutUntil).isInFuture()
     }
 
     suspend fun isLockoutInPast(previous: Lockoutable): Boolean {
-        return previous.lockoutUntil.isInPast()
+        return UtcTimestamp.parse(previous.lockoutUntil).isInPast()
     }
 
     suspend fun createNewLockoutable(previous: Lockoutable? = null): Lockoutable {
@@ -32,7 +32,7 @@ interface LockoutableTokensRepository<T : Lockoutable> {
             in 16..20 -> 360
             else -> 720
         }
-        val lockoutUntil = UtcTimestamp.now().addMinutes(addMinutes.toLong())
+        val lockoutUntil = UtcTimestamp.now().addMinutes(addMinutes.toLong()).toString()
         return object : Lockoutable {
             override val lockoutStage = newLockoutStage
             override val lockoutUntil = lockoutUntil
@@ -41,6 +41,6 @@ interface LockoutableTokensRepository<T : Lockoutable> {
 
     suspend fun resetLockout(token: String) {
         collection.updateOneById(token, setValue(Lockoutable::lockoutStage, 0))
-        collection.updateOneById(token, setValue(Lockoutable::lockoutUntil, UtcTimestamp.now()))
+        collection.updateOneById(token, setValue(Lockoutable::lockoutUntil, UtcTimestamp.now().toString()))
     }
 }

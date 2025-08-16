@@ -155,7 +155,7 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt lt timestamp,
+                MessageDbo::createdAt lt timestamp.toString(),
                 MessageDbo::isDeleted eq false
             )
         ).sort(ascending(MessageDbo::createdAt)).toList()
@@ -165,7 +165,7 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt gt timestamp,
+                MessageDbo::createdAt gt timestamp.toString(),
                 MessageDbo::isDeleted eq false
             )
         ).sort(ascending(MessageDbo::createdAt)).toList()
@@ -175,8 +175,8 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt lte timestamp,
-                MessageDbo::lastModifiedAt gt timestamp,
+                MessageDbo::createdAt lte timestamp.toString(),
+                MessageDbo::lastModifiedAt gt timestamp.toString(),
                 MessageDbo::isDeleted eq false
             )
         ).sort(ascending(MessageDbo::createdAt)).toList()
@@ -186,7 +186,7 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::deletedAt gt timestamp,
+                MessageDbo::deletedAt gt timestamp.toString(),
                 MessageDbo::isDeleted eq true
             )
         ).toList().map { it.clientId } // Возвращаем clientId для клиента
@@ -204,9 +204,9 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt gte oldestTime,
-                MessageDbo::createdAt lte newestTime,
-                MessageDbo::lastModifiedAt gt afterTimestamp,
+                MessageDbo::createdAt gte oldestTime.toString(),
+                MessageDbo::createdAt lte newestTime.toString(),
+                MessageDbo::lastModifiedAt gt afterTimestamp.toString(),
                 MessageDbo::isDeleted eq false
             )
         ).sort(ascending(MessageDbo::createdAt)).toList()
@@ -221,9 +221,9 @@ class MessageRepository(
         return collection.find(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt gte oldestTime,
-                MessageDbo::createdAt lte newestTime,
-                MessageDbo::deletedAt gt afterTimestamp,
+                MessageDbo::createdAt gte oldestTime.toString(),
+                MessageDbo::createdAt lte newestTime.toString(),
+                MessageDbo::deletedAt gt afterTimestamp.toString(),
                 MessageDbo::isDeleted eq true
             )
         ).toList().map { it.clientId }
@@ -237,12 +237,12 @@ class MessageRepository(
         return collection.countDocuments(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt lt beforeTime,
+                MessageDbo::createdAt lt beforeTime.toString(),
                 or(
-                    MessageDbo::lastModifiedAt gt afterTimestamp,
+                    MessageDbo::lastModifiedAt gt afterTimestamp.toString(),
                     and(
                         MessageDbo::isDeleted eq true,
-                        MessageDbo::deletedAt gt afterTimestamp
+                        MessageDbo::deletedAt gt afterTimestamp.toString()
                     )
                 )
             )
@@ -253,7 +253,7 @@ class MessageRepository(
         return collection.countDocuments(
             and(
                 MessageDbo::chatId eq chatId,
-                MessageDbo::createdAt gt afterTime,
+                MessageDbo::createdAt gt afterTime.toString(),
                 MessageDbo::isDeleted eq false
             )
         ) > 0
@@ -264,11 +264,11 @@ class MessageRepository(
             and(
                 MessageDbo::chatId eq chatId,
                 or(
-                    MessageDbo::createdAt gt timestamp,
-                    MessageDbo::lastModifiedAt gt timestamp,
+                    MessageDbo::createdAt gt timestamp.toString(),
+                    MessageDbo::lastModifiedAt gt timestamp.toString(),
                     and(
                         MessageDbo::isDeleted eq true,
-                        MessageDbo::deletedAt gt timestamp
+                        MessageDbo::deletedAt gt timestamp.toString()
                     )
                 )
             )
@@ -320,7 +320,7 @@ class MessageRepository(
             messageId,
             combine(
                 *updates.toTypedArray(),
-                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -335,7 +335,7 @@ class MessageRepository(
             ),
             combine(
                 setValue(MessageDbo::isRead, true),
-                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
 
@@ -355,8 +355,8 @@ class MessageRepository(
             ),
             combine(
                 setValue(MessageDbo::isDeleted, true),
-                setValue(MessageDbo::deletedAt, UtcTimestamp.now()),
-                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -367,8 +367,8 @@ class MessageRepository(
             MessageDbo::id `in` messageIds,
             combine(
                 setValue(MessageDbo::isDeleted, true),
-                setValue(MessageDbo::deletedAt, UtcTimestamp.now()),
-                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -378,8 +378,8 @@ class MessageRepository(
             MessageDbo::chatId eq chatId,
             combine(
                 setValue(MessageDbo::isDeleted, true),
-                setValue(MessageDbo::deletedAt, UtcTimestamp.now()),
-                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }

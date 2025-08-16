@@ -7,12 +7,12 @@ import org.bson.codecs.pojo.annotations.BsonId
 @Serializable
 data class ReviewDbo(
     @BsonId val id: String,
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val createdAt: String = UtcTimestamp.now().toString(),
     val characterId: String,
     val isAnonymous: Boolean,
     val authorId: String,
     val rating: Int,
-    val text: String,
+    val text: String? = null,
     val likesCount: Int = 0,
-    val editedAt: UtcTimestamp? = null
+    val editedAt: String? = null
 )

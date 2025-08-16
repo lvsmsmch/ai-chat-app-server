@@ -22,8 +22,8 @@ enum class EntityType(val code: String, val recommendedIdLength: Int) {
 data class DeletedIdsStatsDbo(
     @BsonId val entityType: String,
     val deletedIds: Set<String> = emptySet(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val lastUpdated: UtcTimestamp = UtcTimestamp.now()
+    val createdAt: String = UtcTimestamp.now().toString(),
+    val lastUpdated: String = UtcTimestamp.now().toString()
 )
 
 class DeletedIdsStatsRepository(
@@ -47,7 +47,7 @@ class DeletedIdsStatsRepository(
 
         val new = current.copy(
             deletedIds = current.deletedIds + id,
-            lastUpdated = UtcTimestamp.now()
+            lastUpdated = UtcTimestamp.now().toString()
         )
 
         collection.replaceOneById(session, current.entityType, new)
@@ -63,7 +63,7 @@ class DeletedIdsStatsRepository(
 
         val new = current.copy(
             deletedIds = current.deletedIds + ids,
-            lastUpdated = UtcTimestamp.now()
+            lastUpdated = UtcTimestamp.now().toString()
         )
 
         collection.replaceOneById(session, current.entityType, new)

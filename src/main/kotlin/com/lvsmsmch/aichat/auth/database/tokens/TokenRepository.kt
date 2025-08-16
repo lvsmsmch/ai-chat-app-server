@@ -3,14 +3,14 @@ package com.lvsmsmch.aichat.auth.database.tokens
 import com.lvsmsmch.aichat.utils.TokenExpiredException
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import io.ktor.server.application.*
-import io.ktor.server.plugins.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.eq
+import com.lvsmsmch.aichat.utils.BadRequestException
 
 interface TokenDbo {
     val token: String
-    val createdAt: UtcTimestamp
-    val expiresAt: UtcTimestamp
+    val createdAt: String
+    val expiresAt: String
 }
 
 interface TokenRepository<T : TokenDbo> {
@@ -23,11 +23,6 @@ interface TokenRepository<T : TokenDbo> {
 
     suspend fun delete(token: String) {
         collection.deleteOne(TokenDbo::token eq token)
-    }
-
-    suspend fun isTokenNullOrExpired(token: String): Boolean {
-        val authToken = collection.findOne(TokenDbo::token eq token)
-        return authToken == null || authToken.expiresAt.isInPast()
     }
 
     suspend fun verifyToken(call: ApplicationCall): T {
@@ -44,7 +39,7 @@ interface TokenRepository<T : TokenDbo> {
         }
 
         val authToken = collection.findOne(TokenDbo::token eq token)
-        if (authToken == null || authToken.expiresAt.isInPast()) {
+        if (authToken == null || UtcTimestamp.parse(authToken.expiresAt).isInPast()) {
             throw TokenExpiredException("Authentication token has expired")
         }
 

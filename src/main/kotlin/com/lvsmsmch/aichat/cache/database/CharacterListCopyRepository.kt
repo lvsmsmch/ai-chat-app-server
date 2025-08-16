@@ -22,7 +22,7 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
             id,
             combine(
                 setValue(CharacterListCopyDbo::currentPosition, newPosition),
-                setValue(CharacterListCopyDbo::lastAccessedAt, UtcTimestamp.now())
+                setValue(CharacterListCopyDbo::lastAccessedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -57,7 +57,7 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
     suspend fun deleteOldCopies(): Long {
         val dayAgo = UtcTimestamp.now().subtractHours(24)
         val result = collection.deleteMany(
-            CharacterListCopyDbo::lastAccessedAt lt dayAgo
+            CharacterListCopyDbo::lastAccessedAt lt dayAgo.toString()
         )
         return result.deletedCount
     }
@@ -69,11 +69,11 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
         val now = UtcTimestamp.now()
 
         val activeCopies = collection.countDocuments(
-            CharacterListCopyDbo::lastAccessedAt gte now.subtractHours(1)
+            CharacterListCopyDbo::lastAccessedAt gte now.subtractHours(1).toString()
         )
 
         val oldCopies = collection.countDocuments(
-            CharacterListCopyDbo::lastAccessedAt lt now.subtractHours(24)
+            CharacterListCopyDbo::lastAccessedAt lt now.subtractHours(24).toString()
         )
 
         val searchCopies = collection.countDocuments(

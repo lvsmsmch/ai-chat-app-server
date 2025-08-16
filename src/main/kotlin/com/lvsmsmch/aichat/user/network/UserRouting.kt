@@ -129,12 +129,12 @@ fun Route.configureUserRouting(
             val followers = followersToReturn.mapNotNull {
                 val follower = userRepository.getUserById(it.followerId) ?: return@mapNotNull null
                 FollowerDto(
-                    followedAt = it.followedAt.toString(),
+                    followedAt = it.followedAt,
                     follower = follower.toUserDto(mapper)
                 )
             }
 
-            val nextCursor = if (hasMore) followersToReturn.lastOrNull()?.followedAt?.toString() else null
+            val nextCursor = if (hasMore) followersToReturn.lastOrNull()?.followedAt else null
 
             val response = FollowersResponse(
                 followers = followers,
@@ -228,7 +228,10 @@ fun Route.configureUserRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
-                            val file = File.createTempFile("profile_", ".tmp")
+                            val originalName = part.originalFileName ?: "image.jpg"
+                            val extension = originalName.substringAfterLast('.', "jpg")
+
+                            val file = File.createTempFile("upload_", ".$extension")
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -243,9 +246,9 @@ fun Route.configureUserRouting(
                 part.dispose() // Don't forget to dispose the part after handling
             }
 
-            if (username == null && name == null && bio == null && pictureFile == null) {
-                throw NoUpdateFieldsProvidedException()
-            }
+//            if (username == null && name == null && bio == null && pictureFile == null) {
+//                throw NoUpdateFieldsProvidedException()
+//            }
 
             username?.let {
                 validateUserUsername(it)
@@ -272,7 +275,7 @@ fun Route.configureUserRouting(
             val updatedUser = userRepository.getUserById(userId)
                 ?: throw UserNotFoundException(id = userId)
 
-            call.respondSuccess(data = updatedUser.toUserDto(mapper))
+            call.respondSuccess(data = updatedUser.toUserFullInfoDto(mapper, demanderId = sessionDbo.userId))
         }
 
         /**

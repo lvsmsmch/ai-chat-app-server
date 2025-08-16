@@ -42,35 +42,19 @@ fun Route.configureReviewRouting(
             }
 
             validateReviewRating(request.rating)
-            validateReviewText(request.text)
+            request.text?.let { validateReviewText(it) }
 
             val reviewDbo = ReviewDbo(
                 id = idGenerator.generateId(EntityType.REVIEW),
                 characterId = request.characterId,
                 isAnonymous = false,
-                createdAt = UtcTimestamp.now(),
+                createdAt = UtcTimestamp.now().toString(),
                 authorId = sessionDbo.userId,
                 rating = request.rating,
                 text = request.text
             )
 
             complexQueryHelper.addReview(reviewDbo)
-
-//            transactionHelper.withTransaction { session ->
-//                reviewRepository.addReview(session, reviewDbo)
-//                characterRepository.incrementReviewsCount(session, reviewDbo.characterId, 1)
-//                characterRepository.updateAvgRating(
-//                    session = session,
-//                    characterId = reviewDbo.characterId,
-//                    newRating = reviewRepository.getAvgRatingForCharacter(reviewDbo.characterId)
-//                )
-//                characterActivityLogRepository.logActivity(
-//                    session = session,
-//                    activityType = ActivityType.REVIEW_ADDED,
-//                    characterId = request.characterId,
-//                    userId = sessionDbo.userId
-//                )
-//            }
 
             call.respondSuccess(data = reviewDbo.toReviewDto(mapper))
         }
@@ -80,6 +64,8 @@ fun Route.configureReviewRouting(
          * Получение списка отзывов с пагинацией
          */
         get {
+            val sessionDbo = sessionRepository.verifyToken(call)
+
             val request = GetReviewsRequest(
                 characterId = call.request.queryParameters["characterId"]
                     ?: throw BadRequestException("Missing characterId parameter"),
@@ -103,8 +89,8 @@ fun Route.configureReviewRouting(
             val hasMore = reviewsDbos.size > request.size
             val reviewsToReturn = if (hasMore) reviewsDbos.dropLast(1) else reviewsDbos
 
-            val reviews = reviewsToReturn.map { it.toReviewDto(mapper) }
-            val nextCursor = if (hasMore) reviewsToReturn.lastOrNull()?.createdAt?.toString() else null
+            val reviews = reviewsToReturn.map { it.toReviewDto(mapper, currentUserId = sessionDbo.userId) }
+            val nextCursor = if (hasMore) reviewsToReturn.lastOrNull()?.createdAt else null
 
             val response = ReviewsResponse(
                 reviews = reviews,
@@ -137,7 +123,7 @@ fun Route.configureReviewRouting(
             val oldRating = reviewDbo.rating
             val newRating = request.rating
 
-            complexQueryHelper.updateReview(
+            val updatedReview = complexQueryHelper.updateReview(
                 reviewId = reviewId,
                 characterId = reviewDbo.characterId,
                 rating = newRating,
@@ -145,7 +131,7 @@ fun Route.configureReviewRouting(
                 oldRating = oldRating
             )
 
-            call.respondSuccess()
+            call.respondSuccess(data = updatedReview.toReviewDto(mapper))
         }
 
         /**
@@ -205,6 +191,11 @@ fun Route.configureReviewRouting(
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
 
+
+            if (reviewLikeRepository.isReviewLikedByUser(sessionDbo.userId, reviewId)) {
+                throw ForbiddenException("You already liked this review")
+            }
+
             complexQueryHelper.likeReview(reviewId, sessionDbo.userId)
 
             call.respondSuccess()
@@ -221,6 +212,10 @@ fun Route.configureReviewRouting(
 
             reviewRepository.getReviewById(reviewId)
                 ?: throw ReviewNotFoundException(id = reviewId)
+
+            if (!reviewLikeRepository.isReviewLikedByUser(sessionDbo.userId, reviewId)) {
+                throw ForbiddenException("You don't have a like on this review")
+            }
 
             complexQueryHelper.unlikeReview(reviewId, sessionDbo.userId)
 

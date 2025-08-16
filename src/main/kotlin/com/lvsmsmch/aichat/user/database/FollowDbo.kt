@@ -7,7 +7,7 @@ import org.bson.codecs.pojo.annotations.BsonId
 @Serializable
 data class FollowDbo(
     @BsonId val id: String,
-    val followedAt: UtcTimestamp = UtcTimestamp.now(),
+    val followedAt: String = UtcTimestamp.now().toString(),
     val followerId: String,
     val followeeId: String
 )

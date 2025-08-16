@@ -7,6 +7,10 @@ import com.lvsmsmch.aichat.character.database.*
 import com.lvsmsmch.aichat.character.network.*
 import com.lvsmsmch.aichat.chat.database.*
 import com.lvsmsmch.aichat.chat.network.*
+import com.lvsmsmch.aichat.notification.database.RecommendationsDbo
+import com.lvsmsmch.aichat.notification.network.RecommendationsDto
+import com.lvsmsmch.aichat.notification.network.NotificationDto
+import com.lvsmsmch.aichat.notification.network.NotificationType
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
@@ -48,7 +52,7 @@ suspend fun UserDbo.toUserDetailsDto(
         createdAt = createdAt.toString(),
         bio = bio,
         publicCharactersCount = publicCharacterCount,
-        privateCharactersCount = privateCharacterCount,
+        privateCharactersCount = if (demanderId == id) privateCharacterCount else 0,
         followersCount = followerCount,
         followingCount = followingCount,
         isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id)
@@ -183,5 +187,16 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         isCompleted = status == MessageStatus.COMPLETED.value,
         isFailedCompleting = status == MessageStatus.FAILED.value,
         nsfw = nsfw
+    )
+}
+
+suspend fun RecommendationsDbo.toNotificationDto(mapper: Mapper): NotificationDto {
+    return NotificationDto(
+        type = NotificationType.Recommendations.code,
+        notification = RecommendationsDto(
+            characters = characterIds.mapNotNull {
+                mapper.characterRepository.getCharacter(it)?.toCharacterDto(mapper)
+            }
+        )
     )
 }

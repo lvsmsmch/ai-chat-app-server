@@ -13,7 +13,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 data class DefaultRecommendationsCacheDbo(
     @BsonId val id: String = "default_recommendations_cache",
     val characterIds: List<String>,
-    val updatedAt: UtcTimestamp = UtcTimestamp.now(),
+    val updatedAt: String = UtcTimestamp.now().toString(),
     val version: String = ObjectId().toString()
 )
 
@@ -32,7 +32,7 @@ class DefaultRecommendationsCacheRepository(
     suspend fun updateDefaultCache(characterIds: List<String>) {
         val cache = DefaultRecommendationsCacheDbo(
             characterIds = characterIds,
-            updatedAt = UtcTimestamp.now()
+            updatedAt = UtcTimestamp.now().toString()
         )
         
         collection.replaceOneById("default_recommendations_cache", cache, ReplaceOptions().upsert(true))
@@ -53,6 +53,6 @@ class DefaultRecommendationsCacheRepository(
     suspend fun hasRecentCache(maxAgeHours: Long = 1): Boolean {
         val cache = collection.findOneById("default_recommendations_cache") ?: return false
         val cutoff = UtcTimestamp.now().subtractHours(maxAgeHours)
-        return cache.updatedAt.isAfter(cutoff)
+        return UtcTimestamp.parse(cache.updatedAt).isAfter(cutoff)
     }
 }

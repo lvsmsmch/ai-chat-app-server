@@ -74,41 +74,18 @@ class CacheManager(
         }
     }
 
-    suspend fun refreshItems(
+    suspend fun refreshCategory(
         userId: String,
         deviceId: String,
         listType: CacheListType,
-        size: Int,
-        moveViewedToEndIfNothingToRefresh: Boolean
+        size: Int
     ): CachedCharactersResult {
-        return when (listType) {
-            is CacheListType.Search -> {
-                // Для поиска рефреш = новый поиск
-                characterListCopyRepository.deleteAllSearchCopiesForUserDevice(userId, deviceId)
-                createFreshSearchCopy(userId, deviceId, listType)
-                takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
-            }
-
-            else -> {
-                // Категории и персонализация - как раньше
-                when {
-                    !doesCopyExist(userId, deviceId, listType) || doesNewerVersionExist(userId, deviceId, listType) -> {
-                        updateCopyWithFreshList(userId, deviceId, listType)
-                        takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
-                    }
-
-                    moveViewedToEndIfNothingToRefresh -> {
-                        moveViewedToEnd(userId, deviceId, listType)
-                        takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
-                    }
-
-                    else -> {
-                        val copy = characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
-                        CachedCharactersResult(refreshed = false, emptyList(), copy?.currentPosition ?: 0)
-                    }
-                }
-            }
+        if (!doesCopyExist(userId, deviceId, listType) || doesNewerVersionExist(userId, deviceId, listType)) {
+            updateCopyWithFreshList(userId, deviceId, listType)
+        } else {
+            moveViewedToEnd(userId, deviceId, listType)
         }
+        return takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
     }
 
     // Создание новой копии для поиска
@@ -188,8 +165,8 @@ class CacheManager(
                 characterIds = cachedItems,
                 currentPosition = 0,
                 baseListVersion = cachedVersion,
-                createdAt = UtcTimestamp.now(),
-                lastAccessedAt = UtcTimestamp.now()
+                createdAt = UtcTimestamp.now().toString(),
+                lastAccessedAt = UtcTimestamp.now().toString()
             )
             characterListCopyRepository.upsert(copy)
         }
@@ -210,7 +187,7 @@ class CacheManager(
         val updatedCopy = copy.copy(
             characterIds = rotatedList,
             currentPosition = 0,
-            lastAccessedAt = UtcTimestamp.now()
+            lastAccessedAt = UtcTimestamp.now().toString()
         )
 
         characterListCopyRepository.upsert(updatedCopy)

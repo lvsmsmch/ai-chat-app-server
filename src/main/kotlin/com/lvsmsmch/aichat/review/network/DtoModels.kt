@@ -14,7 +14,7 @@ data class ReviewDto(
     @SerialName("characterId") val characterId: String,
     @SerialName("author") val author: UserDto,
     @SerialName("rating") val rating: Int,
-    @SerialName("text") val text: String,
+    @SerialName("text") val text: String? = null,
     @SerialName("likesCount") val likesCount: Int,
     @SerialName("isLikedByCurrentUser") val isLikedByCurrentUser: Boolean = false
 )
@@ -37,7 +37,7 @@ data class ReviewLikesResponse(
 data class CreateReviewRequest(
     @SerialName("characterId") val characterId: String,
     @SerialName("rating") val rating: Int,
-    @SerialName("text") val text: String
+    @SerialName("text") val text: String? = null
 )
 
 @Serializable

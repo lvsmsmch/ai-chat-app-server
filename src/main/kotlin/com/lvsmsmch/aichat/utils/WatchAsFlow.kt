@@ -5,6 +5,7 @@ import com.mongodb.client.model.changestream.FullDocumentBeforeChange
 import com.mongodb.client.model.changestream.OperationType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import org.litote.kmongo.coroutine.CoroutineCollection
 import kotlinx.coroutines.reactive.asFlow
 

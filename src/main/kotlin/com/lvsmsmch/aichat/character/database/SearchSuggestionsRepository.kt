@@ -44,7 +44,31 @@ class SearchSuggestionsRepository(
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    suspend fun addSuggestion(session: ClientSession, originalText: String, isCharacterName: Boolean = false) {
+    suspend fun addDefaultSuggestions(suggestions: List<String>) {
+        if (suggestions.isEmpty()) return
+
+        val suggestionsToInsert = mutableListOf<SearchSuggestionDbo>()
+
+        suggestions.forEach { originalText ->
+            val normalizedTerm = originalText.trim().lowercase()
+            val existing = collection.findOneById(normalizedTerm)
+            if (existing == null) {
+                val suggestion = SearchSuggestionDbo(
+                    term = normalizedTerm,
+                    displayText = originalText.trim(),
+                    searchCount = 1,
+                    isCharacterName = false,
+                    lastSearchedAt = UtcTimestamp.now().toString()
+                )
+                suggestionsToInsert.add(suggestion)
+            }
+        }
+
+        if (suggestionsToInsert.isNotEmpty()) {
+            collection.insertMany(suggestionsToInsert)
+        }
+    }
+    suspend fun addCharacterName(session: ClientSession, originalText: String) {
         val normalizedTerm = originalText.trim().lowercase()
         val existing = collection.findOneById(normalizedTerm)
         if (existing == null) {
@@ -52,14 +76,14 @@ class SearchSuggestionsRepository(
                 term = normalizedTerm,
                 displayText = normalizedTerm,
                 searchCount = 1,
-                isCharacterName = isCharacterName,
-                lastSearchedAt = UtcTimestamp.now()
+                isCharacterName = true,
+                lastSearchedAt = UtcTimestamp.now().toString()
             )
             collection.insertOne(session, suggestion)
         }
     }
 
-    suspend fun updateSuggestion(session: ClientSession, oldText: String, newText: String, isCharacterName: Boolean = false) {
+    suspend fun updateCharacterName(session: ClientSession, oldText: String, newText: String) {
         val oldNormalizedTerm = oldText.trim().lowercase()
         val newNormalizedTerm = newText.trim().lowercase()
 
@@ -76,8 +100,8 @@ class SearchSuggestionsRepository(
                 term = newNormalizedTerm,
                 displayText = newText.trim(), // Сохраняем оригинальный регистр для отображения
                 searchCount = 1,
-                isCharacterName = isCharacterName,
-                lastSearchedAt = UtcTimestamp.now()
+                isCharacterName = true,
+                lastSearchedAt = UtcTimestamp.now().toString()
             )
             collection.insertOne(session, suggestion)
         } else {
@@ -87,8 +111,8 @@ class SearchSuggestionsRepository(
                 newNormalizedTerm,
                 existing.copy(
                     displayText = newText.trim(),
-                    isCharacterName = isCharacterName,
-                    lastSearchedAt = UtcTimestamp.now()
+                    isCharacterName = true,
+                    lastSearchedAt = UtcTimestamp.now().toString()
                 )
             )
         }
@@ -111,7 +135,7 @@ class SearchSuggestionsRepository(
             normalizedTerm,
             combine(
                 inc(SearchSuggestionDbo::searchCount, 1),
-                setValue(SearchSuggestionDbo::lastSearchedAt, UtcTimestamp.now())
+                setValue(SearchSuggestionDbo::lastSearchedAt, UtcTimestamp.now().toString())
             )
         )
     }

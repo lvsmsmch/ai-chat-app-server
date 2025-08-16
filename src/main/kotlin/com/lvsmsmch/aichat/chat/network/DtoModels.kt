@@ -92,6 +92,7 @@ data class BatchSyncResponse(
 data class CreateChatRequest(
     @SerialName("chatId") val chatId: String,
     @SerialName("characterIds") val characterIds: List<String>,
+    @SerialName("customName") val customName: String? = null,
     @SerialName("initialMessageId") val initialMessageId: String? = null
 )
 
@@ -186,7 +187,6 @@ data class GetMessagesRequest(
 data class GetMessagesResponse(
     @SerialName("messages") val messages: List<MessageDto>,
     @SerialName("nextCursor") val nextCursor: String?,
-    @SerialName("prevCursor") val prevCursor: String?,
     @SerialName("hasMore") val hasMore: Boolean
 )
 

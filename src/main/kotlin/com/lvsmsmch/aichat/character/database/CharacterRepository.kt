@@ -206,7 +206,7 @@ class CharacterRepository(
                 CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
             },
             if (beforeTime != null) {
-                CharacterDbo::createdAt lt beforeTime
+                CharacterDbo::createdAt lt beforeTime.toString()
             } else {
                 EMPTY_BSON
             }
@@ -349,7 +349,10 @@ class CharacterRepository(
 
     suspend fun updateTrendingScore(characterId: String, trendingScore: Float) {
         collection.updateOneById(characterId, setValue(CharacterDbo::trendingScore, trendingScore))
-        collection.updateOneById(characterId, setValue(CharacterDbo::trendingScoreUpdatedAt, UtcTimestamp.now()))
+        collection.updateOneById(
+            characterId,
+            setValue(CharacterDbo::trendingScoreUpdatedAt, UtcTimestamp.now().toString())
+        )
     }
 
     suspend fun updateRecommendationScore(characterId: String, recommendationScore: Float) {
@@ -357,7 +360,7 @@ class CharacterRepository(
             characterId,
             combine(
                 setValue(CharacterDbo::recommendationScore, recommendationScore),
-                setValue(CharacterDbo::recommendationScoreUpdatedAt, UtcTimestamp.now())
+                setValue(CharacterDbo::recommendationScoreUpdatedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -367,7 +370,7 @@ class CharacterRepository(
             characterId,
             combine(
                 setValue(CharacterDbo::coOccurrenceScore, scores),
-                setValue(CharacterDbo::coOccurrenceScoreUpdatedAt, UtcTimestamp.now())
+                setValue(CharacterDbo::coOccurrenceScoreUpdatedAt, UtcTimestamp.now().toString())
             )
         )
     }

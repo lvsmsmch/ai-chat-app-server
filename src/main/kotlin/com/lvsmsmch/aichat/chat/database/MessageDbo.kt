@@ -10,8 +10,8 @@ import java.util.*
 data class MessageDbo(
     @BsonId val id: String = ObjectId().toHexString(),
     val clientId: String = UUID.randomUUID().toString(),
-    val lastModifiedAt: UtcTimestamp = UtcTimestamp.now(),
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
+    val lastModifiedAt: String = UtcTimestamp.now().toString(),
+    val createdAt: String = UtcTimestamp.now().toString(),
     val chatId: String,
     val chatClientId: String,
     val senderId: String,
@@ -23,5 +23,5 @@ data class MessageDbo(
     val status: String,
     val nsfw: Boolean = false,
     val isDeleted: Boolean = false,
-    val deletedAt: UtcTimestamp = UtcTimestamp.now(),
+    val deletedAt: String = UtcTimestamp.now().toString(),
 )

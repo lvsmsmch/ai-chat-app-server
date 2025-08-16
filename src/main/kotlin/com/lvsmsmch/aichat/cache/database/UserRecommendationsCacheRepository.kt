@@ -13,7 +13,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 data class UserRecommendationsCacheDbo(
     @BsonId val userId: String,
     val characterIds: List<String>,
-    val updatedAt: UtcTimestamp = UtcTimestamp.now(),
+    val updatedAt: String = UtcTimestamp.now().toString(),
     val version: String = ObjectId().toString()
 )
 
@@ -33,7 +33,7 @@ class UserRecommendationsCacheRepository(
         val cache = UserRecommendationsCacheDbo(
             userId = userId,
             characterIds = characterIds,
-            updatedAt = UtcTimestamp.now()
+            updatedAt = UtcTimestamp.now().toString()
         )
         
         collection.replaceOneById(userId, cache, ReplaceOptions().upsert(true))
@@ -52,7 +52,7 @@ class UserRecommendationsCacheRepository(
 
     suspend fun hasFreshCache(userId: String, ttlHours: Long): Boolean {
         val cache = collection.findOneById(userId) ?: return false
-        val expirationTime = cache.updatedAt.addHours(ttlHours)
+        val expirationTime = UtcTimestamp.parse(cache.updatedAt).addHours(ttlHours)
         return expirationTime.isAfter(UtcTimestamp.now())
     }
 
@@ -66,7 +66,7 @@ class UserRecommendationsCacheRepository(
     suspend fun deleteInactiveUserCaches(): Long {
         val monthAgo = UtcTimestamp.now().subtractDays(30)
         val result = collection.deleteMany(
-            UserRecommendationsCacheDbo::updatedAt lt monthAgo
+            UserRecommendationsCacheDbo::updatedAt lt monthAgo.toString()
         )
         return result.deletedCount
     }
@@ -79,11 +79,11 @@ class UserRecommendationsCacheRepository(
         val now = UtcTimestamp.now()
         
         val freshCaches = collection.countDocuments(
-            UserRecommendationsCacheDbo::updatedAt gte now.subtractHours(24)
+            UserRecommendationsCacheDbo::updatedAt gte now.subtractHours(24).toString()
         )
         
         val oldCaches = collection.countDocuments(
-            UserRecommendationsCacheDbo::updatedAt lt now.subtractDays(7)
+            UserRecommendationsCacheDbo::updatedAt lt now.subtractDays(7).toString()
         )
         
         return CacheStats(

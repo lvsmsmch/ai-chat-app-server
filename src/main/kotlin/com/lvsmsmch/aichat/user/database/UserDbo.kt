@@ -7,8 +7,8 @@ import org.bson.codecs.pojo.annotations.BsonId
 @Serializable
 data class UserDbo(
     @BsonId val id: String,
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val lastActiveAt: UtcTimestamp = UtcTimestamp.now(),
+    val createdAt: String = UtcTimestamp.now().toString(),
+    val lastActiveAt: String = UtcTimestamp.now().toString(),
     val username: String,
     val name: String? = null,
     val profilePictureUrl: String? = null,

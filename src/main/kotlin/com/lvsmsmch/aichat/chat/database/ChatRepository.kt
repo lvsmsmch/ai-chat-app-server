@@ -2,8 +2,6 @@
 
 package com.lvsmsmch.aichat.chat.database
 
-import com.lvsmsmch.aichat.character.database.CharacterDbo
-import com.lvsmsmch.aichat.character.database.CharacterVisibility
 import com.lvsmsmch.aichat.utils.DatabaseEvent
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
@@ -84,6 +82,10 @@ class ChatRepository(
     /**
      * READ - основные методы
      */
+    suspend fun getChatById(session: ClientSession, chatId: String): ChatDbo? {
+        return collection.findOneById(chatId, session)
+    }
+
     suspend fun getChatById(chatId: String): ChatDbo? {
         return collection.findOneById(chatId)
     }
@@ -115,17 +117,17 @@ class ChatRepository(
                 or(
                     // Новые чаты
                     and(
-                        ChatDbo::createdAt gt timestamp,
+                        ChatDbo::createdAt gt timestamp.toString(),
                         ChatDbo::isDeleted eq false
                     ),
                     // Обновленные чаты
                     and(
-                        ChatDbo::lastModifiedAt gt timestamp,
+                        ChatDbo::lastModifiedAt gt timestamp.toString(),
                         ChatDbo::isDeleted eq false
                     ),
                     // Удаленные чаты
                     and(
-                        ChatDbo::deletedAt gt timestamp,
+                        ChatDbo::deletedAt gt timestamp.toString(),
                         ChatDbo::isDeleted eq true
                     )
                 )
@@ -137,7 +139,7 @@ class ChatRepository(
         return collection.find(
             and(
                 ChatDbo::userId eq userId,
-                ChatDbo::createdAt gt timestamp,
+                ChatDbo::createdAt gt timestamp.toString(),
                 ChatDbo::isDeleted eq false
             )
         ).toList()
@@ -147,8 +149,8 @@ class ChatRepository(
         return collection.find(
             and(
                 ChatDbo::userId eq userId,
-                ChatDbo::createdAt lte timestamp,
-                ChatDbo::lastModifiedAt gt timestamp,
+                ChatDbo::createdAt lte timestamp.toString(),
+                ChatDbo::lastModifiedAt gt timestamp.toString(),
                 ChatDbo::isDeleted eq false
             )
         ).toList()
@@ -158,7 +160,7 @@ class ChatRepository(
         return collection.find(
             and(
                 ChatDbo::userId eq userId,
-                ChatDbo::deletedAt gt timestamp,
+                ChatDbo::deletedAt gt timestamp.toString(),
                 ChatDbo::isDeleted eq true
             )
         ).toList().map { it.clientId } // Возвращаем clientId для клиента
@@ -265,26 +267,11 @@ class ChatRepository(
             chatId,
             combine(
                 *updates.toTypedArray(),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
 
-    suspend fun deleteChatsForWhoIsNotAuthor(session: ClientSession, characterId: String, authorId: String) {
-            collection.updateMany(
-                session,
-                and(
-                    ChatDbo::characterIds contains characterId,
-                    ChatDbo::userId ne authorId,
-                    ChatDbo::isDeleted eq false
-                ),
-                combine(
-                    setValue(ChatDbo::isDeleted, true),
-                    setValue(ChatDbo::deletedAt, UtcTimestamp.now()),
-                    setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
-                )
-            )
-    }
 
     /**
      * DELETE
@@ -299,8 +286,8 @@ class ChatRepository(
             ChatDbo::id `in` chatIds,
             combine(
                 setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -315,8 +302,8 @@ class ChatRepository(
             ),
             combine(
                 setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
@@ -332,9 +319,26 @@ class ChatRepository(
             ),
             combine(
                 setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now())
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
     }
+
+    suspend fun deleteChatsForWhoIsNotAuthor(session: ClientSession, characterId: String, authorId: String) {
+        collection.updateMany(
+            session,
+            and(
+                ChatDbo::characterIds contains characterId,
+                ChatDbo::userId ne authorId,
+                ChatDbo::isDeleted eq false
+            ),
+            combine(
+                setValue(ChatDbo::isDeleted, true),
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
+            )
+        )
+    }
+
 }

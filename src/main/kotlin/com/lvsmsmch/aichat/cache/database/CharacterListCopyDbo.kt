@@ -13,7 +13,7 @@ data class CharacterListCopyDbo(
     val characterIds: List<String>,
     val currentPosition: Int = 0,
     val baseListVersion: String,
-    val createdAt: UtcTimestamp = UtcTimestamp.now(),
-    val lastAccessedAt: UtcTimestamp = UtcTimestamp.now(),
+    val createdAt: String = UtcTimestamp.now().toString(),
+    val lastAccessedAt: String = UtcTimestamp.now().toString(),
     val totalFound: Int? = null
 )

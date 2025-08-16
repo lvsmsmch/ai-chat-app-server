@@ -61,14 +61,14 @@ fun validateCharacterName(name: String) {
 }
 
 fun validateCharacterDescription(description: String) {
-    if (description.isEmpty() || description.length > 1000) {
-        throw ValidationException("Description must be between 1 and 1000 characters")
+    if (description.length > 1000) {
+        throw ValidationException("Description must be between 0 and 1000 characters")
     }
 }
 
 fun validateCharacterPrompt(prompt: String) {
-    if (prompt.isEmpty() || prompt.length > 2000) {
-        throw ValidationException("Prompt must be between 1 and 2000 characters")
+    if (prompt.length > 2000) {
+        throw ValidationException("Prompt must be between 0 and 2000 characters")
     }
 }
 
@@ -116,12 +116,14 @@ fun validateCharacterCategory(category: String) {
     val existingCategoryCodes = CharacterCategory.entries.map { it.code }
     if (category !in existingCategoryCodes) {
         throw ValidationException(
-            "Unknown character category: $category, possible values are: $existingCategoryCodes"
+            "Unknown character category: $category, possible values are: personalized, $existingCategoryCodes"
         )
     }
 }
 
 fun validateCharacterTags(tags: String) {
+    if (tags.isBlank()) return
+
     val existingTagCodes = CharacterTag.entries.map { it.code }
     val tagsAsList = tags.split(",")
     tagsAsList.forEach { tag ->
@@ -152,6 +154,12 @@ fun validateCharacterPicture(pictureFile: File) {
 fun validateMessageText(messageText: String) {
     if (messageText.length > 1000) {
         throw ValidationException("Message is too long")
+    }
+}
+
+fun validateCustomChatName(customName: String) {
+    if (customName.length > 100) {
+        throw ValidationException("Chat name is too long")
     }
 }
 

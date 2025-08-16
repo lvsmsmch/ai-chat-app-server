@@ -18,6 +18,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
@@ -76,8 +77,8 @@ fun Route.configureChatRouting(
                     // Создаем фиктивный запрос для fullSync с очень старой датой
                     val fullSyncRequest = ChatSyncRequest(
                         chatId = chat.clientId,
-                        lastChatSyncTimestamp = UtcTimestamp.now().subtractYears(100).toString(),
-                        lastMessagesSyncTimestamp = UtcTimestamp.now().subtractYears(100).toString(),
+                        lastChatSyncTimestamp = UtcTimestamp.year1900().toString(),
+                        lastMessagesSyncTimestamp = UtcTimestamp.year1900().toString(),
                         oldestLoadedMessageTime = null,
                         newestLoadedMessageTime = null
                     )
@@ -144,15 +145,14 @@ fun Route.configureChatRouting(
                 throw BadRequestException("Some characters not found")
             }
 
+            request.customName?.let { validateCustomChatName(it) }
+
             val isDirect = request.characterIds.size == 1
 
-            if (isDirect) {
-                val existingChat = chatRepository.findChatByUserAndCharacter(
-                    userId, request.characterIds.first()
-                )
-                if (existingChat != null && !existingChat.isDeleted) {
-                    throw BadRequestException("Chat with this character already exists")
-                }
+            val isFirstChat = if (isDirect) {
+                chatRepository.findChatByUserAndCharacter(userId, request.characterIds.first()) == null
+            } else {
+                false
             }
 
             val chatDbo = ChatDbo(
@@ -160,9 +160,10 @@ fun Route.configureChatRouting(
                 clientId = request.chatId,
                 userId = userId,
                 characterIds = request.characterIds,
-                type = if (isDirect) ChatType.DIRECT else ChatType.GROUP
+                customName = request.customName,
+                type = if (isDirect) ChatType.DIRECT else ChatType.GROUP,
+                isFirstChatWithThisCharacter = isFirstChat
             )
-
 
             complexQueryHelper.addChat(chatDbo)
 
@@ -187,8 +188,8 @@ fun Route.configureChatRouting(
             // Создаем полный sync response с учетом всех возможных изменений
             val chatSyncRequest = ChatSyncRequest(
                 chatId = chatDbo.clientId,
-                lastChatSyncTimestamp = UtcTimestamp.now().subtractYears(100).toString(),
-                lastMessagesSyncTimestamp = UtcTimestamp.now().subtractYears(100).toString(),
+                lastChatSyncTimestamp = UtcTimestamp.year1900().toString(),
+                lastMessagesSyncTimestamp = UtcTimestamp.year1900().toString(),
                 oldestLoadedMessageTime = null,
                 newestLoadedMessageTime = null
             )
@@ -245,6 +246,8 @@ fun Route.configureChatRouting(
             if (chat.userId != userId) {
                 throw ForbiddenException("Access denied to this chat")
             }
+
+            request.customName?.let { validateCustomChatName(it) }
 
             // Обновляем чат
             chatRepository.updateChat(
@@ -372,13 +375,10 @@ fun Route.configureChatRouting(
                 resultMessages.lastOrNull()?.clientId
             } else null
 
-            val prevCursor = resultMessages.firstOrNull()?.clientId
-
             call.respondSuccess(
                 GetMessagesResponse(
                     messages = resultMessages.map { it.toMessageDto(mapper) },
                     nextCursor = nextCursor,
-                    prevCursor = prevCursor,
                     hasMore = hasMore
                 )
             )
@@ -559,6 +559,8 @@ fun Route.configureChatRouting(
          * Подписка на стрим обновлений сообщения через SSE с поддержкой синхронизации
          */
         post("/{chatId}/messages/{messageId}/stream") {
+            logger.info("SSE request")
+
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
                 ?: throw BadRequestException("Chat ID is required")
@@ -585,6 +587,8 @@ fun Route.configureChatRouting(
                 throw BadRequestException("Cannot stream user messages")
             }
 
+            logger.info("SSE request passed")
+
             call.response.cacheControl(CacheControl.NoCache(null))
             call.response.header(HttpHeaders.Connection, "keep-alive")
             call.response.header(HttpHeaders.ContentType, ContentType.Text.EventStream.toString())
@@ -593,8 +597,12 @@ fun Route.configureChatRouting(
 
             call.respondTextWriter(contentType = ContentType.Text.EventStream) {
                 try {
+                    logger.info("SSE 1")
+
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
+
+                    logger.info("SSE 2")
 
                     val initialChunk = StreamMessageChunk(
                         chunk = currentMessage.text,
@@ -603,12 +611,20 @@ fun Route.configureChatRouting(
                         nsfw = false
                     )
 
+                    logger.info("SSE 3")
+
                     write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
+
+                    logger.info("SSE 4")
+
                     flush()
+
+                    logger.info("SSE 5")
 
                     if (currentMessage.textVersion == request.version &&
                         currentMessage.status == MessageStatus.COMPLETED.value
                     ) {
+                        logger.info("SSE 6")
                         val finalSyncResponse = generateChatSyncResponse(
                             chat = chat,
                             chatSyncRequest = request.chatSyncRequest,
@@ -630,14 +646,21 @@ fun Route.configureChatRouting(
                         return@respondTextWriter
                     }
 
+
+                    logger.info("SSE 7")
                     if (currentMessage.textVersion != request.version ||
                         currentMessage.status == MessageStatus.FAILED.value
                     ) {
+                        logger.info("SSE 8")
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
+                    logger.info("SSE 9")
+
+
                     messageRepository.streamMessageUpdates(message.id)
                         .collect { update ->
+                            logger.info("SSE 10, ${update.newText}")
                             val chunk = if (update.isComplete || update.isFailed) {
                                 val finalSyncResponse = generateChatSyncResponse(
                                     chat = chat,
@@ -664,11 +687,14 @@ fun Route.configureChatRouting(
                             }
 
                             withContext(Dispatchers.IO) {
+                                logger.info("SSE 11")
+
                                 write("data: ${defaultJson.encodeToString(chunk)}\n\n")
                                 flush()
                             }
 
                             if (update.isComplete || update.isFailed) {
+                                logger.info("SSE 12, ${update.newText}")
                                 return@collect
                             }
                         }
@@ -681,6 +707,7 @@ fun Route.configureChatRouting(
                     )
 
                     try {
+                        logger.error("SSE 13, ${defaultJson.encodeToString(errorChunk)}\n\n")
                         write("data: ${defaultJson.encodeToString(errorChunk)}\n\n")
                         flush()
                     } catch (writeException: Exception) {
@@ -707,18 +734,18 @@ suspend fun generateChatSyncResponse(
     // Определяем временные метки для синхронизации
     val chatSyncTimestamp = chatSyncRequest.lastChatSyncTimestamp?.let {
         UtcTimestamp.parse(it)
-    } ?: UtcTimestamp.now().subtractYears(100)
+    } ?: UtcTimestamp.year1900()
 
     val messagesSyncTimestamp = chatSyncRequest.lastMessagesSyncTimestamp?.let {
         UtcTimestamp.parse(it)
-    } ?: UtcTimestamp.now().subtractYears(100)
+    } ?: UtcTimestamp.year1900()
 
     val oldestLoaded = chatSyncRequest.oldestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
     val newestLoaded = chatSyncRequest.newestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
 
     // Проверяем изменения чата
     var chatUpdatedResponse: ChatUpdatedResponse? = null
-    if (chat.lastModifiedAt > chatSyncTimestamp || chat.isDeleted) {
+    if (chat.lastModifiedAt > chatSyncTimestamp.toString() || chat.isDeleted) {
         chatUpdatedResponse = ChatUpdatedResponse(
             lastChatSyncTimestamp = UtcTimestamp.now().toString(),
             chat = chat.toChatDto(mapper),

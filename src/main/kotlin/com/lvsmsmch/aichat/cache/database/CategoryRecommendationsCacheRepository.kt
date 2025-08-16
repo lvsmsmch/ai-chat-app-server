@@ -14,7 +14,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 data class CategoryRecommendationsCacheDbo(
     @BsonId val categoryCode: String,
     val characterIds: List<String>,
-    val updatedAt: UtcTimestamp = UtcTimestamp.now(),
+    val updatedAt: String = UtcTimestamp.now().toString(),
     val version: String = ObjectId().toString()
 )
 
@@ -46,15 +46,7 @@ class CategoryRecommendationsCacheRepository(
         return collection.findOneById(category.code)
     }
 
-    suspend fun getCachedCharacters(category: CharacterCategory): List<String> {
-        return getCategoryCache(category)?.characterIds ?: emptyList()
-    }
 
-    suspend fun hasFreshCache(category: CharacterCategory, ttlHours: Long = 3): Boolean {
-        val cache = getCategoryCache(category) ?: return false
-        val expirationTime = cache.updatedAt.addHours(ttlHours)
-        return expirationTime.isAfter(UtcTimestamp.now())
-    }
 
     suspend fun getCategoriesNeedingUpdate(ttlHours: Long = 3): List<CharacterCategory> {
         val now = UtcTimestamp.now()
@@ -65,7 +57,7 @@ class CategoryRecommendationsCacheRepository(
         // Проверяем все комбинации категорий и сидов
         CharacterCategory.entries.forEach { category ->
                 val cache = getCategoryCache(category)
-                if (cache == null || cache.updatedAt.isBefore(cutoff)) {
+                if (cache == null || UtcTimestamp.parse(cache.updatedAt).isBefore(cutoff)) {
                     needingUpdate.add(category)
             }
         }
@@ -91,7 +83,7 @@ class CategoryRecommendationsCacheRepository(
         val now = UtcTimestamp.now()
         
         val freshCaches = collection.countDocuments(
-            CategoryRecommendationsCacheDbo::updatedAt gte now.subtractHours(3)
+            CategoryRecommendationsCacheDbo::updatedAt gte now.subtractHours(3).toString()
         )
         
         val cachesByCategory = mutableMapOf<String, Int>()

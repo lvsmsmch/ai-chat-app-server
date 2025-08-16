@@ -16,7 +16,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 @Serializable
 data class ReportDbo(
     @BsonId val id: String = ObjectId().toHexString(),
-    val reportedAt: UtcTimestamp = UtcTimestamp.now(),
+    val reportedAt: String = UtcTimestamp.now().toString(),
     val reportedBy: String,
     val entityType: String,
     val entityId: String,
