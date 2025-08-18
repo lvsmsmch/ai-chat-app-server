@@ -88,14 +88,12 @@ fun Route.configureReviewRouting(
 
             val hasMore = reviewsDbos.size > request.size
             val reviewsToReturn = if (hasMore) reviewsDbos.dropLast(1) else reviewsDbos
-
             val reviews = reviewsToReturn.map { it.toReviewDto(mapper, currentUserId = sessionDbo.userId) }
             val nextCursor = if (hasMore) reviewsToReturn.lastOrNull()?.createdAt else null
 
             val response = ReviewsResponse(
                 reviews = reviews,
-                nextCursor = nextCursor,
-                hasMore = hasMore
+                nextCursor = nextCursor
             )
 
             call.respondSuccess(data = response)

@@ -94,8 +94,7 @@ fun Route.configureUserRouting(
             val charactersDto = result.items.map { it.toCharacterDto(mapper) }
             val response = UserCharactersResponse(
                 characters = charactersDto,
-                nextCursor = result.nextCursor,
-                hasMore = result.hasMore
+                nextCursor = result.nextCursor
             )
             call.respondSuccess(data = response)
         }
@@ -139,7 +138,6 @@ fun Route.configureUserRouting(
             val response = FollowersResponse(
                 followers = followers,
                 nextCursor = nextCursor,
-                hasMore = hasMore
             )
 
             call.respondSuccess(data = response)
@@ -174,17 +172,16 @@ fun Route.configureUserRouting(
             val following = followingToReturn.mapNotNull {
                 val followingUser = userRepository.getUserById(it.followeeId) ?: return@mapNotNull null
                 FollowingDto(
-                    followedAt = it.followedAt.toString(),
+                    followedAt = it.followedAt,
                     following = followingUser.toUserDto(mapper)
                 )
             }
 
-            val nextCursor = if (hasMore) followingToReturn.lastOrNull()?.followedAt?.toString() else null
+            val nextCursor = if (hasMore) followingToReturn.lastOrNull()?.followedAt else null
 
             val response = FollowingResponse(
                 following = following,
                 nextCursor = nextCursor,
-                hasMore = hasMore
             )
 
             call.respondSuccess(data = response)
@@ -228,10 +225,9 @@ fun Route.configureUserRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
-                            val originalName = part.originalFileName ?: "image.jpg"
-                            val extension = originalName.substringAfterLast('.', "jpg")
+                            val file = File.createTempFile("upload_", ".tmp")
+                            logger.debug("new file name: ${file.name}")
 
-                            val file = File.createTempFile("upload_", ".$extension")
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)

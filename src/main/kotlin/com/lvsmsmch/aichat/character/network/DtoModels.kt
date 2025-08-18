@@ -46,7 +46,7 @@ data class CharacterFullInfoDto(
 data class CachedCharactersResultDto(
     @SerialName("refreshed") val refreshed: Boolean = false,
     @SerialName("items") val items: List<CharacterDto>,
-    @SerialName("nextCursor") val nextCursor: Int
+    @SerialName("nextCursor") val nextCursor: String? = null
 )
 
 @Serializable
@@ -85,7 +85,7 @@ data class SearchCharactersRequest(
     @SerialName("searchQuery") val searchQuery: String = "",
     @SerialName("sortCriteria") val sortCriteria: Int = 0,
     @SerialName("size") val size: Int = 10,
-    @SerialName("cursor") val cursor: Int = 0
+    @SerialName("cursor") val cursor: String? = null
 )
 
 @Serializable
@@ -98,7 +98,7 @@ data class GetSearchSuggestionsRequest(
 data class GetCharactersByCategoryRequest(
     @SerialName("deviceId") val deviceId: String,
     @SerialName("size") val size: Int = 10,
-    @SerialName("cursor") val cursor: Int = 0,
+    @SerialName("cursor") val cursor: String? = null,
     @SerialName("refresh") val refresh: Boolean = false
 )
 

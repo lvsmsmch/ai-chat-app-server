@@ -109,7 +109,7 @@ suspend fun CachedCharactersResult.toDto(mapper: Mapper): CachedCharactersResult
     return CachedCharactersResultDto(
         refreshed = refreshed,
         items = items.map { it.toCharacterDto(mapper) },
-        nextCursor = nextCursor,
+        nextCursor = nextCursor?.toString(),
     )
 }
 

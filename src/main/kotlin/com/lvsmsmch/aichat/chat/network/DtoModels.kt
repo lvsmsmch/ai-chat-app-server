@@ -186,8 +186,7 @@ data class GetMessagesRequest(
 @Serializable
 data class GetMessagesResponse(
     @SerialName("messages") val messages: List<MessageDto>,
-    @SerialName("nextCursor") val nextCursor: String?,
-    @SerialName("hasMore") val hasMore: Boolean
+    @SerialName("nextCursor") val nextCursor: String?
 )
 
 

@@ -48,22 +48,19 @@ data class FollowingDto(
 @Serializable
 data class FollowersResponse(
     @SerialName("followers") val followers: List<FollowerDto>,
-    @SerialName("nextCursor") val nextCursor: String? = null,
-    @SerialName("hasMore") val hasMore: Boolean = false
+    @SerialName("nextCursor") val nextCursor: String? = null
 )
 
 @Serializable
 data class FollowingResponse(
     @SerialName("following") val following: List<FollowingDto>,
-    @SerialName("nextCursor") val nextCursor: String? = null,
-    @SerialName("hasMore") val hasMore: Boolean = false
+    @SerialName("nextCursor") val nextCursor: String? = null
 )
 
 @Serializable
 data class UserCharactersResponse(
     @SerialName("characters") val characters: List<CharacterDto>,
-    @SerialName("nextCursor") val nextCursor: String? = null,
-    @SerialName("hasMore") val hasMore: Boolean = false
+    @SerialName("nextCursor") val nextCursor: String? = null
 )
 
 // ============= REQUEST MODELS =============

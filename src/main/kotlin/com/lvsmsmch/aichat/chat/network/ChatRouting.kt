@@ -379,7 +379,6 @@ fun Route.configureChatRouting(
                 GetMessagesResponse(
                     messages = resultMessages.map { it.toMessageDto(mapper) },
                     nextCursor = nextCursor,
-                    hasMore = hasMore
                 )
             )
         }

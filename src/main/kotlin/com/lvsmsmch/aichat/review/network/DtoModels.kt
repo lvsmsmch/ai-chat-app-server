@@ -22,8 +22,7 @@ data class ReviewDto(
 @Serializable
 data class ReviewsResponse(
     @SerialName("reviews") val reviews: List<ReviewDto>,
-    @SerialName("nextCursor") val nextCursor: String? = null,
-    @SerialName("hasMore") val hasMore: Boolean = false
+    @SerialName("nextCursor") val nextCursor: String? = null
 )
 
 @Serializable

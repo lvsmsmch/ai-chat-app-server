@@ -66,20 +66,6 @@ fun Route.configureCharacterRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
-//                            val originalName = part.originalFileName ?: "image.jpg"
-//                            logger.debug("orig file name: ${originalName}")
-//
-//                            val imageContentType = part.contentType?.toString()
-//                            logger.debug("content type: $imageContentType")
-//
-//                            val extension = when (imageContentType) {
-//                                "image/jpeg" -> "jpg"
-//                                "image/png" -> "png"
-//                                "image/jpg" -> "jpg"
-//                                else -> throw BadRequestException("Unsupported image type: $imageContentType")
-//                            }
-//                            logger.debug("orig file extension: ${extension}")
-
                             val file = File.createTempFile("upload_", ".tmp")
                             logger.debug("new file name: ${file.name}")
 
@@ -159,13 +145,19 @@ fun Route.configureCharacterRouting(
                 searchQuery = call.request.queryParameters["searchQuery"] ?: "",
                 sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0,
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
-                cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0
+                cursor = call.request.queryParameters["cursor"]
             )
 
             validateCharacterSearchQuery(request.searchQuery)
             validateCharacterSortCriteria(request.sortCriteria)
             require(request.size in 1..100) { "Size must be between 1 and 100" }
-            require(request.cursor >= 0) { "Cursor position must be non-negative" }
+
+            val cursor = try {
+                request.cursor?.toInt() ?: 0
+            } catch (e: Exception) {
+                throw BadRequestException("Cursor must be an int in a string format")
+            }
+            require(cursor >= 0) { "Cursor position must be non-negative" }
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
 
@@ -181,7 +173,7 @@ fun Route.configureCharacterRouting(
                 deviceId = request.deviceId,
                 listType = searchListType,
                 size = request.size,
-                cursorPosition = request.cursor
+                cursorPosition = cursor
             )
 
             call.respondSuccess(data = result.toDto(mapper))
@@ -218,7 +210,7 @@ fun Route.configureCharacterRouting(
                 deviceId = call.request.queryParameters["deviceId"]
                     ?: throw BadRequestException("Missing deviceId field"),
                 size = call.request.queryParameters["size"]?.toIntOrNull() ?: 10,
-                cursor = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 0,
+                cursor = call.request.queryParameters["cursor"],
                 refresh = call.request.queryParameters["refresh"]?.toBooleanStrictOrNull() ?: false,
             )
 
@@ -226,7 +218,14 @@ fun Route.configureCharacterRouting(
                 validateCharacterCategory(category)
             }
             require(request.size in 1..100) { "Size must be between 1 and 100" }
-            require(request.cursor >= 0) { "Cursor position must be non-negative" }
+
+            val cursor = try {
+                request.cursor?.toInt() ?: 0
+            } catch (e: Exception) {
+                throw BadRequestException("Cursor must be an int in a string format")
+            }
+
+            require(cursor >= 0) { "Cursor position must be non-negative" }
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
 
@@ -248,7 +247,7 @@ fun Route.configureCharacterRouting(
                     deviceId = request.deviceId,
                     listType = listType,
                     size = request.size,
-                    cursorPosition = request.cursor
+                    cursorPosition = cursor
                 )
             }
 
@@ -391,10 +390,9 @@ fun Route.configureCharacterRouting(
 
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
-                            val originalName = part.originalFileName ?: "image.jpg"
-                            val extension = originalName.substringAfterLast('.', "jpg")
+                            val file = File.createTempFile("upload_", ".tmp")
+                            logger.debug("new file name: ${file.name}")
 
-                            val file = File.createTempFile("upload_", ".$extension")
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)

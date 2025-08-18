@@ -127,7 +127,7 @@ class CacheManager(
         size: Int
     ): CachedCharactersResult {
         val copy = characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
-            ?: return CachedCharactersResult(false, emptyList(), 0)
+            ?: return CachedCharactersResult(false, emptyList(), null)
 
         val validCharacters = mutableListOf<CharacterDbo>()
         var currentCursorPos = cursorPosition
@@ -144,7 +144,8 @@ class CacheManager(
 
         characterListCopyRepository.updatePosition(userId, deviceId, listType.code, currentCursorPos)
 
-        return CachedCharactersResult(false, validCharacters.toList(), currentCursorPos)
+        val nextCursorPos = if (currentCursorPos == cursorPosition) null else currentCursorPos
+        return CachedCharactersResult(false, validCharacters.toList(), nextCursorPos)
     }
 
     private suspend fun doesNewerVersionExist(userId: String, deviceId: String, listType: CacheListType): Boolean {
