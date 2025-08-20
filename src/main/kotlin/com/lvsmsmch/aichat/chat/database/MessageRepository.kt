@@ -68,15 +68,20 @@ class MessageRepository(
                 MessageUpdateEvent(
                     messageId = message.id,
                     newText = message.text,
+                    textVersion = message.textVersion,
                     isComplete = message.status == MessageStatus.COMPLETED.value,
                     isFailed = message.status == MessageStatus.FAILED.value
-                )
+                ).also {
+                    logger.info("DB event: ${it}")
+                }
             }
+            .distinctUntilChanged()
     }
 
     data class MessageUpdateEvent(
         val messageId: String,
         val newText: String,
+        val textVersion: Int,
         val isComplete: Boolean,
         val isFailed: Boolean
     )
@@ -307,22 +312,28 @@ class MessageRepository(
         status: String? = null,
         text: String? = null,
         nsfw: Boolean? = null,
+        textVersion: Int? = null,
     ) {
+        logger.info("DB update")
         collection.findOneById(messageId) ?: return
+        logger.info("DB update 1")
         val updates = mutableListOf<Bson>()
         imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
         status?.let { updates.add(setValue(MessageDbo::status, it)) }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
         nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
+        textVersion?.let { updates.add(setValue(MessageDbo::textVersion, it)) }
         if (updates.isEmpty()) return // Nothing to update
-        collection.updateOneById(
+        logger.info("DB update 2")
+        val result = collection.updateOneById(
             messageId,
             combine(
                 *updates.toTypedArray(),
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
+        logger.info("DB update result: $result")
     }
 
     suspend fun markMessagesAsRead(messageIds: List<String>): Int {
@@ -341,6 +352,13 @@ class MessageRepository(
 
         return result.modifiedCount.toInt()
     }
+
+//    suspend fun markMessageAsStreaming(messageId: String) {
+//        val messageDbo = getMessageById(messageId) ?: return
+//        val newMessageDbo = messageDbo.copy(
+//            status = MessageStatus.STREAMING.value
+//        )
+//    }
 
     /**
      * DELETE

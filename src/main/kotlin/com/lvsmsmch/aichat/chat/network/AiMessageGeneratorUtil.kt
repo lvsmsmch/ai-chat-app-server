@@ -4,6 +4,7 @@ import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.chat.database.ChatDbo
 import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.utils.defaultJson
+import com.lvsmsmch.aichat.utils.logger
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -29,6 +30,9 @@ object AiMessageGeneratorUtil {
     /**
      * Генерация с настоящим стримингом от OpenAI
      */
+
+
+
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
@@ -42,9 +46,10 @@ object AiMessageGeneratorUtil {
             val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
             val requestBody = buildRequestBody(messages, stream = true)
 
-
             var textForSimulation: String? = null
-            characterDbo.initialMessage.takeIf { it.isNotBlank() }?.let { textForSimulation = it }
+            characterDbo.initialMessage.takeIf { messagesHistory.isEmpty() && it.isNotBlank() }?.let {
+                textForSimulation = it
+            }
             val shouldStreamFakeResponse = true // todo remove later
             if (textForSimulation == null && shouldStreamFakeResponse) {
                 textForSimulation = possibleFakeResponses.random()
@@ -258,9 +263,14 @@ object AiMessageGeneratorUtil {
             currentMessage.append(words[i])
             onChunk(currentMessage.toString())
             delay(Random.nextLong(30, 120))
+//            delay(Random.nextLong(1000, 3000))
         }
 
-        delay(300)
+        if ((1..5).random() == 5) {
+            throw Exception("Fake exception")
+        }
+
+        delay(100)
         onFinished(currentMessage.toString())
     }
 

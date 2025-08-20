@@ -18,7 +18,9 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
@@ -558,7 +560,13 @@ fun Route.configureChatRouting(
          * Подписка на стрим обновлений сообщения через SSE с поддержкой синхронизации
          */
         post("/{chatId}/messages/{messageId}/stream") {
-            logger.info("SSE request")
+            logger.info(">>>")
+            logger.info(">>>")
+            logger.info(">>>")
+            logger.info(">>> SSE request")
+            logger.info(">>>")
+            logger.info(">>>")
+            logger.info(">>>")
 
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -603,16 +611,16 @@ fun Route.configureChatRouting(
 
                     logger.info("SSE 2")
 
-                    val initialChunk = StreamMessageChunk(
-                        chunk = currentMessage.text,
-                        isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
-                        isFailed = currentMessage.status == MessageStatus.FAILED.value,
-                        nsfw = false
-                    )
-
-                    logger.info("SSE 3")
-
-                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
+//                    val initialChunk = StreamMessageChunk(
+//                        chunk = currentMessage.text,
+//                        isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
+//                        isFailed = currentMessage.status == MessageStatus.FAILED.value,
+//                        nsfw = false
+//                    )
+//
+//                    logger.info("SSE 3")
+//
+//                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
 
                     logger.info("SSE 4")
 
@@ -650,16 +658,43 @@ fun Route.configureChatRouting(
                     if (currentMessage.textVersion != request.version ||
                         currentMessage.status == MessageStatus.FAILED.value
                     ) {
-                        logger.info("SSE 8")
+                        logger.info("SSE 8, upd msg with text = \"\", version = ${request.version}")
+//                        withContext(Dispatchers.IO) {
+//                            logger.info("SSE 8.1")
+//                            messageRepository.updateMessage(
+//                                messageId = messageId,
+//                                text = "",
+//                                status = MessageStatus.STREAMING.value,
+//                                textVersion = request.version
+//                            )
+//                        }
+//
+//                        launch(Dispatchers.IO) {
+//                            logger.info("SSE 8.2")
+//                            messageRepository.updateMessage(
+//                                messageId = messageId,
+//                                text = "",
+//                                status = MessageStatus.STREAMING.value,
+//                                textVersion = request.version
+//                            )
+//                        }
+
+                        messageRepository.updateMessage(
+                            messageId = message.id,
+                            text = "",
+                            status = MessageStatus.STREAMING.value,
+                            textVersion = request.version
+                        )
+
+//                        delay(500)
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
                     logger.info("SSE 9")
 
-
                     messageRepository.streamMessageUpdates(message.id)
                         .collect { update ->
-                            logger.info("SSE 10, ${update.newText}")
+                            logger.info("SSE 10, ${update}")
                             val chunk = if (update.isComplete || update.isFailed) {
                                 val finalSyncResponse = generateChatSyncResponse(
                                     chat = chat,
