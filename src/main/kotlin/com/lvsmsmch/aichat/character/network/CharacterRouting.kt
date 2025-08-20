@@ -129,7 +129,7 @@ fun Route.configureCharacterRouting(
 
             complexQueryHelper.addCharacter(characterDbo)
 
-            call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper))
+            call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }
 
         /**
@@ -291,7 +291,7 @@ fun Route.configureCharacterRouting(
                 throw CharacterNotFoundException(id = characterId)
             }
 
-            call.respondSuccess(data = characterDbo.toCharacterDetailsDto(mapper))
+            call.respondSuccess(data = characterDbo.toCharacterDetailsDto(mapper, currentUserId))
         }
 
         /**
@@ -378,13 +378,13 @@ fun Route.configureCharacterRouting(
                 when (part) {
                     is PartData.FormItem -> {
                         when (part.name) {
-                            "name" -> name = part.value.takeIf { it.isNotBlank() }
-                            "description" -> description = part.value.takeIf { it.isNotBlank() }
-                            "prompt" -> prompt = part.value.takeIf { it.isNotBlank() }
-                            "initialMessage" -> initialMessage = part.value.takeIf { it.isNotBlank() }
+                            "name" -> name = part.value
+                            "description" -> description = part.value
+                            "prompt" -> prompt = part.value
+                            "initialMessage" -> initialMessage = part.value
                             "visibility" -> visibility = part.value.toIntOrNull()
-                            "category" -> category = part.value.takeIf { it.isNotBlank() }
-                            "tags" -> tags = part.value.takeIf { it.isNotBlank() }
+                            "category" -> category = part.value
+                            "tags" -> tags = part.value
                         }
                     }
 
@@ -439,7 +439,7 @@ fun Route.configureCharacterRouting(
                 oldVisibility = character.visibility,
             )
 
-            call.respondSuccess(data = updatedCharacter.toCharacterFullInfoDto(mapper))
+            call.respondSuccess(data = updatedCharacter.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }
 
         /**

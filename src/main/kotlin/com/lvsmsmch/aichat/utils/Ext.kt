@@ -92,56 +92,6 @@ fun generateHash(hashSize: Int, vararg values: String): String {
         .take(hashSize)
 }
 
-suspend fun ensureAllCollectionsWithPreImages(database: CoroutineDatabase) {
-    // Список всех коллекций из вашего кода
-    val allCollections = listOf(
-        "sessions",
-        "entity_id_stats",
-        "category_cache",
-        "user_recommendations_cache",
-        "default_personalized_cache",
-        "search_suggestions",
-        "review_likes",
-        "users",
-        "follows",
-        "reports",
-        "characters",
-        "chats",
-        "messages",
-        "reviews",
-        "character_activity_logs",
-        "character_list_copy_dbo"
-        // 👆 При добавлении новой коллекции - просто добавьте сюда название!
-    )
-
-    allCollections.forEach { collectionName ->
-        try {
-            // Сначала пытаемся создать коллекцию с pre-images
-            database.runCommand<Unit>("""
-                {
-                    "create": "$collectionName",
-                    "changeStreamPreAndPostImages": { "enabled": true }
-                }
-            """.trimIndent())
-            logger.info("✅ Created collection '$collectionName' with pre-images")
-        } catch (e: Exception) {
-            // Если коллекция уже существует, включаем pre-images
-            try {
-                database.runCommand<Unit>("""
-                    {
-                        "collMod": "$collectionName", 
-                        "changeStreamPreAndPostImages": { "enabled": true }
-                    }
-                """.trimIndent())
-                logger.info("✅ Enabled pre-images for '$collectionName'")
-            } catch (e2: Exception) {
-                logger.warn("❌ Failed to configure pre-images for '$collectionName': ${e2.message}")
-            }
-        }
-    }
-
-    logger.info("🎯 Pre-images configuration completed for ${allCollections.size} collections")
-}
 
 //fun Application.logStructuredError(
 //    call: ApplicationCall,

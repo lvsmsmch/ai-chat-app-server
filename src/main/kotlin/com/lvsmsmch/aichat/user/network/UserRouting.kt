@@ -217,9 +217,9 @@ fun Route.configureUserRouting(
                 when (part) {
                     is PartData.FormItem -> {
                         when (part.name) {
-                            "username" -> username = part.value.takeIf { it.isNotBlank() }
-                            "name" -> name = part.value.takeIf { it.isNotBlank() }
-                            "bio" -> bio = part.value.takeIf { it.isNotBlank() }
+                            "username" -> username = part.value
+                            "name" -> name = part.value
+                            "bio" -> bio = part.value
                         }
                     }
 

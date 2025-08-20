@@ -4,7 +4,7 @@ import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.database.MessageStatus
-import com.lvsmsmch.aichat.chat.network.TestAiMessageGeneratorUtil
+import com.lvsmsmch.aichat.chat.network.AiMessageGeneratorUtil
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.coroutines.*
 import kotlinx.coroutines.withTimeout // ✅ Правильно
@@ -30,7 +30,8 @@ class MessageFinisher(
                 val messageHistory = messageRepository.getMessagesCreatedBefore(
                     chatId = chatDbo.id,
                     timestamp = UtcTimestamp.parse(messageDbo.createdAt)
-                ).takeLast(50)
+                ).takeLast(200)
+                val participants = chatDbo.characterIds.mapNotNull { characterRepository.getCharacter(it) }
 
                 messageRepository.updateMessage(
                     messageId = messageId,
@@ -38,8 +39,10 @@ class MessageFinisher(
                 )
 
                 withTimeout(timeoutSeconds.seconds) {
-                    TestAiMessageGeneratorUtil.generateAiMessageWithStreaming(
+                    AiMessageGeneratorUtil.generateAiMessageWithStreaming(
+                        chatDbo = chatDbo,
                         characterDbo = characterDbo,
+                        participants = participants,
                         messagesHistory = messageHistory,
                         onChunk = {
                             ensureActive()

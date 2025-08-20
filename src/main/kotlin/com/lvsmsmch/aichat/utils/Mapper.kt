@@ -113,10 +113,15 @@ suspend fun CachedCharactersResult.toDto(mapper: Mapper): CachedCharactersResult
     )
 }
 
-suspend fun CharacterDbo.toCharacterDetailsDto(mapper: Mapper): CharacterDetailsDto {
+suspend fun CharacterDbo.toCharacterDetailsDto(
+    mapper: Mapper,
+    demanderId: String
+): CharacterDetailsDto {
+    val isReviewed = mapper.reviewRepository.getReview(demanderId, id) != null
     return CharacterDetailsDto(
         id = id,
-        description = description
+        description = description,
+        isReviewed = isReviewed
     )
 }
 
@@ -128,10 +133,10 @@ suspend fun CharacterDbo.toCharacterPrivateInfoDto(mapper: Mapper): CharacterPri
     )
 }
 
-suspend fun CharacterDbo.toCharacterFullInfoDto(mapper: Mapper): CharacterFullInfoDto {
+suspend fun CharacterDbo.toCharacterFullInfoDto(mapper: Mapper, demanderId: String): CharacterFullInfoDto {
     return CharacterFullInfoDto(
         character = toCharacterDto(mapper),
-        characterDetails = toCharacterDetailsDto(mapper),
+        characterDetails = toCharacterDetailsDto(mapper, demanderId),
         characterPrivateInfo = toCharacterPrivateInfoDto(mapper)
     )
 }
@@ -171,7 +176,7 @@ suspend fun ChatDbo.toChatDto(
         chatType = type.code,
         customName = customName,
         characters = characters,
-        createdAt = createdAt.toString()
+        createdAt = createdAt
     )
 }
 

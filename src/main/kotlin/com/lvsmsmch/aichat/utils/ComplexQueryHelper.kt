@@ -118,10 +118,10 @@ class ComplexQueryHelper(
             } else {
                 userRepository.incrementPrivateCharacterCount(session, characterDbo.authorId, 1)
             }
-            searchSuggestionsRepository.addCharacterName(
-                session = session,
-                originalText = characterDbo.name,
-            )
+//            searchSuggestionsRepository.addCharacterName(
+//                session = session,
+//                originalText = characterDbo.name,
+//            )
         }
     }
 
@@ -153,13 +153,13 @@ class ComplexQueryHelper(
                 tags = tags?.let { CharacterTag.fromString(tags) }
             )
 
-            if (name != null && oldName != name) {
-                searchSuggestionsRepository.updateCharacterName(
-                    session = session,
-                    newText = name,
-                    oldText = oldName,
-                )
-            }
+//            if (name != null && oldName != name) {
+//                searchSuggestionsRepository.updateCharacterName(
+//                    session = session,
+//                    newText = name,
+//                    oldText = oldName,
+//                )
+//            }
 
             if (visibility != null && oldVisibility != visibility) {
 

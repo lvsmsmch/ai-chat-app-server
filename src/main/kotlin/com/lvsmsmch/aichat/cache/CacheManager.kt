@@ -132,19 +132,42 @@ class CacheManager(
         val validCharacters = mutableListOf<CharacterDbo>()
         var currentCursorPos = cursorPosition
 
-        // Берем персонажей, скипая удаленных
         while (validCharacters.size < size && currentCursorPos < copy.characterIds.size) {
             copy.characterIds.getOrNull(currentCursorPos)?.let { characterId ->
-                characterRepository.getCharacter(characterId)?.let { characterDbo ->
-                    validCharacters.add(characterDbo)
-                }
+                characterRepository.getCharacter(characterId)
+                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code }
+                    ?.let { validCharacters.add(it) }
             }
             currentCursorPos++
         }
 
+        var checkPos = currentCursorPos
+        val maxLookaheadPos = currentCursorPos + 50
+        var hasMoreValid = false
+
+        while (checkPos < copy.characterIds.size && checkPos < maxLookaheadPos && !hasMoreValid) {
+            copy.characterIds.getOrNull(checkPos)?.let { characterId ->
+                characterRepository.getCharacter(characterId)
+                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code }
+                    ?.let { hasMoreValid = true }
+            }
+            checkPos++
+        }
+
+        if (checkPos >= maxLookaheadPos && checkPos < copy.characterIds.size) {
+            hasMoreValid = true
+        }
+
         characterListCopyRepository.updatePosition(userId, deviceId, listType.code, currentCursorPos)
 
-        val nextCursorPos = if (currentCursorPos == cursorPosition) null else currentCursorPos
+        val nextCursorPos = if (currentCursorPos == cursorPosition) {
+            null // не нашли ни одного персонажа
+        } else if (hasMoreValid) {
+            currentCursorPos // есть еще валидные персонажи
+        } else {
+            null // валидных персонажей больше нет
+        }
+
         return CachedCharactersResult(false, validCharacters.toList(), nextCursorPos)
     }
 

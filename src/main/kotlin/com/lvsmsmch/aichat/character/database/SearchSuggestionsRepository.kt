@@ -68,6 +68,7 @@ class SearchSuggestionsRepository(
             collection.insertMany(suggestionsToInsert)
         }
     }
+
     suspend fun addCharacterName(session: ClientSession, originalText: String) {
         val normalizedTerm = originalText.trim().lowercase()
         val existing = collection.findOneById(normalizedTerm)
