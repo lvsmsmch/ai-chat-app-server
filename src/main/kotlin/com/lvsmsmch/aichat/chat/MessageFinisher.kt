@@ -22,7 +22,6 @@ class MessageFinisher(
     private var currentlyFinishingMessages = mutableMapOf<String, Job>()
 
     fun finishMessageAsync(messageId: String, timeoutSeconds: Int = 30) {
-        logger.debug("finishMessageAsync")
         currentlyFinishingMessages[messageId]?.cancel()
         currentlyFinishingMessages[messageId] = scope.launch {
             try {
@@ -35,7 +34,6 @@ class MessageFinisher(
                 ).takeLast(200)
                 val participants = chatDbo.characterIds.mapNotNull { characterRepository.getCharacter(it) }
 
-                logger.debug("finishMessageAsync init, upd msg")
                 messageRepository.updateMessage(
                     messageId = messageId,
                     text = "",
@@ -78,14 +76,14 @@ class MessageFinisher(
                     )
                 }
             } catch (e: TimeoutCancellationException) {
-                logger.debug("finishMessageAsync 10, upd msg (${e.message})")
+                logger.debug("finishMessageAsync error (timeout), upd msg (${e.message})")
                 messageRepository.updateMessage(
                     messageId = messageId,
                     text = "",
                     status = MessageStatus.FAILED.value
                 )
             } catch (e: Exception) {
-                logger.debug("finishMessageAsync 11, upd msg (${e.message})")
+                logger.debug("finishMessageAsync error, upd msg (${e.message})")
                 messageRepository.updateMessage(
                     messageId = messageId,
                     text = "",

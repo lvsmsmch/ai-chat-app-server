@@ -290,10 +290,12 @@ fun Route.configureUserRouting(
                 throw BadRequestException("Cannot follow yourself")
             }
 
-            complexQueryHelper.followUser(
-                currentUserId = currentUserId,
-                targetUserId = targetUserId
-            )
+            if (!followRepository.doesConnectionExist(currentUserId, targetUserId)) {
+                complexQueryHelper.followUser(
+                    currentUserId = currentUserId,
+                    targetUserId = targetUserId
+                )
+            }
 
             call.respondSuccess()
         }
@@ -314,10 +316,12 @@ fun Route.configureUserRouting(
                 throw BadRequestException("Cannot unfollow yourself")
             }
 
-            complexQueryHelper.unfollowUser(
-                currentUserId = currentUserId,
-                targetUserId = targetUserId
-            )
+            if (followRepository.doesConnectionExist(currentUserId, targetUserId)) {
+                complexQueryHelper.unfollowUser(
+                    currentUserId = currentUserId,
+                    targetUserId = targetUserId
+                )
+            }
 
             call.respondSuccess()
         }

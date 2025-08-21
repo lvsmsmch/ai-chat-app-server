@@ -13,25 +13,29 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 
 object AiMessageGeneratorUtil {
 
-    private val openAiApiUrl = System.getenv("OPEN_AI_API_URL") ?: throw Exception("Missing OPEN_AI_API_URL key")
-    private val openAiApiKey = System.getenv("OPEN_AI_API_KEY") ?: throw Exception("Missing OPEN_AI_API_KEY key")
+    private val openAiApiUrl
+        get() = System.getenv("OPEN_AI_API_URL") ?: throw Exception("Missing OPEN_AI_API_URL key")
+    private val openAiApiKey
+        get() = System.getenv("OPEN_AI_API_KEY") ?: throw Exception("Missing OPEN_AI_API_KEY key")
+    private val useOpenAi
+        get() = (System.getenv("USE_OPEN_AI") ?: throw Exception("Missing USE_OPEN_AI key"))
+            .toBoolean()
+
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(defaultJson)
         }
     }
-
-    /**
-     * Генерация с настоящим стримингом от OpenAI
-     */
-
-
 
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
@@ -43,31 +47,49 @@ object AiMessageGeneratorUtil {
         onError: suspend (String) -> Unit
     ) {
         try {
-            val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
-            val requestBody = buildRequestBody(messages, stream = true)
+            if (useOpenAi) {
+                logger.debug("API Key starts with: ${openAiApiKey.take(10)}...")
+                logger.debug("API URL: $openAiApiUrl")
 
-            var textForSimulation: String? = null
-            characterDbo.initialMessage.takeIf { messagesHistory.isEmpty() && it.isNotBlank() }?.let {
-                textForSimulation = it
-            }
-            val shouldStreamFakeResponse = true // todo remove later
-            if (textForSimulation == null && shouldStreamFakeResponse) {
-                textForSimulation = possibleFakeResponses.random()
-            }
-            textForSimulation?.let {
-                simulateStreaming(it, onChunk, onFinished)
-                return
-            }
+//                val testResponse = httpClient.get("https://api.openai.com/v1/models") {
+//                    header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+//                }
+//                logger.debug("Models endpoint status: ${testResponse.status}")
+//
 
-            val response = httpClient.post(openAiApiUrl) {
-                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                header(HttpHeaders.Accept, "text/event-stream")
-                contentType(ContentType.Application.Json)
-                setBody(requestBody)
-            }
+                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
+                val requestBody = buildRequestBody(messages, stream = true)
 
-            processStreamingResponse(response, onChunk, onFinished)
+                logger.debug("Sending request to: $openAiApiUrl")
+                logger.debug("Request body: ${Json.encodeToString(requestBody)}")
+                logger.debug("Messages count: ${messages.size}")
+
+                val response = httpClient.post(openAiApiUrl) {
+                    header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+                    header(HttpHeaders.Accept, "text/event-stream")
+                    contentType(ContentType.Application.Json)
+                    setBody(requestBody)
+                }
+
+                logger.debug("Response status: ${response.status}")
+                logger.debug("Response headers: ${response.headers}")
+
+                processStreamingResponse(response, onChunk, onFinished)
+            } else {
+                var textForSimulation: String? = null
+                characterDbo.initialMessage.takeIf { messagesHistory.isEmpty() && it.isNotBlank() }?.let {
+                    textForSimulation = it
+                }
+                val shouldStreamFakeResponse = true // todo remove later
+                if (textForSimulation == null && shouldStreamFakeResponse) {
+                    textForSimulation = possibleFakeResponses.random()
+                }
+                textForSimulation?.let {
+                    simulateStreaming(it, onChunk, onFinished)
+                }
+            }
         } catch (e: Exception) {
+            logger.error("Full error: ${e.message}", e) // ← Полный стектрейс
             onError(e.localizedMessage)
         }
     }
@@ -116,6 +138,8 @@ object AiMessageGeneratorUtil {
             if (!message.isSentByUser) {
                 participants.find { it.id == message.senderId }?.let { sender ->
                     messageMap["name"] = sender.name
+                        .replace(Regex("[^a-zA-Z0-9_]"), "_")
+                        .take(64)
                 }
             }
 
@@ -145,6 +169,9 @@ object AiMessageGeneratorUtil {
             append(" Reply naturally as this character would in a chat conversation.")
             append(" Keep responses conversational and in character.")
             append(" Match the language and tone of the conversation.")
+            append(" Always respond in the same language as the user's message.")
+            append(" Use proper UTF-8 encoding for non-English characters.")
+            append(" Keep responses short, only if user don't ask otherwise.")
         }
     }
 
@@ -154,17 +181,25 @@ object AiMessageGeneratorUtil {
     private fun buildRequestBody(
         messages: List<Map<String, String>>,
         stream: Boolean
-    ): Map<String, Any> {
-        return mapOf(
-            "model" to "gpt-3.5-turbo",
-            "messages" to messages,
-            "temperature" to 0.8,
-            "max_tokens" to 1000,
-            "top_p" to 1.0,
-            "frequency_penalty" to 0.3,
-            "presence_penalty" to 0.3,
-            "stream" to stream
-        )
+    ): JsonObject {
+        return buildJsonObject {
+            put("model", "gpt-5-nano")
+            putJsonArray("messages") {
+                messages.forEach { message ->
+                    addJsonObject {
+                        put("role", message["role"]!!)
+                        put("content", message["content"]!!)
+                        message["name"]?.let { put("name", it) }
+                    }
+                }
+            }
+            put("max_completion_tokens", 1000)
+//            put("temperature", 0.8)
+//            put("top_p", 1.0)
+//            put("frequency_penalty", 0.3)
+//            put("presence_penalty", 0.3)
+            put("stream", stream)
+        }
     }
 
     /**
@@ -175,17 +210,25 @@ object AiMessageGeneratorUtil {
         onChunk: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit
     ) {
-        val channel = response.bodyAsChannel()
+        if (response.status != HttpStatusCode.OK) {
+            val errorBody = response.bodyAsText()
+            logger.error("OpenAI API error: ${response.status}, body: $errorBody")
+            throw Exception("OpenAI API error: ${response.status} - $errorBody")
+        }
+
+        val channel = response.bodyAsChannel() // ← ОСТАВЛЯЕМ!
         val fullMessage = StringBuilder()
+        var hasContent = false
 
         try {
-            // Читаем SSE поток
             channel.readUTF8LineSequence()
                 .filter { line -> line.startsWith("data: ") && line != "data: [DONE]" }
                 .map { line -> line.removePrefix("data: ") }
                 .filter { data -> data.isNotBlank() }
                 .collect { data ->
                     try {
+                        logger.debug("Received chunk: $data")
+
                         val jsonData = Json.parseToJsonElement(data).jsonObject
                         val choices = jsonData["choices"]?.jsonArray
 
@@ -194,11 +237,17 @@ object AiMessageGeneratorUtil {
                             val content = delta?.get("content")?.jsonPrimitive?.contentOrNull
 
                             if (!content.isNullOrEmpty()) {
+                                hasContent = true
                                 fullMessage.append(content)
+
+                                // ✅ ДОБАВЬ ОТЛАДКУ КОДИРОВКИ:
+                                logger.debug("Raw content: '$content'")
+                                logger.debug("Content bytes: ${content.toByteArray(Charsets.UTF_8).contentToString()}")
+                                logger.debug("Full message so far: '${fullMessage.toString()}'")
+
                                 onChunk(fullMessage.toString())
                             }
 
-                            // Проверяем завершение
                             val finishReason = choices[0].jsonObject["finish_reason"]?.jsonPrimitive?.contentOrNull
                             if (finishReason == "stop") {
                                 onFinished(fullMessage.toString())
@@ -206,47 +255,62 @@ object AiMessageGeneratorUtil {
                             }
                         }
                     } catch (e: Exception) {
-                        // Игнорируем ошибки парсинга отдельных чанков
-                        println("Error parsing chunk: ${e.message}")
+                        logger.error("Error parsing chunk: ${e.message}")
                     }
                 }
         } catch (e: Exception) {
             throw Exception("Streaming error: ${e.message}")
         }
 
-        val finalMessage = fullMessage.toString()
-        if (finalMessage.isBlank()) {
-            throw Exception("No content received from stream")
+        if (!hasContent) {
+            throw Exception("No content received from stream (empty response)")
         }
 
-        onFinished(finalMessage)
+        onFinished(fullMessage.toString())
     }
 
     /**
      * Расширение для чтения UTF8 строк из канала
      */
     private suspend fun ByteReadChannel.readUTF8LineSequence(): Flow<String> = flow {
-        val buffer = StringBuilder()
+        val buffer = ByteArray(8192) // Буфер для байтов
+        val stringBuilder = StringBuilder()
 
         while (!isClosedForRead) {
-            val byte = readByte().toInt().toChar()
+            try {
+                // Читаем доступные байты
+                val bytesRead = readAvailable(buffer, 0, buffer.size)
+                if (bytesRead > 0) {
+                    // Правильно декодируем UTF-8
+                    val text = String(buffer, 0, bytesRead, Charsets.UTF_8)
+                    stringBuilder.append(text)
 
-            if (byte == '\n') {
-                if (buffer.isNotEmpty()) {
-                    emit(buffer.toString().trimEnd('\r'))
-                    buffer.clear()
+                    // Разбиваем на строки
+                    val lines = stringBuilder.toString().split('\n')
+
+                    // Отправляем все строки кроме последней (она может быть неполной)
+                    for (i in 0 until lines.size - 1) {
+                        val line = lines[i].trimEnd('\r')
+                        if (line.isNotEmpty()) {
+                            emit(line)
+                        }
+                    }
+
+                    // Оставляем последнюю (возможно неполную) строку в буфере
+                    stringBuilder.clear()
+                    stringBuilder.append(lines.last())
                 }
-            } else {
-                buffer.append(byte)
+            } catch (e: Exception) {
+                break
             }
         }
 
-        // Последняя строка без \n
-        if (buffer.isNotEmpty()) {
-            emit(buffer.toString().trimEnd('\r'))
+        // Отправляем оставшуюся строку
+        val remaining = stringBuilder.toString().trimEnd('\r')
+        if (remaining.isNotEmpty()) {
+            emit(remaining)
         }
     }
-
 
     private suspend fun simulateStreaming(
         message: String,
@@ -262,7 +326,7 @@ object AiMessageGeneratorUtil {
             }
             currentMessage.append(words[i])
             onChunk(currentMessage.toString())
-            delay(Random.nextLong(30, 120))
+            delay(Random.nextLong(100, 250))
 //            delay(Random.nextLong(1000, 3000))
         }
 

@@ -98,7 +98,7 @@ class CacheManager(
             searchQuery = listType.searchQuery,
             sortCriteria = listType.sortCriteria,
             page = 1,
-            size = 1000, // максимум 1000 результатов
+            size = 1000,
             visibilityFilter = CharacterVisibility.PUBLIC.code
         )
 

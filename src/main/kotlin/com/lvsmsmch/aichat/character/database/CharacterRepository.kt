@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.character.database
 
 import com.lvsmsmch.aichat.utils.*
+import com.mongodb.client.model.Filters.regex
 import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -105,7 +106,9 @@ class CharacterRepository(
             if (searchQuery.isNotBlank()) {
                 or(
                     CharacterDbo::name.regex(".*$searchQuery.*", "i"),
-                    CharacterDbo::description.regex(".*$searchQuery.*", "i")
+                    CharacterDbo::category.regex(".*$searchQuery.*", "i"),
+                    regex(CharacterDbo::tags.name, ".*$searchQuery.*", "i"),
+                    CharacterDbo::description.regex(".*$searchQuery.*", "i"),
                 )
             } else EMPTY_BSON,
             if (authorId != null) {

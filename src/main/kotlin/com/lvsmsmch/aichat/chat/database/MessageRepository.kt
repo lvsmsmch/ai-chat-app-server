@@ -365,8 +365,10 @@ class MessageRepository(
      */
 
     suspend fun deleteMessagesByIds(chatId: String, messageIds: List<String>) {
+        logger.debug("DB delete messages 0")
         if (messageIds.isEmpty()) return
-        collection.updateMany(
+        logger.debug("DB delete messages 1")
+        val result = collection.updateMany(
             and(
                 MessageDbo::id `in` messageIds,
                 MessageDbo::chatId eq chatId,
@@ -377,6 +379,7 @@ class MessageRepository(
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
+        logger.debug("DB delete messages 2 (result=$result)")
     }
 
     suspend fun deleteMessagesByIds(messageIds: List<String>) {

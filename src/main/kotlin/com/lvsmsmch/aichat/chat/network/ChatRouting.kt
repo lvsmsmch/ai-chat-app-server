@@ -6,8 +6,6 @@ import com.lvsmsmch.aichat._common.database.ReportDbo
 import com.lvsmsmch.aichat._common.database.ReportEntity
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
-import com.lvsmsmch.aichat.character.database.ActivityType
-import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.*
@@ -18,9 +16,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
@@ -282,11 +277,11 @@ fun Route.configureChatRouting(
          */
         delete("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
-            val chatId = call.parameters["chatId"]
+            val chatClientId = call.parameters["chatId"]
                 ?: throw BadRequestException("Chat ID is required")
 
-            val chat = chatRepository.getChatByClientId(chatId)
-                ?: throw ChatNotFoundException(chatId)
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
 
             if (chat.userId != userId) {
                 throw ForbiddenException("Access denied to this chat")
@@ -313,12 +308,12 @@ fun Route.configureChatRouting(
                 throw BadRequestException("Cannot delete more than 100 chats at once")
             }
 
-            val chatIds = request.chatIds.distinct()
-            val chats = chatRepository.getChatsByClientIds(chatIds)
+            val chatClientIds = request.chatIds.distinct()
+            val chats = chatRepository.getChatsByClientIds(chatClientIds)
 
             // Проверяем, что все чаты найдены
             val foundChatIds = chats.map { it.clientId }.toSet()
-            val notFoundChatIds = chatIds.toSet() - foundChatIds
+            val notFoundChatIds = chatClientIds.toSet() - foundChatIds
             if (notFoundChatIds.isNotEmpty()) {
                 throw BadRequestException("Chats not found: ${notFoundChatIds.joinToString(", ")}")
             }
@@ -331,8 +326,7 @@ fun Route.configureChatRouting(
             }
 
             // Удаляем чаты
-            val chatDbIds = chats.map { it.id }
-            chatRepository.deleteChatsByIds(chatDbIds)
+            chatRepository.deleteChatsByIds(chats.map { it.id })
 
             call.respondSuccess(
                 DeleteChatsResponse(isSuccess = true)
@@ -391,12 +385,12 @@ fun Route.configureChatRouting(
          */
         post("/{chatId}/messages") {
             val userId = sessionRepository.verifyToken(call).userId
-            val chatId = call.parameters["chatId"]
+            val chatClientId = call.parameters["chatId"]
                 ?: throw BadRequestException("Chat ID is required")
             val request = call.receive<SendMessageRequest>()
 
-            val chat = chatRepository.getChatByClientId(chatId)
-                ?: throw ChatNotFoundException(chatId)
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
 
             if (chat.userId != userId) {
                 throw ForbiddenException("Access denied to this chat")
@@ -481,15 +475,18 @@ fun Route.configureChatRouting(
          */
         post("/messages/{messageId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
-            val messageId = call.parameters["id"]
+            val messageClientId = call.parameters["id"]
                 ?: throw BadRequestException("Missing messageId parameter")
             val request = call.receive<ReportMessageRequest>()
+
+            val messageDbo = messageRepository.findByClientId(messageClientId)
+                ?: throw BadRequestException("Message not found")
 
             reportRepository.addReport(
                 ReportDbo(
                     reportedBy = currentUserId,
                     entityType = ReportEntity.Message.code,
-                    entityId = messageId,
+                    entityId = messageDbo.id,
                     reason = request.reason,
                     text = request.text
                 )
@@ -506,11 +503,20 @@ fun Route.configureChatRouting(
             val userId = sessionRepository.verifyToken(call).userId
             val request = call.receive<DeleteMessagesRequest>()
 
-            val messageIds = request.messageIds.distinct()
-            val messageDbos = messageRepository.getMessagesByClientIds(messageIds)
+            logger.debug(">>>")
+            logger.debug(">>>")
+            logger.debug(">>>")
+            logger.debug(">>> /messages/delete")
+            logger.debug(">>>")
+            logger.debug(">>>")
+            logger.debug(">>>")
+            logger.debug("request: ${request}")
+
+            val messageClientIds = request.messageIds.distinct()
+            val messageDbos = messageRepository.getMessagesByClientIds(messageClientIds)
 
             // Проверяем, что все сообщения существуют
-            if (messageDbos.size != messageIds.size) {
+            if (messageDbos.size != messageClientIds.size) {
                 throw BadRequestException("Some messages not found")
             }
 
@@ -530,10 +536,12 @@ fun Route.configureChatRouting(
             }
 
             // Удаляем сообщения
+            logger.debug("delete messages...")
             messageRepository.deleteMessagesByIds(
                 chatId = chatId,
-                messageIds = request.messageIds
+                messageIds = messageDbos.map { it.id }
             )
+            logger.debug("delete messages done")
 
             // Используем метод для генерации полного sync response
             val chatSyncResponse = generateChatSyncResponse(
@@ -543,6 +551,8 @@ fun Route.configureChatRouting(
                 messageRepository = messageRepository,
                 mapper = mapper
             )
+
+            logger.debug("Done, chatSyncResponse: $chatSyncResponse")
 
             call.respondSuccess(
                 DeleteMessagesResponse(
@@ -609,8 +619,6 @@ fun Route.configureChatRouting(
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
 
-                    logger.info("SSE 2")
-
 //                    val initialChunk = StreamMessageChunk(
 //                        chunk = currentMessage.text,
 //                        isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
@@ -622,16 +630,13 @@ fun Route.configureChatRouting(
 //
 //                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
 
-                    logger.info("SSE 4")
 
                     flush()
 
-                    logger.info("SSE 5")
 
                     if (currentMessage.textVersion == request.version &&
                         currentMessage.status == MessageStatus.COMPLETED.value
                     ) {
-                        logger.info("SSE 6")
                         val finalSyncResponse = generateChatSyncResponse(
                             chat = chat,
                             chatSyncRequest = request.chatSyncRequest,
@@ -648,17 +653,20 @@ fun Route.configureChatRouting(
                             chatSyncResponse = finalSyncResponse
                         )
 
-                        write("data: ${defaultJson.encodeToString(finalChunk)}\n\n")
-                        flush()
+                        try {
+                            write("data: ${defaultJson.encodeToString(finalChunk)}\n\n")
+                            flush()
+                        } catch (writeException: Exception) {
+                        }
+
                         return@respondTextWriter
                     }
 
 
-                    logger.info("SSE 7")
+
                     if (currentMessage.textVersion != request.version ||
                         currentMessage.status == MessageStatus.FAILED.value
                     ) {
-                        logger.info("SSE 8, upd msg with text = \"\", version = ${request.version}")
 //                        withContext(Dispatchers.IO) {
 //                            logger.info("SSE 8.1")
 //                            messageRepository.updateMessage(
@@ -690,7 +698,6 @@ fun Route.configureChatRouting(
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
-                    logger.info("SSE 9")
 
                     messageRepository.streamMessageUpdates(message.id)
                         .collect { update ->
@@ -721,14 +728,15 @@ fun Route.configureChatRouting(
                             }
 
                             withContext(Dispatchers.IO) {
-                                logger.info("SSE 11")
 
-                                write("data: ${defaultJson.encodeToString(chunk)}\n\n")
-                                flush()
+                                try {
+                                    write("data: ${defaultJson.encodeToString(chunk)}\n\n")
+                                    flush()
+                                } catch (writeException: Exception) {
+                                }
                             }
 
                             if (update.isComplete || update.isFailed) {
-                                logger.info("SSE 12, ${update.newText}")
                                 return@collect
                             }
                         }
@@ -741,14 +749,13 @@ fun Route.configureChatRouting(
                     )
 
                     try {
-                        logger.error("SSE 13, ${defaultJson.encodeToString(errorChunk)}\n\n")
+                        logger.error("SSE error, ${defaultJson.encodeToString(errorChunk)}\n\n")
                         write("data: ${defaultJson.encodeToString(errorChunk)}\n\n")
                         flush()
                     } catch (writeException: Exception) {
-                        // Игнорируем ошибки записи при закрытии соединения
                     }
 
-                    logger.error("Error in SSE stream for message $messageId", e)
+                    logger.error("Error in SSE stream for message $${message.id}", e)
                 }
             }
         }

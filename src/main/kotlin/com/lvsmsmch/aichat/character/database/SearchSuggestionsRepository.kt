@@ -7,6 +7,7 @@ import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
+import org.litote.kmongo.coroutine.insertOne
 
 class SearchSuggestionsRepository(
     private val collection: CoroutineCollection<SearchSuggestionDbo>
@@ -56,6 +57,7 @@ class SearchSuggestionsRepository(
                 val suggestion = SearchSuggestionDbo(
                     term = normalizedTerm,
                     displayText = originalText.trim(),
+                    isAllowedToShow = true,
                     searchCount = 1,
                     isCharacterName = false,
                     lastSearchedAt = UtcTimestamp.now().toString()
@@ -132,12 +134,25 @@ class SearchSuggestionsRepository(
     
     suspend fun recordSearch(query: String) {
         val normalizedTerm = query.trim().lowercase()
-        collection.updateOneById(
-            normalizedTerm,
-            combine(
-                inc(SearchSuggestionDbo::searchCount, 1),
-                setValue(SearchSuggestionDbo::lastSearchedAt, UtcTimestamp.now().toString())
+        val existing = collection.findOneById(normalizedTerm)
+        if (existing == null) {
+            val suggestion = SearchSuggestionDbo(
+                term = normalizedTerm,
+                displayText = normalizedTerm,
+                isAllowedToShow = false,
+                searchCount = 1,
+                isCharacterName = false,
+                lastSearchedAt = UtcTimestamp.now().toString()
             )
-        )
+            collection.insertOne(suggestion)
+        } else {
+            collection.updateOneById(
+                normalizedTerm,
+                combine(
+                    inc(SearchSuggestionDbo::searchCount, 1),
+                    setValue(SearchSuggestionDbo::lastSearchedAt, UtcTimestamp.now().toString())
+                )
+            )
+        }
     }
 }
