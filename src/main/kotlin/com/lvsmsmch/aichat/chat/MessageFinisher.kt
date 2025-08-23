@@ -21,7 +21,7 @@ class MessageFinisher(
 
     private var currentlyFinishingMessages = mutableMapOf<String, Job>()
 
-    fun finishMessageAsync(messageId: String, timeoutSeconds: Int = 30) {
+    fun finishMessageAsync(messageId: String, timeoutSeconds: Int = 30) {   // todo 30 seconds
         currentlyFinishingMessages[messageId]?.cancel()
         currentlyFinishingMessages[messageId] = scope.launch {
             try {
@@ -46,8 +46,8 @@ class MessageFinisher(
                         characterDbo = characterDbo,
                         participants = participants,
                         messagesHistory = messageHistory,
-                        onChunk = {
-                            logger.debug("finishMessageAsync onChunk, upd msg")
+                        onMsgTextUpdate = {
+                            logger.debug("finishMessageAsync onMsgTextUpdate, upd msg")
                             ensureActive()
                             messageRepository.updateMessage(
                                 messageId = messageId,

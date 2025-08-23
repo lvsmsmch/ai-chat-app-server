@@ -314,9 +314,7 @@ class MessageRepository(
         nsfw: Boolean? = null,
         textVersion: Int? = null,
     ) {
-        logger.info("DB update")
         collection.findOneById(messageId) ?: return
-        logger.info("DB update 1")
         val updates = mutableListOf<Bson>()
         imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
@@ -325,7 +323,6 @@ class MessageRepository(
         nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
         textVersion?.let { updates.add(setValue(MessageDbo::textVersion, it)) }
         if (updates.isEmpty()) return // Nothing to update
-        logger.info("DB update 2")
         val result = collection.updateOneById(
             messageId,
             combine(
@@ -333,7 +330,6 @@ class MessageRepository(
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
-        logger.info("DB update result: $result")
     }
 
     suspend fun markMessagesAsRead(messageIds: List<String>): Int {

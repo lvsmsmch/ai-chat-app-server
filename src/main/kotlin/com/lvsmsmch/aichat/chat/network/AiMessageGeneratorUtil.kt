@@ -19,21 +19,135 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.io.File
 import kotlin.random.Random
+import kotlin.system.measureTimeMillis
 
 object AiMessageGeneratorUtil {
+
+    private val groqApiUrl
+        get() = System.getenv("GROQ_API_URL") ?: throw Exception("Missing GROQ_API_URL key")
+    private val groqApiKey
+        get() = System.getenv("GROQ_API_KEY") ?: throw Exception("Missing GROQ_API_KEY key")
+    private val groqModel
+        get() = System.getenv("GROQ_MODEL") ?: throw Exception("Missing GROQ_MODEL key")
+    private val useGroq
+        get() = (System.getenv("USE_GROQ") ?: throw Exception("Missing USE_GROQ key")).toBoolean()
 
     private val openAiApiUrl
         get() = System.getenv("OPEN_AI_API_URL") ?: throw Exception("Missing OPEN_AI_API_URL key")
     private val openAiApiKey
         get() = System.getenv("OPEN_AI_API_KEY") ?: throw Exception("Missing OPEN_AI_API_KEY key")
+    private val openAiModel
+        get() = System.getenv("OPEN_AI_MODEL") ?: throw Exception("Missing OPEN_AI_MODEL key")
     private val useOpenAi
-        get() = (System.getenv("USE_OPEN_AI") ?: throw Exception("Missing USE_OPEN_AI key"))
-            .toBoolean()
+        get() = (System.getenv("USE_OPEN_AI") ?: throw Exception("Missing USE_OPEN_AI key")).toBoolean()
+
+    private val temperature
+        get() = (System.getenv("AI_TEMPERATURE") ?: throw Exception("Missing AI_TEMPERATURE key")).toFloat()
+    private val aiPrompt
+        get() = System.getenv("AI_PROMPT") ?: throw Exception("Missing AI_PROMPT key")
+    private val aiGroupChatPrompt
+        get() = System.getenv("AI_GROUP_CHAT_PROMPT") ?: throw Exception("Missing AI_GROUP_CHAT_PROMPT key")
+
 
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(defaultJson)
+        }
+    }
+
+    private suspend fun testModels() {
+        measureTimeMillis {
+            httpClient.post(openAiApiUrl) {
+                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+                header(HttpHeaders.Accept, "text/event-stream")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", "gpt-3.5-turbo-0613")
+                        putJsonArray("messages") {
+                            addJsonObject {
+                                put("role", "user")
+                                put("content", "hi")
+                            }
+                        }
+                        put("max_completion_tokens", 1000)
+                        put("stream", true)
+                    }
+                )
+            }
+        }.also {
+            logger.debug("# Measure time for gpt-3.5-turbo-0613: $it ms")
+        }
+
+        measureTimeMillis {
+            httpClient.post(openAiApiUrl) {
+                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+                header(HttpHeaders.Accept, "text/event-stream")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", "gpt-5-nano")
+                        putJsonArray("messages") {
+                            addJsonObject {
+                                put("role", "user")
+                                put("content", "hi")
+                            }
+                        }
+                        put("max_completion_tokens", 1000)
+                        put("stream", true)
+                    }
+                )
+            }
+        }.also {
+            logger.debug("# Measure time for gpt-5-nano: $it ms")
+        }
+
+        measureTimeMillis {
+            httpClient.post(openAiApiUrl) {
+                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+                header(HttpHeaders.Accept, "text/event-stream")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", "gpt-4o-mini")
+                        putJsonArray("messages") {
+                            addJsonObject {
+                                put("role", "user")
+                                put("content", "hi")
+                            }
+                        }
+                        put("max_completion_tokens", 1000)
+                        put("stream", true)
+                    }
+                )
+            }
+        }.also {
+            logger.debug("# Measure time for gpt-4o-mini: $it ms")
+        }
+
+        measureTimeMillis {
+            httpClient.post(openAiApiUrl) {
+                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+                header(HttpHeaders.Accept, "text/event-stream")
+                contentType(ContentType.Application.Json)
+                setBody(
+                    buildJsonObject {
+                        put("model", "gpt-3.5-turbo")
+                        putJsonArray("messages") {
+                            addJsonObject {
+                                put("role", "user")
+                                put("content", "hi")
+                            }
+                        }
+                        put("max_completion_tokens", 1000)
+                        put("stream", true)
+                    }
+                )
+            }
+        }.also {
+            logger.debug("# Measure time for gpt-3.5-turbo: $it ms")
         }
     }
 
@@ -42,54 +156,73 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
-        onChunk: suspend (String) -> Unit,
+        onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit,
         onError: suspend (String) -> Unit
     ) {
         try {
-            if (useOpenAi) {
-                logger.debug("API Key starts with: ${openAiApiKey.take(10)}...")
-                logger.debug("API URL: $openAiApiUrl")
+            if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
+                simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
+            } else if (useGroq || useOpenAi) {
+                val url = if (useGroq) groqApiUrl else openAiApiUrl
+                val key = if (useGroq) groqApiKey else openAiApiKey
+                val model = if (useGroq) groqModel else openAiModel
 
-//                val testResponse = httpClient.get("https://api.openai.com/v1/models") {
-//                    header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-//                }
-//                logger.debug("Models endpoint status: ${testResponse.status}")
-//
+                logger.debug("API Key starts with: ${key.take(10)}...")
+                logger.debug("API URL: $url")
 
                 val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
-                val requestBody = buildRequestBody(messages, stream = true)
+                val requestBody = buildRequestBody(messages, model = model, stream = true)
 
-                logger.debug("Sending request to: $openAiApiUrl")
+                logger.debug("Sending request to: $url")
                 logger.debug("Request body: ${Json.encodeToString(requestBody)}")
                 logger.debug("Messages count: ${messages.size}")
 
-                val response = httpClient.post(openAiApiUrl) {
-                    header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                    header(HttpHeaders.Accept, "text/event-stream")
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody)
+                var lastException: Exception? = null
+                var isSuccessfulGeneration = false
+                var attempt = 0
+                val maxRetries = 3
+                val retryDelayMs = 500L
+
+                while (!isSuccessfulGeneration && attempt < maxRetries) {
+                    try {
+                        attempt++
+                        logger.debug("Attempt ${attempt} of $maxRetries")
+
+                        val response = httpClient.post(groqApiUrl) {
+                            header(HttpHeaders.Authorization, "Bearer $groqApiKey")
+                            header(HttpHeaders.Accept, "text/event-stream")
+                            contentType(ContentType.Application.Json)
+                            setBody(requestBody)
+                        }
+
+                        logger.debug("Response status: ${response.status}")
+                        logger.debug("Response headers: ${response.headers}")
+
+                        processStreamingResponse(response, onMsgTextUpdate, onFinished)
+
+                        isSuccessfulGeneration = true
+                    } catch (e: Exception) {
+                        lastException = e
+                        logger.error("Attempt ${attempt} failed: ${e.message}")
+
+                        if (attempt < maxRetries) {
+                            logger.debug("Retrying in ${retryDelayMs}ms...")
+                            delay(retryDelayMs)
+                        }
+                    }
                 }
 
-                logger.debug("Response status: ${response.status}")
-                logger.debug("Response headers: ${response.headers}")
-
-                processStreamingResponse(response, onChunk, onFinished)
+                if (!isSuccessfulGeneration) {
+                    lastException?.let {
+                        throw Exception("Failed to generate after $maxRetries attempts with error: $it")
+                    }
+                }
             } else {
-                var textForSimulation: String? = null
-                characterDbo.initialMessage.takeIf { messagesHistory.isEmpty() && it.isNotBlank() }?.let {
-                    textForSimulation = it
-                }
-                val shouldStreamFakeResponse = true // todo remove later
-                if (textForSimulation == null && shouldStreamFakeResponse) {
-                    textForSimulation = possibleFakeResponses.random()
-                }
-                textForSimulation?.let {
-                    simulateStreaming(it, onChunk, onFinished)
-                }
+                simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
         } catch (e: Exception) {
-            logger.error("Full error: ${e.message}", e) // ← Полный стектрейс
+            logger.error("Full error: ${e.message}", e)
             onError(e.localizedMessage)
         }
     }
@@ -102,7 +235,7 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
-        maxCharacters: Int = 5000
+        maxCharacters: Int = 2500
     ): List<Map<String, String>> {
         val systemMessage = mapOf(
             "role" to "system",
@@ -153,26 +286,11 @@ object AiMessageGeneratorUtil {
      * Строим системный промпт
      */
     private fun buildSystemPrompt(chatDbo: ChatDbo, characterDbo: CharacterDbo): String {
-        return buildString {
-            if (chatDbo.characterIds.size > 1) {
-                append("You are ${characterDbo.name} in a group chat with multiple participants.")
-                append(" Other AI characters may also be present.")
-                append(" When responding, stay in character as ${characterDbo.name}.")
-            } else {
-                append("You are ${characterDbo.name}.")
-            }
+        val template = aiPrompt + if (chatDbo.characterIds.size > 1) aiGroupChatPrompt else ""
 
-            if (characterDbo.prompt.isNotBlank()) {
-                append(" Your character description: ${characterDbo.prompt}")
-            }
-
-            append(" Reply naturally as this character would in a chat conversation.")
-            append(" Keep responses conversational and in character.")
-            append(" Match the language and tone of the conversation.")
-            append(" Always respond in the same language as the user's message.")
-            append(" Use proper UTF-8 encoding for non-English characters.")
-            append(" Keep responses short, only if user don't ask otherwise.")
-        }
+        return template
+            .replace("{CHARACTER_NAME}", characterDbo.name)
+            .replace("{USER_PROMPT}", characterDbo.prompt.takeIf { it.isNotBlank() } ?: "")
     }
 
     /**
@@ -180,10 +298,11 @@ object AiMessageGeneratorUtil {
      */
     private fun buildRequestBody(
         messages: List<Map<String, String>>,
+        model: String,
         stream: Boolean
     ): JsonObject {
         return buildJsonObject {
-            put("model", "gpt-5-nano")
+            put("model", model)
             putJsonArray("messages") {
                 messages.forEach { message ->
                     addJsonObject {
@@ -194,7 +313,7 @@ object AiMessageGeneratorUtil {
                 }
             }
             put("max_completion_tokens", 1000)
-//            put("temperature", 0.8)
+            put("temperature", temperature)
 //            put("top_p", 1.0)
 //            put("frequency_penalty", 0.3)
 //            put("presence_penalty", 0.3)
@@ -207,13 +326,13 @@ object AiMessageGeneratorUtil {
      */
     private suspend fun processStreamingResponse(
         response: HttpResponse,
-        onChunk: suspend (String) -> Unit,
+        onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit
     ) {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
-            logger.error("OpenAI API error: ${response.status}, body: $errorBody")
-            throw Exception("OpenAI API error: ${response.status} - $errorBody")
+            logger.error("API error: ${response.status}, body: $errorBody")
+            throw Exception("API error: ${response.status} - $errorBody")
         }
 
         val channel = response.bodyAsChannel() // ← ОСТАВЛЯЕМ!
@@ -245,7 +364,7 @@ object AiMessageGeneratorUtil {
                                 logger.debug("Content bytes: ${content.toByteArray(Charsets.UTF_8).contentToString()}")
                                 logger.debug("Full message so far: '${fullMessage.toString()}'")
 
-                                onChunk(fullMessage.toString())
+                                onMsgTextUpdate(fullMessage.toString())
                             }
 
                             val finishReason = choices[0].jsonObject["finish_reason"]?.jsonPrimitive?.contentOrNull
@@ -330,9 +449,9 @@ object AiMessageGeneratorUtil {
 //            delay(Random.nextLong(1000, 3000))
         }
 
-        if ((1..5).random() == 5) {
-            throw Exception("Fake exception")
-        }
+//        if ((1..5).random() == 5) {
+//            throw Exception("Fake exception")
+//        }
 
         delay(100)
         onFinished(currentMessage.toString())
@@ -381,5 +500,22 @@ object AiMessageGeneratorUtil {
                 "Ehehe~ you always know just what to say! ♪"
     )
 
+    private fun getPromptTemplate(fileName: String): String {
+        return try {
+            val currentDir = System.getProperty("user.dir")
+            val jarLocation =
+                File(AiMessageGeneratorUtil::class.java.protectionDomain.codeSource.location.toURI()).parent
 
+            logger.debug("=== FILE DEBUG INFO ===")
+            logger.debug("Current working directory: $currentDir")
+            logger.debug("JAR location: $jarLocation")
+            logger.debug("Files in current dir: ${File(".").listFiles()?.map { it.name }}")
+            logger.debug("=======================")
+
+            File("resources/prompts/${fileName}").readText(Charsets.UTF_8)
+        } catch (e: Exception) {
+            logger.error("Failed to load external prompt file $fileName", e)
+            ""
+        }
+    }
 }

@@ -67,14 +67,14 @@ fun validateCharacterDescription(description: String) {
 }
 
 fun validateCharacterPrompt(prompt: String) {
-    if (prompt.length > 2000) {
-        throw ValidationException("Prompt must be between 0 and 2000 characters")
+    if (prompt.length > 500) {
+        throw ValidationException("Prompt must be between 0 and 500 characters")
     }
 }
 
 fun validateCharacterInitialMessage(initialMessage: String) {
-    if (initialMessage.isEmpty() || initialMessage.length > 1000) {
-        throw ValidationException("initialMessage must be between 1 and 1000 characters")
+    if (initialMessage.isEmpty() || initialMessage.length > 500) {
+        throw ValidationException("initialMessage must be between 1 and 500 characters")
     }
 }
 

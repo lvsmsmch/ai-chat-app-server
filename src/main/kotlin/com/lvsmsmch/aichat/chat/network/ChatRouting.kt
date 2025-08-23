@@ -618,6 +618,10 @@ fun Route.configureChatRouting(
 
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
+                    logger.info("SSE 2, " +
+                            "request version ${request.version}, " +
+                            "current version ${currentMessage.textVersion}, " +
+                            "current status ${currentMessage.status}")
 
 //                    val initialChunk = StreamMessageChunk(
 //                        chunk = currentMessage.text,
@@ -629,14 +633,13 @@ fun Route.configureChatRouting(
 //                    logger.info("SSE 3")
 //
 //                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
-
-
-                    flush()
+//                    flush()
 
 
                     if (currentMessage.textVersion == request.version &&
                         currentMessage.status == MessageStatus.COMPLETED.value
                     ) {
+                        logger.info("SSE 3")
                         val finalSyncResponse = generateChatSyncResponse(
                             chat = chat,
                             chatSyncRequest = request.chatSyncRequest,
@@ -662,46 +665,22 @@ fun Route.configureChatRouting(
                         return@respondTextWriter
                     }
 
-
-
                     if (currentMessage.textVersion != request.version ||
                         currentMessage.status == MessageStatus.FAILED.value
                     ) {
-//                        withContext(Dispatchers.IO) {
-//                            logger.info("SSE 8.1")
-//                            messageRepository.updateMessage(
-//                                messageId = messageId,
-//                                text = "",
-//                                status = MessageStatus.STREAMING.value,
-//                                textVersion = request.version
-//                            )
-//                        }
-//
-//                        launch(Dispatchers.IO) {
-//                            logger.info("SSE 8.2")
-//                            messageRepository.updateMessage(
-//                                messageId = messageId,
-//                                text = "",
-//                                status = MessageStatus.STREAMING.value,
-//                                textVersion = request.version
-//                            )
-//                        }
-
+                        logger.info("SSE 4")
                         messageRepository.updateMessage(
                             messageId = message.id,
                             text = "",
                             status = MessageStatus.STREAMING.value,
                             textVersion = request.version
                         )
-
-//                        delay(500)
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
-
                     messageRepository.streamMessageUpdates(message.id)
                         .collect { update ->
-                            logger.info("SSE 10, ${update}")
+//                            logger.info("SSE 10, ${update}")
                             val chunk = if (update.isComplete || update.isFailed) {
                                 val finalSyncResponse = generateChatSyncResponse(
                                     chat = chat,
@@ -728,7 +707,6 @@ fun Route.configureChatRouting(
                             }
 
                             withContext(Dispatchers.IO) {
-
                                 try {
                                     write("data: ${defaultJson.encodeToString(chunk)}\n\n")
                                     flush()
