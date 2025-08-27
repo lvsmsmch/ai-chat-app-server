@@ -235,7 +235,7 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
-        maxCharacters: Int = 2500
+        maxCharacters: Int = 1000
     ): List<Map<String, String>> {
         val systemMessage = mapOf(
             "role" to "system",
@@ -346,7 +346,7 @@ object AiMessageGeneratorUtil {
                 .filter { data -> data.isNotBlank() }
                 .collect { data ->
                     try {
-                        logger.debug("Received chunk: $data")
+//                        logger.debug("Received chunk: $data")
 
                         val jsonData = Json.parseToJsonElement(data).jsonObject
                         val choices = jsonData["choices"]?.jsonArray
@@ -360,9 +360,9 @@ object AiMessageGeneratorUtil {
                                 fullMessage.append(content)
 
                                 // ✅ ДОБАВЬ ОТЛАДКУ КОДИРОВКИ:
-                                logger.debug("Raw content: '$content'")
-                                logger.debug("Content bytes: ${content.toByteArray(Charsets.UTF_8).contentToString()}")
-                                logger.debug("Full message so far: '${fullMessage.toString()}'")
+//                                logger.debug("Raw content: '$content'")
+//                                logger.debug("Content bytes: ${content.toByteArray(Charsets.UTF_8).contentToString()}")
+//                                logger.debug("Full message so far: '${fullMessage.toString()}'")
 
                                 onMsgTextUpdate(fullMessage.toString())
                             }

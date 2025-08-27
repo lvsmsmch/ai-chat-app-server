@@ -68,11 +68,10 @@ class MessageRepository(
                 MessageUpdateEvent(
                     messageId = message.id,
                     newText = message.text,
-                    textVersion = message.textVersion,
                     isComplete = message.status == MessageStatus.COMPLETED.value,
                     isFailed = message.status == MessageStatus.FAILED.value
                 ).also {
-                    logger.info("DB event: ${it}")
+//                    logger.info("DB event: ${it}")
                 }
             }
             .distinctUntilChanged()
@@ -81,7 +80,6 @@ class MessageRepository(
     data class MessageUpdateEvent(
         val messageId: String,
         val newText: String,
-        val textVersion: Int,
         val isComplete: Boolean,
         val isFailed: Boolean
     )
@@ -312,7 +310,6 @@ class MessageRepository(
         status: String? = null,
         text: String? = null,
         nsfw: Boolean? = null,
-        textVersion: Int? = null,
     ) {
         collection.findOneById(messageId) ?: return
         val updates = mutableListOf<Bson>()
@@ -321,7 +318,6 @@ class MessageRepository(
         status?.let { updates.add(setValue(MessageDbo::status, it)) }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
         nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
-        textVersion?.let { updates.add(setValue(MessageDbo::textVersion, it)) }
         if (updates.isEmpty()) return // Nothing to update
         val result = collection.updateOneById(
             messageId,

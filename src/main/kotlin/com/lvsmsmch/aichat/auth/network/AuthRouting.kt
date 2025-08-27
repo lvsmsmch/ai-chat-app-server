@@ -127,6 +127,24 @@ fun Route.configureAuthRouting(
             )
         }
 
+
+        /**
+         * POST /auth/subscription
+         * Авторизация как гость
+         */
+        post("/subscription") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val request = call.receive<SubscriptionStatusRequest>()
+
+            val userDbo = userRepository.getUserById(sessionDbo.userId)
+                ?: throw BadRequestException("User does not exist")
+
+            userRepository.updateSubscriptionStatus(userDbo.id, request.hasSubscription)
+
+            call.respondSuccess()
+        }
+
+
         /**
          * POST /auth/logout
          * Выход из системы

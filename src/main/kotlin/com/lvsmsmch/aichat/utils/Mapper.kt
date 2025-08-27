@@ -55,6 +55,8 @@ suspend fun UserDbo.toUserDetailsDto(
         privateCharactersCount = if (demanderId == id) privateCharacterCount else 0,
         followersCount = followerCount,
         followingCount = followingCount,
+        totalChatsCount = if (demanderId == id) totalChatsCount else 0,
+        totalMessagesCount = if (demanderId == id) totalMessagesCount else 0,
         isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id)
     )
 }

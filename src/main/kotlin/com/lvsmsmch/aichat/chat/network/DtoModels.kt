@@ -83,7 +83,8 @@ data class BatchSyncRequest(
 
 @Serializable
 data class BatchSyncResponse(
-    @SerialName("chatSyncResponses") val chatSyncResponses: List<ChatSyncResponse>
+    @SerialName("chatSyncResponses") val chatSyncResponses: List<ChatSyncResponse>,
+    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
 )
 
 // ============= СОЗДАНИЕ ЧАТА =============
@@ -99,6 +100,8 @@ data class CreateChatRequest(
 @Serializable
 data class CreateChatResponse(
     @SerialName("isSuccess") val isSuccess: Boolean,
+    @SerialName("addInitMessageSuccess") val addInitMessageSuccess: Boolean,
+    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
@@ -140,6 +143,7 @@ data class SendMessageRequest(
 @Serializable
 data class SendMessageResponse(
     @SerialName("isSuccess") val isSuccess: Boolean,
+    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
@@ -162,7 +166,6 @@ data class ReloadMessageResponse(
 
 @Serializable
 data class StreamMessageRequest(
-    @SerialName("version") val version: Int,
     @SerialName("chatSyncRequest") val chatSyncRequest: ChatSyncRequest
 )
 
@@ -212,4 +215,12 @@ data class DeleteMessagesRequest(
 data class DeleteMessagesResponse(
     @SerialName("isSuccess") val isSuccess: Boolean,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
+)
+
+// ============= ПРОЧЕЕ =============
+
+
+@Serializable
+data class LimitReachedSignal(
+    @SerialName("limitUntil") val limitUntil: String
 )

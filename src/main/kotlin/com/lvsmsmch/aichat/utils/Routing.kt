@@ -110,6 +110,7 @@ fun Application.configureRouting(
                 reportRepository = reportRepository,
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
+                userRepository = userRepository
             )
         }
     }

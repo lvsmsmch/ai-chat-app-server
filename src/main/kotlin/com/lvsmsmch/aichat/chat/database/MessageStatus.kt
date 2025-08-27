@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 enum class MessageStatus(val value: String) {
     STREAMING("streaming"),
     COMPLETED("completed"),
-    FAILED("failed");
+    FAILED("failed")
+    ;
 }

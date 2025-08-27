@@ -300,6 +300,7 @@ class ComplexQueryHelper(
     suspend fun addChat(chatDbo: ChatDbo) {
         transactionHelper.withTransaction { session ->
             chatRepository.insertChat(session, chatDbo)
+            userRepository.incrementChatCounters(session, chatDbo.userId)
             chatDbo.characterIds.forEach { characterId ->
 
                 if (chatDbo.isFirstChatWithThisCharacter) {
@@ -321,7 +322,7 @@ class ComplexQueryHelper(
             messageRepository.insertMessage(session, messageDbo)
             if (!messageDbo.isSentByUser) {
                 val chat = chatRepository.getChatById(session, messageDbo.chatId)!!
-                characterRepository.incrementMessagesCount(session, messageDbo.senderId, 1)
+                userRepository.incrementMessageCounters(session, chat.userId)
                 characterActivityLogRepository.logActivity(
                     session = session,
                     activityType = ActivityType.MESSAGE_SENT,

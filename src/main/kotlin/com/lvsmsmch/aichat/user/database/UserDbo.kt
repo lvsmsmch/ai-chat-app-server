@@ -16,11 +16,17 @@ data class UserDbo(
     val bio: String? = null,
     val googleOauthId: String? = null,
     val accountType: AccountType = AccountType.GUEST,
+    val hasSubscription: Boolean = false,
     val deviceId: String? = null,
     val facebookOauthId: String? = null,
     val hashedPassword: String? = null,
     val privateCharacterCount: Int = 0,
     val publicCharacterCount: Int = 0,
     val followerCount: Int = 0,
-    val followingCount: Int = 0
+    val followingCount: Int = 0,
+    val hourlyMessageCount: Int = 0,
+    val dailyMessageCount: Int = 0,
+    val totalMessagesCount: Int = 0,
+    val totalChatsCount: Int = 0,
+    val extraFreeMessagesCount: Int = 0
 )

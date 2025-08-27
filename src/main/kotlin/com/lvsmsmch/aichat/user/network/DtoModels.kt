@@ -24,7 +24,9 @@ data class UserDetailsDto(
     @SerialName("privateCharactersCount") val privateCharactersCount: Int = 0,
     @SerialName("followersCount") val followersCount: Int = 0,
     @SerialName("followingCount") val followingCount: Int = 0,
-    @SerialName("isFollowing") val isFollowing: Boolean = false
+    @SerialName("totalChatsCount") val totalChatsCount: Int = 0,
+    @SerialName("totalMessagesCount") val totalMessagesCount: Int = 0,
+    @SerialName("isFollowing") val isFollowing: Boolean = false,
 )
 
 @Serializable

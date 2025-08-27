@@ -236,6 +236,16 @@ fun Application.module() {
         updateIntervalMinutes = 60 // каждый час
     )
 
+    val hourlyCounterUpdaterJob = configureHourlyCountersUpdater(
+        databaseScope = databaseScope,
+        userRepository = userRepository
+    )
+
+    val dailyCounterUpdaterJob = configureDailyCountersUpdater(
+        databaseScope = databaseScope,
+        userRepository = userRepository
+    )
+
     val fillDefaultSuggestionsJob = fillDefaultSuggestions(
         databaseScope = databaseScope,
         searchSuggestionsRepository = searchSuggestionsRepository
@@ -277,6 +287,8 @@ fun Application.module() {
             userRecommendationsUpdaterJob.cancelAndJoin()
             categoryCacheUpdaterJob.cancelAndJoin()
             defaultPersonalizedUpdaterJob.cancelAndJoin()
+            hourlyCounterUpdaterJob.cancelAndJoin()
+            dailyCounterUpdaterJob.cancelAndJoin()
             fillDefaultSuggestionsJob.cancelAndJoin()
             fillInitialDataJob.cancelAndJoin()
 

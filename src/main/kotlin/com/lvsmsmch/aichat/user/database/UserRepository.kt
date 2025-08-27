@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.user.database
 
+import com.lvsmsmch.aichat.auth.network.SubscriptionStatusRequest
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Updates
 import com.mongodb.reactivestreams.client.ClientSession
@@ -91,6 +92,31 @@ class UserRepository(
         ).toList()
     }
 
+    suspend fun getHasLimitUntil(userId: String): UtcTimestamp? {
+        logger.debug(">>> getHasLimitUntil $userId")
+        val user = getUserById(userId) ?: return null
+
+        val dailyLimit = if (user.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
+        val hourlyLimit = if (user.hasSubscription) HOURLY_LIMIT_MESSAGES_PREMIUM else HOURLY_LIMIT_MESSAGES_REGULAR
+
+        val now = java.time.LocalDateTime.now()
+
+        logger.debug(">>> daily ${user.dailyMessageCount}/$dailyLimit")
+        logger.debug(">>> hourly ${user.hourlyMessageCount}/$hourlyLimit")
+
+        if (user.dailyMessageCount >= dailyLimit) {
+            val nextDay = now.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
+            return UtcTimestamp(nextDay.toInstant(java.time.ZoneOffset.UTC))
+        }
+
+        if (user.hourlyMessageCount >= hourlyLimit) {
+            val nextHour = now.plusHours(1).withMinute(0).withSecond(0).withNano(0)
+            return UtcTimestamp(nextHour.toInstant(java.time.ZoneOffset.UTC))
+        }
+
+        return null
+    }
+
     /**
      * UPDATE
      */
@@ -132,6 +158,14 @@ class UserRepository(
                 Updates.set(UserDbo::email.name, email),
                 Updates.set(UserDbo::name.name, name),
                 Updates.set(UserDbo::profilePictureUrl.name, profilePictureUrl),
+            )
+        )
+    }
+
+    suspend fun updateSubscriptionStatus(userId: String, hasSubscription: Boolean) {
+        collection.updateOneById(
+            userId, combine(
+                Updates.set(UserDbo::hasSubscription.name, hasSubscription),
             )
         )
     }
@@ -184,11 +218,63 @@ class UserRepository(
         )
     }
 
+    suspend fun resetHourlyCountersForAllUsers() {
+        collection.updateMany(
+            filter = UserDbo::hourlyMessageCount gt 0,
+            update = setValue(UserDbo::hourlyMessageCount, 0)
+        )
+    }
+
+    suspend fun resetDailyCountersForAllUsers() {
+        collection.updateMany(
+            filter = UserDbo::dailyMessageCount gt 0,
+            update = setValue(UserDbo::dailyMessageCount, 0)
+        )
+    }
+
+    suspend fun incrementMessageCounters(session: ClientSession, userId: String) {
+        logger.debug("incrementMessageCounters for ${userId}")
+        logger.debug("before, hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
+        collection.updateOneById(
+            session,
+            userId,
+            combine(
+                inc(UserDbo::hourlyMessageCount, 1),
+                inc(UserDbo::dailyMessageCount, 1),
+                inc(UserDbo::totalMessagesCount, 1),
+                setValue(UserDbo::lastActiveAt, UtcTimestamp.now().toString())
+            )
+        )
+        logger.debug("after,  hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
+    }
+
+    suspend fun incrementChatCounters(session: ClientSession, userId: String) {
+        logger.debug("incrementChatCounters by 1")
+        collection.updateOneById(
+            session,
+            userId,
+            combine(
+                inc(UserDbo::totalChatsCount, 1),
+                setValue(UserDbo::lastActiveAt, UtcTimestamp.now().toString())
+            )
+        )
+    }
+
+
+
     /**
      * DELETE
      */
     suspend fun deleteUser(session: ClientSession, userId: String): Boolean {
         val deleteResult = collection.deleteOneById(session, userId)
         return deleteResult.deletedCount > 0
+    }
+
+
+    companion object {
+        const val DAILY_LIMIT_MESSAGES_REGULAR = 60
+        const val HOURLY_LIMIT_MESSAGES_REGULAR = 30
+        const val DAILY_LIMIT_MESSAGES_PREMIUM = 200
+        const val HOURLY_LIMIT_MESSAGES_PREMIUM = 100
     }
 }

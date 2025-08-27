@@ -40,6 +40,11 @@ data class GuestAuthRequest(
     @SerialName("deviceId") val deviceId: String
 )
 
+@Serializable
+data class SubscriptionStatusRequest(
+    @SerialName("hasSubscription") val hasSubscription: Boolean
+)
+
 // ============= INTERNAL MODELS =============
 
 data class OAuthUserData(

@@ -9,6 +9,7 @@ import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.*
+import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -16,6 +17,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 
@@ -25,6 +27,7 @@ fun Route.configureChatRouting(
     characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
     reportRepository: ReportRepository,
+    userRepository: UserRepository,
     idGenerator: IdGenerator,
     messageFinisher: MessageFinisher,
     complexQueryHelper: ComplexQueryHelper,
@@ -117,7 +120,10 @@ fun Route.configureChatRouting(
 
             call.respondSuccess(
                 BatchSyncResponse(
-                    chatSyncResponses = chatSyncResponses
+                    chatSyncResponses = chatSyncResponses,
+                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
+                        LimitReachedSignal(it.toString())
+                    }
                 )
             )
         }
@@ -164,8 +170,11 @@ fun Route.configureChatRouting(
 
             complexQueryHelper.addChat(chatDbo)
 
+            val limitUntil = userRepository.getHasLimitUntil(userId)
+            val shouldAddInitMessage = limitUntil == null
+
             // Создаем начальное сообщение если указано
-            if (request.initialMessageId != null) {
+            if (request.initialMessageId != null && shouldAddInitMessage) {
                 val characterId = request.characterIds.first()
                 MessageDbo(
                     id = idGenerator.generateId(EntityType.MESSAGE),
@@ -202,6 +211,10 @@ fun Route.configureChatRouting(
             call.respondSuccess(
                 CreateChatResponse(
                     isSuccess = true,
+                    addInitMessageSuccess = shouldAddInitMessage,
+                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
+                        LimitReachedSignal(it.toString())
+                    },
                     chatSyncResponse = chatSyncResponse
                 )
             )
@@ -417,7 +430,27 @@ fun Route.configureChatRouting(
                 }
             }
 
-            // Создаем пользовательское сообщение
+            val limitUntil = userRepository.getHasLimitUntil(userId)
+            if (limitUntil != null) {
+                val chatSyncResponse = generateChatSyncResponse(
+                    chat = chat,
+                    chatSyncRequest = request.chatSyncRequest,
+                    chatRepository = chatRepository,
+                    messageRepository = messageRepository,
+                    mapper = mapper
+                )
+
+                call.respondSuccess(
+                    SendMessageResponse(
+                        isSuccess = false,
+                        limitReachedSignal = LimitReachedSignal(limitUntil = limitUntil.toString()),
+                        chatSyncResponse = chatSyncResponse
+                    )
+                )
+
+                return@post
+            }
+
             request.userMessage?.let { userMessage ->
                 validateMessageText(userMessage.text)
                 MessageDbo(
@@ -434,7 +467,6 @@ fun Route.configureChatRouting(
                 }
             }
 
-            // Создаем сообщение персонажа
             request.characterMessage?.let { characterMessage ->
                 val characterId = characterMessage.characterId
                 MessageDbo(
@@ -452,7 +484,6 @@ fun Route.configureChatRouting(
                 }
             }
 
-            // Генерируем полный sync response с учетом всех изменений
             val chatSyncResponse = generateChatSyncResponse(
                 chat = chat,
                 chatSyncRequest = request.chatSyncRequest,
@@ -464,6 +495,9 @@ fun Route.configureChatRouting(
             call.respondSuccess(
                 SendMessageResponse(
                     isSuccess = true,
+                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
+                        LimitReachedSignal(limitUntil = it.toString())
+                    },
                     chatSyncResponse = chatSyncResponse
                 )
             )
@@ -618,10 +652,9 @@ fun Route.configureChatRouting(
 
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
-                    logger.info("SSE 2, " +
-                            "request version ${request.version}, " +
-                            "current version ${currentMessage.textVersion}, " +
-                            "current status ${currentMessage.status}")
+                    logger.info(
+                        "SSE 2,current status ${currentMessage.status}"
+                    )
 
 //                    val initialChunk = StreamMessageChunk(
 //                        chunk = currentMessage.text,
@@ -636,9 +669,7 @@ fun Route.configureChatRouting(
 //                    flush()
 
 
-                    if (currentMessage.textVersion == request.version &&
-                        currentMessage.status == MessageStatus.COMPLETED.value
-                    ) {
+                    if (currentMessage.status == MessageStatus.COMPLETED.value) {
                         logger.info("SSE 3")
                         val finalSyncResponse = generateChatSyncResponse(
                             chat = chat,
@@ -665,16 +696,17 @@ fun Route.configureChatRouting(
                         return@respondTextWriter
                     }
 
-                    if (currentMessage.textVersion != request.version ||
-                        currentMessage.status == MessageStatus.FAILED.value
-                    ) {
+                    if (currentMessage.status == MessageStatus.FAILED.value) {
                         logger.info("SSE 4")
-                        messageRepository.updateMessage(
-                            messageId = message.id,
-                            text = "",
-                            status = MessageStatus.STREAMING.value,
-                            textVersion = request.version
-                        )
+//                        messageRepository.updateMessage(
+//                            messageId = message.id,
+//                            text = "",
+//                            status = MessageStatus.STREAMING.value,
+//                        )
+                        messageFinisher.finishMessageAsync(message.id)
+                    }
+
+                    if (!messageFinisher.isFinishing(message.id)) {
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
