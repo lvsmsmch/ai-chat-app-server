@@ -57,99 +57,99 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    private suspend fun testModels() {
-        measureTimeMillis {
-            httpClient.post(openAiApiUrl) {
-                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                header(HttpHeaders.Accept, "text/event-stream")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("model", "gpt-3.5-turbo-0613")
-                        putJsonArray("messages") {
-                            addJsonObject {
-                                put("role", "user")
-                                put("content", "hi")
-                            }
-                        }
-                        put("max_completion_tokens", 1000)
-                        put("stream", true)
-                    }
-                )
-            }
-        }.also {
-            logger.debug("# Measure time for gpt-3.5-turbo-0613: $it ms")
-        }
-
-        measureTimeMillis {
-            httpClient.post(openAiApiUrl) {
-                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                header(HttpHeaders.Accept, "text/event-stream")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("model", "gpt-5-nano")
-                        putJsonArray("messages") {
-                            addJsonObject {
-                                put("role", "user")
-                                put("content", "hi")
-                            }
-                        }
-                        put("max_completion_tokens", 1000)
-                        put("stream", true)
-                    }
-                )
-            }
-        }.also {
-            logger.debug("# Measure time for gpt-5-nano: $it ms")
-        }
-
-        measureTimeMillis {
-            httpClient.post(openAiApiUrl) {
-                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                header(HttpHeaders.Accept, "text/event-stream")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("model", "gpt-4o-mini")
-                        putJsonArray("messages") {
-                            addJsonObject {
-                                put("role", "user")
-                                put("content", "hi")
-                            }
-                        }
-                        put("max_completion_tokens", 1000)
-                        put("stream", true)
-                    }
-                )
-            }
-        }.also {
-            logger.debug("# Measure time for gpt-4o-mini: $it ms")
-        }
-
-        measureTimeMillis {
-            httpClient.post(openAiApiUrl) {
-                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-                header(HttpHeaders.Accept, "text/event-stream")
-                contentType(ContentType.Application.Json)
-                setBody(
-                    buildJsonObject {
-                        put("model", "gpt-3.5-turbo")
-                        putJsonArray("messages") {
-                            addJsonObject {
-                                put("role", "user")
-                                put("content", "hi")
-                            }
-                        }
-                        put("max_completion_tokens", 1000)
-                        put("stream", true)
-                    }
-                )
-            }
-        }.also {
-            logger.debug("# Measure time for gpt-3.5-turbo: $it ms")
-        }
-    }
+//    private suspend fun testModels() {
+//        measureTimeMillis {
+//            httpClient.post(openAiApiUrl) {
+//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+//                header(HttpHeaders.Accept, "text/event-stream")
+//                contentType(ContentType.Application.Json)
+//                setBody(
+//                    buildJsonObject {
+//                        put("model", "gpt-3.5-turbo-0613")
+//                        putJsonArray("messages") {
+//                            addJsonObject {
+//                                put("role", "user")
+//                                put("content", "hi")
+//                            }
+//                        }
+//                        put("max_completion_tokens", 1000)
+//                        put("stream", true)
+//                    }
+//                )
+//            }
+//        }.also {
+//            logger.debug("# Measure time for gpt-3.5-turbo-0613: $it ms")
+//        }
+//
+//        measureTimeMillis {
+//            httpClient.post(openAiApiUrl) {
+//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+//                header(HttpHeaders.Accept, "text/event-stream")
+//                contentType(ContentType.Application.Json)
+//                setBody(
+//                    buildJsonObject {
+//                        put("model", "gpt-5-nano")
+//                        putJsonArray("messages") {
+//                            addJsonObject {
+//                                put("role", "user")
+//                                put("content", "hi")
+//                            }
+//                        }
+//                        put("max_completion_tokens", 1000)
+//                        put("stream", true)
+//                    }
+//                )
+//            }
+//        }.also {
+//            logger.debug("# Measure time for gpt-5-nano: $it ms")
+//        }
+//
+//        measureTimeMillis {
+//            httpClient.post(openAiApiUrl) {
+//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+//                header(HttpHeaders.Accept, "text/event-stream")
+//                contentType(ContentType.Application.Json)
+//                setBody(
+//                    buildJsonObject {
+//                        put("model", "gpt-4o-mini")
+//                        putJsonArray("messages") {
+//                            addJsonObject {
+//                                put("role", "user")
+//                                put("content", "hi")
+//                            }
+//                        }
+//                        put("max_completion_tokens", 1000)
+//                        put("stream", true)
+//                    }
+//                )
+//            }
+//        }.also {
+//            logger.debug("# Measure time for gpt-4o-mini: $it ms")
+//        }
+//
+//        measureTimeMillis {
+//            httpClient.post(openAiApiUrl) {
+//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+//                header(HttpHeaders.Accept, "text/event-stream")
+//                contentType(ContentType.Application.Json)
+//                setBody(
+//                    buildJsonObject {
+//                        put("model", "gpt-3.5-turbo")
+//                        putJsonArray("messages") {
+//                            addJsonObject {
+//                                put("role", "user")
+//                                put("content", "hi")
+//                            }
+//                        }
+//                        put("max_completion_tokens", 1000)
+//                        put("stream", true)
+//                    }
+//                )
+//            }
+//        }.also {
+//            logger.debug("# Measure time for gpt-3.5-turbo: $it ms")
+//        }
+//    }
 
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
@@ -172,7 +172,7 @@ object AiMessageGeneratorUtil {
                 logger.debug("API URL: $url")
 
                 val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
-                val requestBody = buildRequestBody(messages, model = model, stream = true)
+                val requestBody = buildRequestBody(messages, model = model, stream = false)
 
                 logger.debug("Sending request to: $url")
                 logger.debug("Request body: ${Json.encodeToString(requestBody)}")
@@ -199,7 +199,11 @@ object AiMessageGeneratorUtil {
                         logger.debug("Response status: ${response.status}")
                         logger.debug("Response headers: ${response.headers}")
 
-                        processStreamingResponse(response, onMsgTextUpdate, onFinished)
+//                        processStreamingResponse(response, onMsgTextUpdate, onFinished)
+
+                        val fullMessage = processNonStreamingResponse(response)
+                            .removePrefixIgnoringCase("${characterDbo.name}: ")
+                        simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
                     } catch (e: Exception) {
@@ -263,10 +267,16 @@ object AiMessageGeneratorUtil {
 
         // Переворачиваем обратно (от старых к новым)
         val historyMessages = selectedMessages.reversed().map { message ->
-            val messageMap = mutableMapOf(
-                "role" to if (message.isSentByUser) "user" else "assistant",
-                "content" to message.text
-            )
+            val messageMap = mutableMapOf<String, String>()
+
+            messageMap["role"] = if (message.isSentByUser) "user" else "assistant"
+
+            messageMap["content"] = if (!message.isSentByUser && chatDbo.characterIds.size > 1) {
+                val senderName = participants.find { it.id == message.senderId }?.name ?: "Unknown"
+                "$senderName: ${message.text}"
+            } else {
+                message.text
+            }
 
             if (!message.isSentByUser) {
                 participants.find { it.id == message.senderId }?.let { sender ->
@@ -308,7 +318,7 @@ object AiMessageGeneratorUtil {
                     addJsonObject {
                         put("role", message["role"]!!)
                         put("content", message["content"]!!)
-                        message["name"]?.let { put("name", it) }
+//                        message["name"]?.let { put("name", it) }
                     }
                 }
             }
@@ -318,7 +328,23 @@ object AiMessageGeneratorUtil {
 //            put("frequency_penalty", 0.3)
 //            put("presence_penalty", 0.3)
             put("stream", stream)
+            put("tool_choice", "auto")
         }
+    }
+
+    private suspend fun processNonStreamingResponse(response: HttpResponse): String {
+        if (response.status != HttpStatusCode.OK) {
+            val errorBody = response.bodyAsText()
+            logger.error("API error: ${response.status}, body: $errorBody")
+            throw Exception("API error: ${response.status} - $errorBody")
+        }
+
+        val responseBody = response.bodyAsText()
+        val jsonResponse = Json.parseToJsonElement(responseBody).jsonObject
+        val choices = jsonResponse["choices"]?.jsonArray
+        val content = choices?.get(0)?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.content
+
+        return content ?: throw Exception("No content in response")
     }
 
     /**
@@ -445,7 +471,7 @@ object AiMessageGeneratorUtil {
             }
             currentMessage.append(words[i])
             onChunk(currentMessage.toString())
-            delay(Random.nextLong(100, 250))
+            delay(Random.nextLong(50, 150))
 //            delay(Random.nextLong(1000, 3000))
         }
 
@@ -517,5 +543,12 @@ object AiMessageGeneratorUtil {
             logger.error("Failed to load external prompt file $fileName", e)
             ""
         }
+    }
+
+    private fun String.removePrefixIgnoringCase(prefix: String): String {
+        if (startsWith(prefix, ignoreCase = true)) {
+            return substring(prefix.length)
+        }
+        return this
     }
 }

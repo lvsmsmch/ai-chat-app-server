@@ -52,7 +52,11 @@ fun Application.configureRouting(
             call.respond(HttpStatusCode.OK, "Test successful")
         }
 
-        rateLimit(RateLimitName("auth-strict")) {
+//        rateLimit(RateLimitName("auth-strict")) {
+//
+//        }
+
+        rateLimit(RateLimitName("ip-based")) {
             configureAuthRouting(
                 userRepository = userRepository,
                 sessionRepository = sessionRepository,
@@ -61,9 +65,7 @@ fun Application.configureRouting(
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper
             )
-        }
 
-        rateLimit(RateLimitName("ip-based")) {
             configureAppDataRouting()
 
             configureUserRouting(

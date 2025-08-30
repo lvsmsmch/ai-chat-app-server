@@ -96,7 +96,7 @@ fun Route.configureChatRouting(
                         val limitedMessages = messageRepository.getMessagesPaginated(
                             chatId = chat.id,
                             cursor = null,
-                            limit = 50
+                            limit = 250
                         )
 
                         val limitedMessageListResponse = MessageListUpdatedResponse(
@@ -121,9 +121,7 @@ fun Route.configureChatRouting(
             call.respondSuccess(
                 BatchSyncResponse(
                     chatSyncResponses = chatSyncResponses,
-                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
-                        LimitReachedSignal(it.toString())
-                    }
+                    limitsResponse = userRepository.getLimits(userId)
                 )
             )
         }
@@ -170,8 +168,7 @@ fun Route.configureChatRouting(
 
             complexQueryHelper.addChat(chatDbo)
 
-            val limitUntil = userRepository.getHasLimitUntil(userId)
-            val shouldAddInitMessage = limitUntil == null
+            val shouldAddInitMessage = userRepository.getLimits(userId).limitUntil == null
 
             // Создаем начальное сообщение если указано
             if (request.initialMessageId != null && shouldAddInitMessage) {
@@ -212,9 +209,7 @@ fun Route.configureChatRouting(
                 CreateChatResponse(
                     isSuccess = true,
                     addInitMessageSuccess = shouldAddInitMessage,
-                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
-                        LimitReachedSignal(it.toString())
-                    },
+                    limitsResponse = userRepository.getLimits(userId),
                     chatSyncResponse = chatSyncResponse
                 )
             )
@@ -423,15 +418,16 @@ fun Route.configureChatRouting(
 
                     return@post call.respondSuccess(
                         SendMessageResponse(
-                            isSuccess = false,
+                            isSuccess = true,
+                            limitsResponse = userRepository.getLimits(userId),
                             chatSyncResponse = chatSyncResponse
                         )
                     )
                 }
             }
 
-            val limitUntil = userRepository.getHasLimitUntil(userId)
-            if (limitUntil != null) {
+            val limits = userRepository.getLimits(userId)
+            if (limits.limitUntil != null) {
                 val chatSyncResponse = generateChatSyncResponse(
                     chat = chat,
                     chatSyncRequest = request.chatSyncRequest,
@@ -443,7 +439,7 @@ fun Route.configureChatRouting(
                 call.respondSuccess(
                     SendMessageResponse(
                         isSuccess = false,
-                        limitReachedSignal = LimitReachedSignal(limitUntil = limitUntil.toString()),
+                        limitsResponse = limits,
                         chatSyncResponse = chatSyncResponse
                     )
                 )
@@ -495,9 +491,7 @@ fun Route.configureChatRouting(
             call.respondSuccess(
                 SendMessageResponse(
                     isSuccess = true,
-                    limitReachedSignal = userRepository.getHasLimitUntil(userId)?.let {
-                        LimitReachedSignal(limitUntil = it.toString())
-                    },
+                    limitsResponse = userRepository.getLimits(userId),
                     chatSyncResponse = chatSyncResponse
                 )
             )
@@ -680,7 +674,7 @@ fun Route.configureChatRouting(
                         )
 
                         val finalChunk = StreamMessageChunk(
-                            chunk = "",
+                            chunk = currentMessage.text,
                             isComplete = true,
                             isFailed = false,
                             nsfw = false,
@@ -768,6 +762,31 @@ fun Route.configureChatRouting(
                     logger.error("Error in SSE stream for message $${message.id}", e)
                 }
             }
+        }
+
+
+        // ========== ПРОЧЕЕ ==========
+
+        /**
+         * POST /chats/rewarded
+         * Юзер получил ревард для увеличения лимитов
+         */
+        post("/rewarded") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val request = call.receive<UserRewardedRequest>()
+
+            logger.debug(">>>")
+            logger.debug(">>> /rewarded")
+            logger.debug(">>>")
+
+            userRepository.addUserLimitsAfterRewardedWasWatched(userId)
+            delay(100)
+
+            call.respondSuccess(
+                UserRewardedResponse(
+                    limitsResponse = userRepository.getLimits(userId)
+                )
+            )
         }
     }
 }

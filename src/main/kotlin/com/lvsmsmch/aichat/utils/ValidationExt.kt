@@ -36,7 +36,7 @@ fun validateUserPicture(pictureFile: File) {
     validatePicture(
         pictureFile = pictureFile,
         maxSizeBytes = 1 * 1024 * 1024,
-        minDimensionsPixels = 200 to 200,
+        minDimensionsPixels = 100 to 100,
         maxDimensionsPixels = 2000 to 2000,
         aspectRatio = 1.0f
     )
@@ -145,7 +145,7 @@ fun validateCharacterPicture(pictureFile: File) {
     validatePicture(
         pictureFile = pictureFile,
         maxSizeBytes = 1 * 1024 * 1024,
-        minDimensionsPixels = 200 to 200,
+        minDimensionsPixels = 100 to 100,
         maxDimensionsPixels = 2000 to 2000,
         aspectRatio = 1.0f
     )

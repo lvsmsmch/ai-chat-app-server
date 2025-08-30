@@ -38,7 +38,7 @@ suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
         id = id,
         username = username,
         name = name,
-        profilePicUrl = profilePictureUrl
+        profilePicUrlThumbnail = profilePictureUrlThumbnail ?: profilePictureUrl
     )
 }
 
@@ -57,7 +57,8 @@ suspend fun UserDbo.toUserDetailsDto(
         followingCount = followingCount,
         totalChatsCount = if (demanderId == id) totalChatsCount else 0,
         totalMessagesCount = if (demanderId == id) totalMessagesCount else 0,
-        isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id)
+        isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id),
+        profilePicUrl = profilePictureUrl
     )
 }
 
@@ -99,11 +100,11 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
         name = name,
         category = category,
         tags = tags,
-        picUrl = picUrl,
         totalChats = totalChats,
         totalMessages = totalMessages,
         totalReviews = totalReviews,
         averageRating = averageRating,
+        picUrlThumbnail = picUrlThumbnail ?: picUrl,
     )
 }
 
@@ -123,6 +124,7 @@ suspend fun CharacterDbo.toCharacterDetailsDto(
     return CharacterDetailsDto(
         id = id,
         description = description,
+        picUrl = picUrl,
         isReviewed = isReviewed
     )
 }

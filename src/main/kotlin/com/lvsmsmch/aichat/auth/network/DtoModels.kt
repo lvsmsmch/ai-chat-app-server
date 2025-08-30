@@ -36,6 +36,11 @@ data class GoogleAuthRequest(
 )
 
 @Serializable
+data class GoogleConnectRequest(
+    @SerialName("googleToken") val googleToken: String
+)
+
+@Serializable
 data class GuestAuthRequest(
     @SerialName("deviceId") val deviceId: String
 )

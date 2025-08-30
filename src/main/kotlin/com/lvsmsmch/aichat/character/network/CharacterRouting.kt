@@ -110,7 +110,7 @@ fun Route.configureCharacterRouting(
                 throw BadRequestException("Maximum characters limit exceeded (100)")
             }
 
-            val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
+            val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
             val userId = sessionDbo.userId
 
@@ -120,7 +120,8 @@ fun Route.configureCharacterRouting(
                 name = name!!,
                 description = description!!,
                 prompt = prompt!!,
-                picUrl = pictureUrl,
+                picUrl = images?.originalUrl,
+                picUrlThumbnail = images?.thumbnailUrl,
                 visibility = visibility!!,
                 category = category!!,
                 tags = CharacterTag.fromString(tags!!).map { it.code },
@@ -372,6 +373,7 @@ fun Route.configureCharacterRouting(
             var visibility: Int? = null
             var category: String? = null
             var tags: String? = null
+            var removePicture: Boolean? = false
             var pictureFile: File? = null
 
             call.receiveMultipart().forEachPart { part ->
@@ -385,6 +387,7 @@ fun Route.configureCharacterRouting(
                             "visibility" -> visibility = part.value.toIntOrNull()
                             "category" -> category = part.value
                             "tags" -> tags = part.value
+                            "removePicture" -> removePicture = part.value.toBoolean()
                         }
                     }
 
@@ -422,7 +425,7 @@ fun Route.configureCharacterRouting(
             tags?.let { validateCharacterTags(it) }
             pictureFile?.let { validateCharacterPicture(it) }
 
-            val pictureUrl = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
+            val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
             val updatedCharacter = complexQueryHelper.updateCharacter(
                 characterId = characterId,
@@ -432,7 +435,9 @@ fun Route.configureCharacterRouting(
                 prompt = prompt,
                 initialMessage = initialMessage,
                 visibility = visibility,
-                pictureUrl = pictureUrl,
+                pictureUrl = images?.originalUrl,
+                pictureUrlThumbnail = images?.thumbnailUrl,
+                removePicture = removePicture,
                 category = category,
                 tags = tags,
                 oldName = character.name,

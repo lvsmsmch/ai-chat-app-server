@@ -212,6 +212,7 @@ fun Route.configureUserRouting(
             var name: String? = null
             var bio: String? = null
             var pictureFile: File? = null
+            var removePicture: Boolean? = false
 
             call.receiveMultipart().forEachPart { part ->
                 when (part) {
@@ -220,6 +221,7 @@ fun Route.configureUserRouting(
                             "username" -> username = part.value
                             "name" -> name = part.value
                             "bio" -> bio = part.value
+                            "removePicture" -> removePicture = part.value.toBoolean()
                         }
                     }
 
@@ -256,7 +258,7 @@ fun Route.configureUserRouting(
             bio?.let { validateUserBio(it) }
             pictureFile?.let { validateUserPicture(it) }
 
-            val profilePictureUrl = pictureFile?.let {
+            val images = pictureFile?.let {
                 ImageServer.uploadImageOnServer(it)
             }
 
@@ -265,7 +267,9 @@ fun Route.configureUserRouting(
                 username = username?.lowercase(),
                 name = name,
                 bio = bio,
-                profilePictureUrl = profilePictureUrl,
+                profilePictureUrl = images?.originalUrl,
+                profilePictureUrlThumbnail = images?.thumbnailUrl,
+                removePicture = removePicture
             )
 
             val updatedUser = userRepository.getUserById(userId)

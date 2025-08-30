@@ -12,6 +12,7 @@ data class UserDbo(
     val username: String,
     val name: String? = null,
     val profilePictureUrl: String? = null,
+    val profilePictureUrlThumbnail: String? = null,
     val email: String? = null,
     val bio: String? = null,
     val googleOauthId: String? = null,

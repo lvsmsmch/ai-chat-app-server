@@ -325,6 +325,8 @@ class CharacterRepository(
         initialMessage: String? = null,
         visibility: Int? = null,
         pictureUrl: String? = null,
+        pictureUrlThumbnail: String? = null,
+        removePicture: Boolean? = null,
         category: CharacterCategory? = null,
         tags: List<CharacterTag>? = null,
     ) {
@@ -336,6 +338,13 @@ class CharacterRepository(
         initialMessage?.let { updates.add(setValue(CharacterDbo::initialMessage, it)) }
         visibility?.let { updates.add(setValue(CharacterDbo::visibility, it)) }
         pictureUrl?.let { updates.add(setValue(CharacterDbo::picUrl, it)) }
+        pictureUrlThumbnail?.let { updates.add(setValue(CharacterDbo::picUrlThumbnail, it)) }
+        removePicture?.let {
+            if (it) {
+                updates.add(setValue(CharacterDbo::picUrl, null))
+                updates.add(setValue(CharacterDbo::picUrlThumbnail, null))
+            }
+        }
         category?.let { updates.add(setValue(CharacterDbo::category, it.code)) }
         tags?.let { updates.add(setValue(CharacterDbo::tags, it.map { tag -> tag.code })) }
 

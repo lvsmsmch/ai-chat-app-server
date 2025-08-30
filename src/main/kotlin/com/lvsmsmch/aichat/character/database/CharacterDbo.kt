@@ -15,6 +15,7 @@ data class CharacterDbo(
     val prompt: String,
     val initialMessage: String,
     val picUrl: String? = null,
+    val picUrlThumbnail: String? = null,
     val visibility: Int,
     val category: String,
     val tags: List<String>,

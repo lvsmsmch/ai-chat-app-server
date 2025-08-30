@@ -134,6 +134,8 @@ class ComplexQueryHelper(
         initialMessage: String?,
         visibility: Int?,
         pictureUrl: String?,
+        pictureUrlThumbnail: String?,
+        removePicture: Boolean?,
         category: String?,
         tags: String?,
         oldName: String,
@@ -149,6 +151,8 @@ class ComplexQueryHelper(
                 initialMessage = initialMessage,
                 visibility = visibility,
                 pictureUrl = pictureUrl,
+                pictureUrlThumbnail = pictureUrlThumbnail,
+                removePicture = removePicture,
                 category = category?.let { CharacterCategory.getByCode(it) },
                 tags = tags?.let { CharacterTag.fromString(tags) }
             )
@@ -162,7 +166,6 @@ class ComplexQueryHelper(
 //            }
 
             if (visibility != null && oldVisibility != visibility) {
-
                 chatRepository.deleteChatsForWhoIsNotAuthor(
                     session = session,
                     characterId = characterId,
@@ -222,8 +225,8 @@ class ComplexQueryHelper(
     suspend fun addUser(userDbo: UserDbo) {
         transactionHelper.withTransaction { session ->
             userRepository.addUser(session, userDbo)
-            val userInTransaction = userRepository.getUserById(session, "testUser001")
-            logger.info("User exists in transaction: ${userInTransaction != null}")
+//            val userInTransaction = userRepository.getUserById(session, "testUser001")
+//            logger.info("User exists in transaction: ${userInTransaction != null}")
         }
     }
 
@@ -233,6 +236,8 @@ class ComplexQueryHelper(
         name: String?,
         bio: String?,
         profilePictureUrl: String?,
+        profilePictureUrlThumbnail: String?,
+        removePicture: Boolean?,
     ) {
         transactionHelper.withTransaction { session ->
             userRepository.updateUser(
@@ -242,6 +247,8 @@ class ComplexQueryHelper(
                 name = name,
                 bio = bio,
                 profilePictureUrl = profilePictureUrl,
+                profilePictureUrlThumbnail = profilePictureUrlThumbnail,
+                removePicture = removePicture
             )
         }
     }
@@ -300,7 +307,7 @@ class ComplexQueryHelper(
     suspend fun addChat(chatDbo: ChatDbo) {
         transactionHelper.withTransaction { session ->
             chatRepository.insertChat(session, chatDbo)
-            userRepository.incrementChatCounters(session, chatDbo.userId)
+            userRepository.notifyChatWasCreated(session, chatDbo.userId)
             chatDbo.characterIds.forEach { characterId ->
 
                 if (chatDbo.isFirstChatWithThisCharacter) {
@@ -322,7 +329,7 @@ class ComplexQueryHelper(
             messageRepository.insertMessage(session, messageDbo)
             if (!messageDbo.isSentByUser) {
                 val chat = chatRepository.getChatById(session, messageDbo.chatId)!!
-                userRepository.incrementMessageCounters(session, chat.userId)
+                userRepository.notifyCharacterMessageWasSent(session, chat.userId)
                 characterActivityLogRepository.logActivity(
                     session = session,
                     activityType = ActivityType.MESSAGE_SENT,

@@ -84,7 +84,7 @@ data class BatchSyncRequest(
 @Serializable
 data class BatchSyncResponse(
     @SerialName("chatSyncResponses") val chatSyncResponses: List<ChatSyncResponse>,
-    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
+    @SerialName("limitsResponse") val limitsResponse: LimitsResponse
 )
 
 // ============= СОЗДАНИЕ ЧАТА =============
@@ -101,7 +101,7 @@ data class CreateChatRequest(
 data class CreateChatResponse(
     @SerialName("isSuccess") val isSuccess: Boolean,
     @SerialName("addInitMessageSuccess") val addInitMessageSuccess: Boolean,
-    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
+    @SerialName("limitsResponse") val limitsResponse: LimitsResponse,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
@@ -143,7 +143,7 @@ data class SendMessageRequest(
 @Serializable
 data class SendMessageResponse(
     @SerialName("isSuccess") val isSuccess: Boolean,
-    @SerialName("limitReachedSignal") val limitReachedSignal: LimitReachedSignal? = null,
+    @SerialName("limitsResponse") val limitsResponse: LimitsResponse,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
@@ -221,6 +221,23 @@ data class DeleteMessagesResponse(
 
 
 @Serializable
-data class LimitReachedSignal(
-    @SerialName("limitUntil") val limitUntil: String
+data class UserRewardedRequest(
+    @SerialName("rewarded") val rewarded: Boolean
+)
+
+@Serializable
+data class UserRewardedResponse(
+    @SerialName("limitsResponse") val limitsResponse: LimitsResponse
+)
+
+
+@Serializable
+data class LimitsResponse(
+    @SerialName("limitUntil") val limitUntil: String? = null,
+    @SerialName("hourlyUsed") val hourlyUsed: Int,
+    @SerialName("hourlyLimit") val hourlyLimit: Int,
+    @SerialName("dailyUsed") val dailyUsed: Int,
+    @SerialName("dailyLimit") val dailyLimit: Int,
+    @SerialName("extraLeft") val extraLeft: Int,
+    @SerialName("extraAmountForReward") val extraAmountForReward: Int
 )

@@ -15,7 +15,7 @@ data class CharacterDto(
     @SerialName("name") val name: String,
     @SerialName("category") val category: String,
     @SerialName("tags") val tags: List<String>,
-    @SerialName("picUrl") val picUrl: String? = null,
+    @SerialName("picUrlThumbnail") val picUrlThumbnail: String? = null,
     @SerialName("totalChats") val totalChats: Int,
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,
@@ -26,7 +26,8 @@ data class CharacterDto(
 data class CharacterDetailsDto(
     @SerialName("id") val id: String,
     @SerialName("description") val description: String,
-    @SerialName("isReviewed") val isReviewed: Boolean   // todo
+    @SerialName("isReviewed") val isReviewed: Boolean,
+    @SerialName("picUrl") val picUrl: String? = null,
 )
 
 @Serializable

@@ -18,6 +18,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.apache.commons.logging.Log
 
 fun Route.configureAuthRouting(
     userRepository: UserRepository,
@@ -38,47 +39,16 @@ fun Route.configureAuthRouting(
 
             validateDeviceId(request.deviceId)
 
-            val oauthUserData = HttpClient().use { client ->
-                val googleOauthTokenInfoUrl = System.getenv("GOOGLE_OAUTH_TOKEN_INFO_URL")
-                    ?: throw Exception("Missing GOOGLE_OAUTH_TOKEN_INFO_URL key")
-                val apiUrl = "$googleOauthTokenInfoUrl?id_token=${request.googleToken}"
-                val response = client.get(apiUrl)
-                if (response.status != HttpStatusCode.OK) {
-                    logger.error(
-                        "OAuth response error occurred, " +
-                                "status: ${response.status}, " +
-                                "body: ${response.bodyAsText()}"
-                    )
-                    throw OAuthException()
-                }
-                val responseBody = response.bodyAsText()
-                val json = Json.parseToJsonElement(responseBody).jsonObject
-                OAuthUserData(
-                    id = json["sub"]?.jsonPrimitive?.content
-                        ?: throw Exception("Google response missing 'sub' field"),
-                    email = json["email"]?.jsonPrimitive?.content,
-                    name = json["name"]?.jsonPrimitive?.content,
-                    profilePictureUrl = json["picture"]?.jsonPrimitive?.content
-                )
-            }
+            val oauthUserData = getOauthUserData(request.googleToken)
 
             val userDbo = userRepository.findByGoogleId(oauthUserData.id)
-                ?: userRepository.findByDeviceId(request.deviceId)?.let {
-                    userRepository.linkGoogleToUser(
-                        userId = it.id,
-                        googleId = oauthUserData.id,
-                        email = oauthUserData.email,
-                        name = oauthUserData.name,
-                        profilePictureUrl = oauthUserData.profilePictureUrl,
-                    )
-                    userRepository.getUserById(it.id)!!
-                } ?: UserDbo(
+                ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
                     username = usernameGenerator.generateUniqueUsername(),
                     googleOauthId = oauthUserData.id,
                     email = oauthUserData.email,
                     name = oauthUserData.name,
-                    profilePictureUrl = oauthUserData.profilePictureUrl,
+                    profilePictureUrl = null,
                     accountType = AccountType.REGISTERED
                 ).also {
                     complexQueryHelper.addUser(it)
@@ -92,7 +62,9 @@ fun Route.configureAuthRouting(
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
                     userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
-                )
+                ).also {
+                    logger.debug("Google login successful: ${it}")
+                }
             )
         }
 
@@ -105,7 +77,9 @@ fun Route.configureAuthRouting(
 
             validateDeviceId(request.deviceId)
 
-            val userDbo = userRepository.findByUsername("lvsm")
+            val userDbo =
+                null
+//                userRepository.findByUsername("lvsm")
                 ?: userRepository.findByDeviceId(request.deviceId)
                 ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
@@ -123,14 +97,16 @@ fun Route.configureAuthRouting(
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
                     userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
-                )
+                ).also {
+                    logger.debug("Guest login successful: ${it}")
+                }
             )
         }
 
 
         /**
          * POST /auth/subscription
-         * Авторизация как гость
+         * Уведомление что юзер подписался
          */
         post("/subscription") {
             val sessionDbo = sessionRepository.verifyToken(call)
@@ -140,6 +116,38 @@ fun Route.configureAuthRouting(
                 ?: throw BadRequestException("User does not exist")
 
             userRepository.updateSubscriptionStatus(userDbo.id, request.hasSubscription)
+
+            call.respondSuccess()
+        }
+
+        /**
+         * POST /auth/link-google
+         * Присоединить гугл
+         */
+        post("/link-google") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val request = call.receive<GoogleConnectRequest>()
+
+            val userDbo = userRepository.getUserById(sessionDbo.userId)
+                ?: throw BadRequestException("User does not exist")
+
+            val oauthUserData = getOauthUserData(request.googleToken)
+
+            logger.debug("Google link to user ${userDbo.id}")
+
+            val existingUser = userRepository.findByGoogleId(oauthUserData.id)
+            logger.debug("Existing user with google id: ${existingUser?.id}")
+            if (existingUser != null) {
+                throw GoogleAccountAlreadyInUseException()
+            }
+
+            userRepository.linkGoogleToUser(
+                userId = sessionDbo.userId,
+                googleId = oauthUserData.id,
+                email = oauthUserData.email,
+            )
+
+            logger.debug("Google linked to user ${userDbo.id}")
 
             call.respondSuccess()
         }
@@ -154,5 +162,32 @@ fun Route.configureAuthRouting(
             sessionRepository.delete(sessionDbo.token)
             call.respondSuccess()
         }
+    }
+}
+
+
+private suspend fun getOauthUserData(googleToken: String): OAuthUserData {
+    return HttpClient().use { client ->
+        val googleOauthTokenInfoUrl = System.getenv("GOOGLE_OAUTH_TOKEN_INFO_URL")
+            ?: throw Exception("Missing GOOGLE_OAUTH_TOKEN_INFO_URL key")
+        val apiUrl = "$googleOauthTokenInfoUrl?id_token=${googleToken}"
+        val response = client.get(apiUrl)
+        if (response.status != HttpStatusCode.OK) {
+            logger.error(
+                "OAuth response error occurred, " +
+                        "status: ${response.status}, " +
+                        "body: ${response.bodyAsText()}"
+            )
+            throw OAuthException()
+        }
+        val responseBody = response.bodyAsText()
+        val json = Json.parseToJsonElement(responseBody).jsonObject
+        OAuthUserData(
+            id = json["sub"]?.jsonPrimitive?.content
+                ?: throw Exception("Google response missing 'sub' field"),
+            email = json["email"]?.jsonPrimitive?.content,
+            name = json["name"]?.jsonPrimitive?.content,
+            profilePictureUrl = json["picture"]?.jsonPrimitive?.content
+        )
     }
 }

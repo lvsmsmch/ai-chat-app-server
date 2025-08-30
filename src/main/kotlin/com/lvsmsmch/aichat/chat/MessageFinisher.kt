@@ -51,7 +51,6 @@ class MessageFinisher(
                         participants = participants,
                         messagesHistory = messageHistory,
                         onMsgTextUpdate = {
-//                            logger.debug("finishMessageAsync onMsgTextUpdate, upd msg")
                             ensureActive()
                             messageRepository.updateMessage(
                                 messageId = messageId,

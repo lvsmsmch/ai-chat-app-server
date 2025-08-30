@@ -1,6 +1,6 @@
 package com.lvsmsmch.aichat.user.database
 
-import com.lvsmsmch.aichat.auth.network.SubscriptionStatusRequest
+import com.lvsmsmch.aichat.chat.network.LimitsResponse
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Updates
 import com.mongodb.reactivestreams.client.ClientSession
@@ -8,9 +8,6 @@ import kotlinx.coroutines.runBlocking
 import org.bson.conversions.Bson
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
-
-
-
 
 
 class UserRepository(
@@ -92,29 +89,40 @@ class UserRepository(
         ).toList()
     }
 
-    suspend fun getHasLimitUntil(userId: String): UtcTimestamp? {
-        logger.debug(">>> getHasLimitUntil $userId")
-        val user = getUserById(userId) ?: return null
+    suspend fun getLimits(userId: String): LimitsResponse {
+        logger.debug(">>> getLimits $userId")
+        val user = getUserById(userId) ?: throw UserNotFoundException()
 
         val dailyLimit = if (user.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
         val hourlyLimit = if (user.hasSubscription) HOURLY_LIMIT_MESSAGES_PREMIUM else HOURLY_LIMIT_MESSAGES_REGULAR
 
         val now = java.time.LocalDateTime.now()
 
-        logger.debug(">>> daily ${user.dailyMessageCount}/$dailyLimit")
-        logger.debug(">>> hourly ${user.hourlyMessageCount}/$hourlyLimit")
-
-        if (user.dailyMessageCount >= dailyLimit) {
+        val limitUntil = if (user.extraFreeMessagesCount > 0) {
+            null
+        } else if (user.dailyMessageCount >= dailyLimit) {
             val nextDay = now.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
-            return UtcTimestamp(nextDay.toInstant(java.time.ZoneOffset.UTC))
-        }
-
-        if (user.hourlyMessageCount >= hourlyLimit) {
+            UtcTimestamp(nextDay.toInstant(java.time.ZoneOffset.UTC)).toString()
+        } else if (user.hourlyMessageCount >= hourlyLimit) {
             val nextHour = now.plusHours(1).withMinute(0).withSecond(0).withNano(0)
-            return UtcTimestamp(nextHour.toInstant(java.time.ZoneOffset.UTC))
+            UtcTimestamp(nextHour.toInstant(java.time.ZoneOffset.UTC)).toString()
+        } else {
+            null
         }
 
-        return null
+        val limitsResponse = LimitsResponse(
+            limitUntil = limitUntil,
+            hourlyUsed = user.hourlyMessageCount,
+            hourlyLimit = hourlyLimit,
+            dailyUsed = user.dailyMessageCount,
+            dailyLimit = dailyLimit,
+            extraLeft = user.extraFreeMessagesCount,
+            extraAmountForReward = EXTRA_AMOUNT_FOR_REWARD
+        )
+
+        logger.debug("Limits: $limitsResponse")
+
+        return limitsResponse
     }
 
     /**
@@ -128,6 +136,8 @@ class UserRepository(
         name: String? = null,
         bio: String? = null,
         profilePictureUrl: String? = null,
+        profilePictureUrlThumbnail: String? = null,
+        removePicture: Boolean? = null,
         hashedPassword: String? = null,
     ) {
         collection.findOneById(userId) ?: return
@@ -137,7 +147,14 @@ class UserRepository(
         name?.let { updates.add(setValue(UserDbo::name, it)) }
         bio?.let { updates.add(setValue(UserDbo::bio, it)) }
         profilePictureUrl?.let { updates.add(setValue(UserDbo::profilePictureUrl, it)) }
+        profilePictureUrlThumbnail?.let { updates.add(setValue(UserDbo::profilePictureUrlThumbnail, it)) }
         hashedPassword?.let { updates.add(setValue(UserDbo::hashedPassword, it)) }
+        removePicture?.let {
+            if (it) {
+                updates.add(setValue(UserDbo::profilePictureUrl, null))
+                updates.add(setValue(UserDbo::profilePictureUrlThumbnail, null))
+            }
+        }
         if (updates.isEmpty()) return // Nothing to update
         collection.updateOneById(session, userId, combine(*updates.toTypedArray()))
     }
@@ -146,8 +163,6 @@ class UserRepository(
         userId: String,
         googleId: String,
         email: String? = null,
-        name: String? = null,
-        profilePictureUrl: String? = null,
     ) {
         collection.findOneById(userId) ?: return
         collection.updateOneById(
@@ -156,8 +171,6 @@ class UserRepository(
                 Updates.set(UserDbo::deviceId.name, null),
                 Updates.set(UserDbo::googleOauthId.name, googleId),
                 Updates.set(UserDbo::email.name, email),
-                Updates.set(UserDbo::name.name, name),
-                Updates.set(UserDbo::profilePictureUrl.name, profilePictureUrl),
             )
         )
     }
@@ -232,23 +245,36 @@ class UserRepository(
         )
     }
 
-    suspend fun incrementMessageCounters(session: ClientSession, userId: String) {
-        logger.debug("incrementMessageCounters for ${userId}")
+    suspend fun notifyCharacterMessageWasSent(session: ClientSession, userId: String) {
+        logger.debug("> incrementMessageCounters for ${userId}")
+        logger.debug("before, extra count for ${userId} : ${getUserById(userId)?.extraFreeMessagesCount}")
         logger.debug("before, hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
+
+        val userDbo = getUserById(session, userId) ?: return
+        val messagesUpdateBson = if (userDbo.extraFreeMessagesCount > 0) {
+            inc(UserDbo::extraFreeMessagesCount, -1)
+        } else {
+            combine(
+                inc(UserDbo::hourlyMessageCount, 1),
+                inc(UserDbo::dailyMessageCount, 1),
+            )
+        }
+
         collection.updateOneById(
             session,
             userId,
             combine(
-                inc(UserDbo::hourlyMessageCount, 1),
-                inc(UserDbo::dailyMessageCount, 1),
+                messagesUpdateBson,
                 inc(UserDbo::totalMessagesCount, 1),
                 setValue(UserDbo::lastActiveAt, UtcTimestamp.now().toString())
             )
         )
+
+        logger.debug("after, extra count for ${userId} : ${getUserById(userId)?.extraFreeMessagesCount}")
         logger.debug("after,  hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
     }
 
-    suspend fun incrementChatCounters(session: ClientSession, userId: String) {
+    suspend fun notifyChatWasCreated(session: ClientSession, userId: String) {
         logger.debug("incrementChatCounters by 1")
         collection.updateOneById(
             session,
@@ -260,6 +286,14 @@ class UserRepository(
         )
     }
 
+    suspend fun addUserLimitsAfterRewardedWasWatched(userId: String) {
+        collection.updateOneById(
+            userId,
+            combine(
+                inc(UserDbo::extraFreeMessagesCount, EXTRA_AMOUNT_FOR_REWARD)
+            )
+        )
+    }
 
 
     /**
@@ -276,5 +310,6 @@ class UserRepository(
         const val HOURLY_LIMIT_MESSAGES_REGULAR = 30
         const val DAILY_LIMIT_MESSAGES_PREMIUM = 200
         const val HOURLY_LIMIT_MESSAGES_PREMIUM = 100
+        const val EXTRA_AMOUNT_FOR_REWARD = 15
     }
 }

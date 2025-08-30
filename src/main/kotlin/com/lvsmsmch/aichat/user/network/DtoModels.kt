@@ -11,7 +11,7 @@ data class UserDto(
     @SerialName("id") val id: String,
     @SerialName("username") val username: String,
     @SerialName("name") val name: String? = null,
-    @SerialName("profilePicUrl") val profilePicUrl: String? = null
+    @SerialName("profilePicUrlThumbnail") val profilePicUrlThumbnail: String? = null
 )
 
 @Serializable
@@ -27,6 +27,7 @@ data class UserDetailsDto(
     @SerialName("totalChatsCount") val totalChatsCount: Int = 0,
     @SerialName("totalMessagesCount") val totalMessagesCount: Int = 0,
     @SerialName("isFollowing") val isFollowing: Boolean = false,
+    @SerialName("profilePicUrl") val profilePicUrl: String? = null
 )
 
 @Serializable

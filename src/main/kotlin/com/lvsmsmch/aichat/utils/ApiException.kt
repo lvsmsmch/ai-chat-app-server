@@ -114,6 +114,14 @@ class AlreadyReviewedException(
     errorMessage = errorMessage
 )
 
+class GoogleAccountAlreadyInUseException(
+    errorMessage: String = "This google account is already connected to another account."
+) : ApiException(
+    httpStatus = HttpStatusCode.Conflict,
+    errorCode = "already_google_connected",
+    errorMessage = errorMessage
+)
+
 // Uncategorized errors
 class InternalServerErrorException(
     errorMessage: String = "An unexpected error occurred"
