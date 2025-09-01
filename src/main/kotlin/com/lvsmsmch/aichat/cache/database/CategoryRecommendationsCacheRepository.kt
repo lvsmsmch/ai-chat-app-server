@@ -49,6 +49,7 @@ class CategoryRecommendationsCacheRepository(
 
 
     suspend fun getCategoriesNeedingUpdate(ttlHours: Long = 3): List<CharacterCategory> {
+        return CharacterCategory.entries.toList()
         val now = UtcTimestamp.now()
         val cutoff = now.subtractHours(ttlHours)
         

@@ -80,11 +80,13 @@ class CacheManager(
         listType: CacheListType,
         size: Int
     ): CachedCharactersResult {
-        if (!doesCopyExist(userId, deviceId, listType) || doesNewerVersionExist(userId, deviceId, listType)) {
-            updateCopyWithFreshList(userId, deviceId, listType)
-        } else {
-            moveViewedToEnd(userId, deviceId, listType)
-        }
+        updateCopyWithFreshList(userId, deviceId, listType)
+
+//        if (!doesCopyExist(userId, deviceId, listType) || doesNewerVersionExist(userId, deviceId, listType)) {
+//            updateCopyWithFreshList(userId, deviceId, listType)
+//        } else {
+//            moveViewedToEnd(userId, deviceId, listType)
+//        }
         return takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
     }
 

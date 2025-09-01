@@ -257,7 +257,7 @@ fun Route.configureChatRouting(
             // Обновляем чат
             chatRepository.updateChat(
                 chatId = chat.id,
-                customName = request.customName
+                customName = request.customName?.takeIf { it.isNotBlank() }
             )
 
             val updatedChat = chatRepository.getChatById(chat.id)!!

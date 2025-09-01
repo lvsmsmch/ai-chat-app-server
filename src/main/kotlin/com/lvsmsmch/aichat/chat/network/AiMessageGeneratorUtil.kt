@@ -198,6 +198,7 @@ object AiMessageGeneratorUtil {
 
                         logger.debug("Response status: ${response.status}")
                         logger.debug("Response headers: ${response.headers}")
+                        logger.debug("Response body: ${response.bodyAsText()}")
 
 //                        processStreamingResponse(response, onMsgTextUpdate, onFinished)
 
@@ -328,7 +329,7 @@ object AiMessageGeneratorUtil {
 //            put("frequency_penalty", 0.3)
 //            put("presence_penalty", 0.3)
             put("stream", stream)
-            put("tool_choice", "auto")
+//            put("tool_choice", "auto")
         }
     }
 
@@ -344,7 +345,9 @@ object AiMessageGeneratorUtil {
         val choices = jsonResponse["choices"]?.jsonArray
         val content = choices?.get(0)?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.content
 
-        return content ?: throw Exception("No content in response")
+        if (content == "")  throw Exception("Empty content in response")
+
+        return content ?: throw Exception("Null content in response")
     }
 
     /**

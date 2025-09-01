@@ -10,7 +10,7 @@ fun configureCategoryRecommendationsUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     categoryRecommendationsCacheRepository: CategoryRecommendationsCacheRepository,
-    updateIntervalMinutes: Long = 180 // каждые 3 часа
+    updateIntervalMinutes: Long
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)

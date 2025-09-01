@@ -19,8 +19,11 @@ fun fillInitialData(
     usernameGenerator: UsernameGenerator,
     complexQueryHelper: ComplexQueryHelper
 ): Job {
+
     val parentJob = SupervisorJob()
     val scope = CoroutineScope(databaseScope.coroutineContext + parentJob)
+
+    return parentJob    // dont fill
 
     scope.launch {
         try {

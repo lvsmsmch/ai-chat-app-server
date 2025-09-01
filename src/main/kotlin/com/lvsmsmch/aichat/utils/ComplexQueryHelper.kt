@@ -330,6 +330,7 @@ class ComplexQueryHelper(
             if (!messageDbo.isSentByUser) {
                 val chat = chatRepository.getChatById(session, messageDbo.chatId)!!
                 userRepository.notifyCharacterMessageWasSent(session, chat.userId)
+                characterRepository.incrementMessagesCount(session, messageDbo.senderId, 1)
                 characterActivityLogRepository.logActivity(
                     session = session,
                     activityType = ActivityType.MESSAGE_SENT,

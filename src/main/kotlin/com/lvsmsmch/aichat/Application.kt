@@ -226,7 +226,7 @@ fun Application.module() {
         databaseScope = databaseScope,
         characterRepository = characterRepository,
         categoryRecommendationsCacheRepository = categoryRecommendationsCacheRepository,
-        updateIntervalMinutes = 180 // каждые 3 часа
+        updateIntervalMinutes = 5 // каждые 3 часа
     )
 
     val defaultPersonalizedUpdaterJob = configureDefaultRecommendationsUpdater(
