@@ -43,6 +43,15 @@ object AiMessageGeneratorUtil {
     private val useOpenAi
         get() = (System.getenv("USE_OPEN_AI") ?: throw Exception("Missing USE_OPEN_AI key")).toBoolean()
 
+    private val geminiApiUrl
+        get() = System.getenv("GEMINI_API_URL") ?: "https://generativelanguage.googleapis.com/v1beta/models"
+    private val geminiApiKey
+        get() = System.getenv("GEMINI_API_KEY") ?: throw Exception("Missing GEMINI_API_KEY key")
+    private val geminiModel
+        get() = System.getenv("GEMINI_MODEL") ?: "gemini-1.5-flash"
+    private val useGemini
+        get() = (System.getenv("USE_GEMINI") ?: throw Exception("Missing USE_GEMINI key")).toBoolean()
+
     private val temperature
         get() = (System.getenv("AI_TEMPERATURE") ?: throw Exception("Missing AI_TEMPERATURE key")).toFloat()
     private val aiPrompt
@@ -56,100 +65,6 @@ object AiMessageGeneratorUtil {
             json(defaultJson)
         }
     }
-
-//    private suspend fun testModels() {
-//        measureTimeMillis {
-//            httpClient.post(openAiApiUrl) {
-//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-//                header(HttpHeaders.Accept, "text/event-stream")
-//                contentType(ContentType.Application.Json)
-//                setBody(
-//                    buildJsonObject {
-//                        put("model", "gpt-3.5-turbo-0613")
-//                        putJsonArray("messages") {
-//                            addJsonObject {
-//                                put("role", "user")
-//                                put("content", "hi")
-//                            }
-//                        }
-//                        put("max_completion_tokens", 1000)
-//                        put("stream", true)
-//                    }
-//                )
-//            }
-//        }.also {
-//            logger.debug("# Measure time for gpt-3.5-turbo-0613: $it ms")
-//        }
-//
-//        measureTimeMillis {
-//            httpClient.post(openAiApiUrl) {
-//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-//                header(HttpHeaders.Accept, "text/event-stream")
-//                contentType(ContentType.Application.Json)
-//                setBody(
-//                    buildJsonObject {
-//                        put("model", "gpt-5-nano")
-//                        putJsonArray("messages") {
-//                            addJsonObject {
-//                                put("role", "user")
-//                                put("content", "hi")
-//                            }
-//                        }
-//                        put("max_completion_tokens", 1000)
-//                        put("stream", true)
-//                    }
-//                )
-//            }
-//        }.also {
-//            logger.debug("# Measure time for gpt-5-nano: $it ms")
-//        }
-//
-//        measureTimeMillis {
-//            httpClient.post(openAiApiUrl) {
-//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-//                header(HttpHeaders.Accept, "text/event-stream")
-//                contentType(ContentType.Application.Json)
-//                setBody(
-//                    buildJsonObject {
-//                        put("model", "gpt-4o-mini")
-//                        putJsonArray("messages") {
-//                            addJsonObject {
-//                                put("role", "user")
-//                                put("content", "hi")
-//                            }
-//                        }
-//                        put("max_completion_tokens", 1000)
-//                        put("stream", true)
-//                    }
-//                )
-//            }
-//        }.also {
-//            logger.debug("# Measure time for gpt-4o-mini: $it ms")
-//        }
-//
-//        measureTimeMillis {
-//            httpClient.post(openAiApiUrl) {
-//                header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
-//                header(HttpHeaders.Accept, "text/event-stream")
-//                contentType(ContentType.Application.Json)
-//                setBody(
-//                    buildJsonObject {
-//                        put("model", "gpt-3.5-turbo")
-//                        putJsonArray("messages") {
-//                            addJsonObject {
-//                                put("role", "user")
-//                                put("content", "hi")
-//                            }
-//                        }
-//                        put("max_completion_tokens", 1000)
-//                        put("stream", true)
-//                    }
-//                )
-//            }
-//        }.also {
-//            logger.debug("# Measure time for gpt-3.5-turbo: $it ms")
-//        }
-//    }
 
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
@@ -223,6 +138,24 @@ object AiMessageGeneratorUtil {
                         throw Exception("Failed to generate after $maxRetries attempts with error: $it")
                     }
                 }
+            } else if (useGemini) {
+                val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
+                val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo)
+
+                logger.debug("Sending request to Gemini API")
+                logger.debug("Request body: ${Json.encodeToString(requestBody)}")
+
+                val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
+                    contentType(ContentType.Application.Json)
+                    setBody(requestBody)
+                }
+
+                logger.debug("Response status: ${response.status}")
+                logger.debug("Response headers: ${response.headers}")
+                logger.debug("Response body: ${response.bodyAsText()}")
+
+                val fullMessage = processGeminiResponse(response, characterDbo)
+                simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
@@ -345,7 +278,7 @@ object AiMessageGeneratorUtil {
         val choices = jsonResponse["choices"]?.jsonArray
         val content = choices?.get(0)?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.content
 
-        if (content == "")  throw Exception("Empty content in response")
+        if (content == "") throw Exception("Empty content in response")
 
         return content ?: throw Exception("Null content in response")
     }
@@ -415,6 +348,132 @@ object AiMessageGeneratorUtil {
         }
 
         onFinished(fullMessage.toString())
+    }
+
+
+    /**
+     * Строим историю сообщений для Gemini API
+     */
+    private fun buildGeminiMessageHistory(
+        chatDbo: ChatDbo,
+        characterDbo: CharacterDbo,
+        participants: List<CharacterDbo>,
+        messagesHistory: List<MessageDbo>,
+        maxCharacters: Int = 1000
+    ): List<Map<String, Any>> {
+        // Берем сообщения с конца до достижения лимита
+        val selectedMessages = mutableListOf<MessageDbo>()
+        var currentCharacterCount = 0
+
+        for (message in messagesHistory.reversed()) {
+            if (message.text.isBlank()) continue
+
+            val messageLength = message.text.length
+            if (currentCharacterCount + messageLength > maxCharacters) {
+                break
+            }
+
+            selectedMessages.add(message)
+            currentCharacterCount += messageLength
+        }
+
+        val isGroupChat = chatDbo.characterIds.size > 1
+
+        // Переворачиваем обратно (от старых к новым)
+        val history = selectedMessages.reversed().map { message ->
+            val role = if (message.isSentByUser) "user" else "model"
+            val content = if (!message.isSentByUser && isGroupChat) {
+                val senderName = participants.find { it.id == message.senderId }?.name ?: "Unknown"
+                message.text.addCharacterName(senderName)
+            } else {
+                message.text
+            }
+
+            mapOf(
+                "role" to role,
+                "parts" to listOf(mapOf("text" to content))
+            )
+        }
+
+        val nextMessageForGroupChat = mapOf(
+            "role" to "user",
+            "parts" to listOf(mapOf("text" to "Continue dialog for [${characterDbo.name}], send next message."))
+        )
+
+        return if (isGroupChat) {
+            history + nextMessageForGroupChat
+        } else {
+            history
+        }
+    }
+
+    /**
+     * Строим тело запроса для Gemini
+     */
+    private fun buildGeminiRequestBody(
+        messages: List<Map<String, Any>>,
+        chatDbo: ChatDbo,
+        characterDbo: CharacterDbo
+    ): JsonObject {
+        val systemPrompt = buildSystemPrompt(chatDbo, characterDbo)
+
+        return buildJsonObject {
+            putJsonObject("systemInstruction") {
+                putJsonArray("parts") {
+                    addJsonObject {
+                        put("text", systemPrompt)
+                    }
+                }
+            }
+            putJsonArray("contents") {
+                messages.forEach { message ->
+                    addJsonObject {
+                        put("role", message["role"] as String)
+                        putJsonArray("parts") {
+                            (message["parts"] as List<Map<String, String>>).forEach { part ->
+                                addJsonObject {
+                                    put("text", part["text"]!!)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            putJsonObject("generationConfig") {
+                put("temperature", temperature)
+                put("maxOutputTokens", 1000)
+            }
+        }
+    }
+
+    /**
+     * Обрабатываем ответ от Gemini
+     */
+    private suspend fun processGeminiResponse(response: HttpResponse, characterDbo: CharacterDbo): String {
+        if (response.status != HttpStatusCode.OK) {
+            val errorBody = response.bodyAsText()
+            logger.error("Gemini API error: ${response.status}, body: $errorBody")
+            throw Exception("Gemini API error: ${response.status} - $errorBody")
+        }
+
+        val responseBody = response.bodyAsText()
+        logger.debug("Gemini response: $responseBody")
+
+        val jsonResponse = Json.parseToJsonElement(responseBody).jsonObject
+        val candidates = jsonResponse["candidates"]?.jsonArray
+        val content = candidates?.get(0)?.jsonObject
+            ?.get("content")?.jsonObject
+            ?.get("parts")?.jsonArray
+            ?.get(0)?.jsonObject
+            ?.get("text")?.jsonPrimitive?.content
+
+        if (content.isNullOrBlank()) {
+            throw Exception("Empty or null content in Gemini response")
+        }
+
+        return content
+            .removeBracketContent()
+            .replace("\n", "")
     }
 
     /**
@@ -553,5 +612,13 @@ object AiMessageGeneratorUtil {
             return substring(prefix.length)
         }
         return this
+    }
+
+    fun String.removeBracketContent(): String {
+        return this.replace(Regex("\\[.*?\\]"), "")
+    }
+
+    fun String.addCharacterName(characterName: String): String {
+        return "[$characterName] $this"
     }
 }

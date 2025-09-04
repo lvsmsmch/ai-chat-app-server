@@ -106,8 +106,8 @@ fun Route.configureCharacterRouting(
                 userId = sessionDbo.userId, includePrivate = true
             ).size
 
-            if (existingCharactersCount > 100) {
-                throw BadRequestException("Maximum characters limit exceeded (100)")
+            if (existingCharactersCount > 500) {
+                throw BadRequestException("Maximum characters limit exceeded (500)")
             }
 
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
