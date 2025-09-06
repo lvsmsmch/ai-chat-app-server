@@ -98,12 +98,14 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
         author = mapper.userRepository.getUserById(authorId)!!.toUserDto(mapper),
         visibility = visibility,
         name = name,
+        description = description,
         category = category,
         tags = tags,
         totalChats = totalChats,
         totalMessages = totalMessages,
         totalReviews = totalReviews,
         averageRating = averageRating,
+        picUrl = picUrl,
         picUrlThumbnail = picUrlThumbnail ?: picUrl,
     )
 }
@@ -123,8 +125,6 @@ suspend fun CharacterDbo.toCharacterDetailsDto(
     val isReviewed = mapper.reviewRepository.getReview(demanderId, id) != null
     return CharacterDetailsDto(
         id = id,
-        description = description,
-        picUrl = picUrl,
         isReviewed = isReviewed
     )
 }
