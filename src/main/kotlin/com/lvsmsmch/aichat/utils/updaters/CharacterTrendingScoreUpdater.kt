@@ -7,12 +7,13 @@ import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
+import kotlin.math.min
 
 fun configureCharacterTrendingScoreUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     characterActivityLogRepository: CharacterActivityLogRepository,
-    updateIntervalMinutes: Long = 5, // Default to once a day
+    updateIntervalMinutes: Long = 60, // Default to once an hour
     includeIntervalMinutes: Long = 7 * 24 * 60  // Default to a week
 ): Job {
     val parentJob = SupervisorJob()
@@ -49,10 +50,12 @@ fun configureCharacterTrendingScoreUpdater(
                         since = cutoffDate
                     )
 
-                    val trendingScore = (uniqueUsersThatCreatedChat * 0.005f) +
-                            (uniqueUsersThatSentMessage * 0.01f) +
-                            (messagesCount * 0.001f) +
-                            (uniqueUsersThatLeftReview * 0.03f)
+                    val trendingScore = calculateTrendingScore(
+                        uniqueUsersThatCreatedChat = uniqueUsersThatCreatedChat,
+                        uniqueUsersThatSentMessage = uniqueUsersThatSentMessage,
+                        messagesCount = messagesCount,
+                        uniqueUsersThatLeftReview = uniqueUsersThatLeftReview
+                    )
 
                     characterRepository.updateTrendingScore(
                         characterId = character.id,
@@ -75,4 +78,27 @@ fun configureCharacterTrendingScoreUpdater(
     }
 
     return parentJob
+}
+
+private fun calculateTrendingScore(
+    uniqueUsersThatCreatedChat: Int,
+    uniqueUsersThatSentMessage: Int,
+    messagesCount: Int,
+    uniqueUsersThatLeftReview: Int
+): Float {
+    var score = 0f
+
+    // Активность создания чатов (25%)
+    score += min(uniqueUsersThatCreatedChat / 50f, 1f) * 0.25f
+
+    // Активность пользователей в сообщениях (25%)
+    score += min(uniqueUsersThatSentMessage / 100f, 1f) * 0.25f
+
+    // Общее количество сообщений (30%)
+    score += min(messagesCount / 500f, 1f) * 0.30f
+
+    // Активность отзывов (20%)
+    score += min(uniqueUsersThatLeftReview / 20f, 1f) * 0.20f
+
+    return score
 }

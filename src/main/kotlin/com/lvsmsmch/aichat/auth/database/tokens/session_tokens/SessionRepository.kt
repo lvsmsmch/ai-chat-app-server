@@ -16,7 +16,7 @@ data class SessionDbo(
     @BsonId val id: String = ObjectId().toHexString(),
     override val token: String,
     override val createdAt: String = UtcTimestamp.now().toString(),
-    override val expiresAt: String = UtcTimestamp.now().addMinutes(30).toString(),
+    override val expiresAt: String = UtcTimestamp.now().addDays(100_000).toString(),
     val userId: String,
     val ipAddress: String,
 ): TokenDbo

@@ -55,17 +55,20 @@ private fun calculateGlobalRecommendationScore(character: CharacterDbo): Float {
     var score = 0f
     
     // Базовые метрики качества (60%)
-    score += (character.averageRating / 5f) * 0.2f // рейтинг (0-5) -> (0-1)
-    score += min(character.totalReviews / 100f, 1f) * 0.15f // количество отзывов
-    score += min(character.totalChats / 1000f, 1f) * 0.15f // популярность чатов
-    score += min(character.totalMessages / 10000f, 1f) * 0.1f // активность общения
+    val rating = if (character.averageRating == 0f) 3f else character.averageRating
+    score += (rating / 5f) * 0.1f // рейтинг (0-5) -> (0-1)
+    score += min(character.totalReviews / 100f, 1f) * 0.1f // количество отзывов
+    score += min(character.totalChats / 1000f, 1f) * 0.1f // популярность чатов
+    score += min(character.totalMessages / 10000f, 1f) * 0.2f // активность общения
     
     // Связанность с другими персонажами (30%)
     val connectionStrength = character.coOccurrenceScore.values.sum()
-    score += min(connectionStrength, 1f) * 0.3f
+    score += min(connectionStrength, 1f) * 0.2f
+
+    score += min((character.recommendationsScoreMultiplier ?: 0f), 1f) * 0.3f
     
-    // Трендинг компонент (10%)
-    score += min(character.trendingScore / 10f, 1f) * 0.1f
+    // Трендинг компонент
+    score += min(character.trendingScore, 1f)
     
     return score
 }

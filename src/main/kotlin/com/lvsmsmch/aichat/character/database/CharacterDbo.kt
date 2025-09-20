@@ -27,6 +27,7 @@ data class CharacterDbo(
     val trendingScoreUpdatedAt: String? = null,
     val recommendationScore: Float = 0f,
     val recommendationScoreUpdatedAt: String? = null,
+    val recommendationsScoreMultiplier: Float? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
-    val coOccurrenceScoreUpdatedAt: String? = null
+    val coOccurrenceScoreUpdatedAt: String? = null,
 )

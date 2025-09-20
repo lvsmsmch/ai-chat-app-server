@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.utils
 
+import com.lvsmsmch.aichat.character.database.CharacterDbo
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
@@ -9,10 +10,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.litote.kmongo.coroutine.CoroutineCollection
-import org.litote.kmongo.coroutine.CoroutineDatabase
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
@@ -92,38 +91,10 @@ fun generateHash(hashSize: Int, vararg values: String): String {
         .take(hashSize)
 }
 
-
-//fun Application.logStructuredError(
-//    call: ApplicationCall,
-//    errorCode: String,
-//    statusCode: Int,
-//    message: String,
-//    userId: String? = null,
-//    exception: Throwable? = null
-//) {
-//    data class ErrorLogEntry(
-//        val errorCode: String,
-//        val statusCode: Int,
-//        val uri: String,
-//        val method: String,
-//        val message: String,
-//        val correlationId: String? = null,
-//        val userId: String? = null,
-//        val stackTrace: String? = null
-//    )
-//
-//    val entry = ErrorLogEntry(
-//        errorCode = errorCode,
-//        statusCode = statusCode,
-//        uri = call.request.path(),
-//        method = call.request.httpMethod.value,
-//        message = message,
-//        correlationId = call.request.header("X-Correlation-ID"),
-//        userId = userId,
-//        stackTrace = exception?.stackTraceToString()
-//    )
-//
-//    logger.error(Json.encodeToString(entry))
-//}
-
 val logger: Logger get() = LoggerFactory.getLogger("default")
+
+fun List<CharacterDbo>.getRecommendations(): List<String> {
+    return this.sortedByDescending { (it.trendingScore * 0.4f) + (it.recommendationScore * 0.3f) }
+        .take(1000)
+        .map { it.id }
+}

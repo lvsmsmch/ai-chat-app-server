@@ -6,7 +6,6 @@ enum class CharacterCategory(val code: String) {
     GAMES("games"),
     BOOKS_COMICS("books_comics"),
     FANTASY("fantasy"),
-    SCI_FI("sci_fi"),
     HISTORICAL("historical"),
     MODERN("modern"),
     ORIGINAL("original"),

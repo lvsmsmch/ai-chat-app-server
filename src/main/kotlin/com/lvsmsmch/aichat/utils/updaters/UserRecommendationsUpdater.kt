@@ -10,6 +10,7 @@ import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.cache.database.UserRecommendationsCacheRepository
 import com.lvsmsmch.aichat.user.database.UserDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
+import com.lvsmsmch.aichat.utils.getRecommendations
 import com.lvsmsmch.aichat.utils.logger
 
 fun configureUserRecommendationsUpdater(
@@ -110,10 +111,7 @@ private suspend fun generateBaseRecommendationsForUser(
 
     return if (userCharacterIds.isEmpty()) {
         // Новый пользователь
-        availableCharacters
-            .sortedByDescending { it.recommendationScore }
-            .take(1000)
-            .map { it.id }
+        availableCharacters.getRecommendations()
     } else {
         // Персонализированные рекомендации
         val userCharacters = userCharacterIds.mapNotNull { charactersById[it] }

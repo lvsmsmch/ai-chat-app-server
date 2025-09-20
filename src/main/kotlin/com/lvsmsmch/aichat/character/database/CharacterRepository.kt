@@ -129,17 +129,6 @@ class CharacterRepository(
     }
 
 
-    suspend fun getTopCharactersByRecommendationScore(limit: Int): List<String> {
-        return collection.find(
-            and(
-                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-            )
-        ).sort(descending(CharacterDbo::recommendationScore))
-            .limit(limit)
-            .toList()
-            .map { it.id }
-    }
-
     private suspend fun getCharactersByIds(characterIds: List<String>): List<CharacterDbo> {
         val filters = and(
             CharacterDbo::id `in` characterIds,
@@ -251,45 +240,6 @@ class CharacterRepository(
             )
         }
     }
-
-    suspend fun countCharactersByUserId(
-        userId: String,
-        visibility: CharacterVisibility
-    ): Int {
-        val filters = and(
-            CharacterDbo::authorId eq userId,
-            CharacterDbo::visibility eq visibility.code,
-        )
-
-        return collection.countDocuments(filters).toInt()
-    }
-
-    private suspend fun calculatePersonalizedScore(
-        character: CharacterDbo,
-        userCharacterIds: List<String>
-    ): Float {
-        var score = character.recommendationScore * 0.3f // базовый recommendation score
-
-        // Content-based similarity (категория + теги)
-        userCharacterIds.forEach { userCharId ->
-            val userChar = getCharacter(userCharId)
-            userChar?.let {
-                if (it.category == character.category) score += 0.2f
-                val commonTags = it.tags.intersect(character.tags.toSet()).size
-                score += commonTags * 0.1f
-            }
-        }
-
-        // Collaborative filtering
-        character.coOccurrenceScore.forEach { (charId, coScore) ->
-            if (charId in userCharacterIds) {
-                score += coScore * 0.4f
-            }
-        }
-
-        return score / maxOf(userCharacterIds.size, 1)
-    }
-
 
     suspend fun getAllPublicCharactersForCategory(category: CharacterCategory): List<CharacterDbo> {
         return collection.find(

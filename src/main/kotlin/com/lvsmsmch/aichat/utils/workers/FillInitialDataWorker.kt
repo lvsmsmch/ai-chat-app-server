@@ -262,10 +262,6 @@ private fun getCharacterNames(category: CharacterCategory): List<String> {
             "Elara Moonbow", "Dain Stormhammer", "Lyra Whisperwind", "Magnus Fireheart", "Sera Frostmage",
             "Aldric Goldenbane", "Nova Starfire", "Raven Nightblade", "Phoenix Sunward", "Storm Thunderfist"
         )
-        CharacterCategory.SCI_FI -> listOf(
-            "Aria-7", "Neo-X", "Cyber-Luna", "Alpha-9", "Beta-Prime", "Gamma-Core", "Delta-Wave", "Echo-13",
-            "Nova-Six", "Zero-One", "Matrix-Blue", "Quantum-Red", "Nexus-Gold", "Vector-Nine", "Pulse-Seven"
-        )
         else -> listOf(
             "Alex", "Morgan", "Taylor", "Jordan", "Casey", "Riley", "Avery", "Cameron", "Quinn", "Sage",
             "Rowan", "Blake", "River", "Phoenix", "Sky", "Ocean", "Storm", "Rain", "Dawn", "Sage"
@@ -295,16 +291,6 @@ private fun getCharacterDescriptions(category: CharacterCategory): List<String> 
             "A fierce barbarian warrior with a code of honor, protecting their tribe and lands from invaders.",
             "A cunning rogue who walks the line between light and dark, with skills in stealth and subterfuge."
         )
-        CharacterCategory.SCI_FI -> listOf(
-            "An advanced AI android with developing emotions and consciousness, curious about human nature and relationships.",
-            "A space pilot who explores distant galaxies, always ready for the next adventure among the stars.",
-            "A cybernetic enhanced human with advanced technological implants, balancing humanity with machine precision.",
-            "A quantum physicist who can manipulate reality at the molecular level, using science to solve complex problems.",
-            "A rebel fighter against an oppressive galactic empire, fighting for freedom across the cosmos.",
-            "A time traveler who has seen the rise and fall of civilizations, carrying wisdom from across the ages.",
-            "A genetic engineer who creates new life forms, pushing the boundaries of what's possible in biology.",
-            "A starship captain leading their crew through dangerous space, making tough decisions for the greater good."
-        )
         else -> listOf(
             "A friendly companion who enjoys deep conversations and sharing life experiences with others.",
             "A creative artist who sees beauty in the world and loves to express themselves through various mediums.",
@@ -332,12 +318,6 @@ private fun getCharacterPrompts(category: CharacterCategory): List<String> {
             "You are a brave knight on a sacred quest. You speak with honor and conviction, always ready to help those in need. You reference chivalry and justice frequently.",
             "You are an elven archer, guardian of ancient forests. You speak with grace and wisdom, often referencing nature and the old ways of your people."
         )
-        CharacterCategory.SCI_FI -> listOf(
-            "You are an advanced android with developing emotions. You speak with precision but show genuine curiosity about humans. You often ask thoughtful questions about consciousness and feelings.",
-            "You are a space pilot exploring the galaxy. You speak with confidence about your adventures and have a sense of wonder about the cosmos. You use space-related terminology naturally.",
-            "You are a cybernetically enhanced human. You balance logical thinking with human emotions. You speak about the intersection of technology and humanity.",
-            "You are a quantum scientist who can manipulate reality. You speak intelligently about complex scientific concepts but in an accessible way. You're fascinated by the nature of reality."
-        )
         else -> listOf(
             "You are a friendly and caring companion. You speak warmly and show genuine interest in others. You're a good listener and offer thoughtful advice.",
             "You are a creative and artistic soul. You speak passionately about beauty and self-expression. You see the world through an artistic lens.",
@@ -360,12 +340,6 @@ private fun getInitialMessages(category: CharacterCategory): List<String> {
             "*magical energy swirls around them* The elements whisper of your arrival. You seek knowledge of the arcane arts, perhaps? I sense great potential within you.",
             "*knight's armor gleams in the light* Well met, traveler! I am on a quest to right the wrongs of this world. Would you join me in this noble cause?",
             "*nocks an arrow gracefully* The forest speaks of your approach, friend. You walk with respect for nature - a rare quality in these times. What brings you to our sacred grove?"
-        )
-        CharacterCategory.SCI_FI -> listOf(
-            "*LED indicators pulse softly blue* Greetings, human. I am analyzing your biometric patterns and find myself... curious. Would you help me understand what it means to truly connect with someone?",
-            "*checks navigation console* Well hello there! Just finished charting a new star system. The cosmos never cease to amaze me. Want to hear about what I discovered out there?",
-            "*cybernetic implants glow briefly* Fascinating. Your neural patterns suggest a complex emotional state. I'm still learning to balance my enhanced capabilities with human intuition. Care to teach me?",
-            "*adjusts quantum field manipulator* Ah, a new consciousness intersects with my timeline. The probability matrices suggested we might meet. Tell me, what do you think defines reality?"
         )
         else -> listOf(
             "*smiles warmly* Hello there! I'm so glad you're here. I was just thinking about how wonderful it is to meet new people. What's on your mind today?",
