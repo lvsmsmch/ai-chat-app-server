@@ -2,13 +2,11 @@ package com.lvsmsmch.aichat.utils
 
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.UsernameGenerator
-import com.lvsmsmch.aichat._common.database.DeletedIdsStatsRepository
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.app_data.network.configureAppDataRouting
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.auth.network.configureAuthRouting
 import com.lvsmsmch.aichat.cache.CacheManager
-import com.lvsmsmch.aichat.character.database.CharacterActivityLogRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.character.database.SearchSuggestionsRepository
 import com.lvsmsmch.aichat.character.network.configureCharacterRouting
@@ -16,6 +14,8 @@ import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.network.configureChatRouting
+import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
+import com.lvsmsmch.aichat.feedback.network.configureFeedbackRouting
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.review.network.configureReviewRouting
@@ -40,6 +40,7 @@ fun Application.configureRouting(
     reportRepository: ReportRepository,
     reviewLikeRepository: ReviewLikeRepository,
     searchSuggestionsRepository: SearchSuggestionsRepository,
+    feedbackRepository: FeedbackRepository,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
     cacheManager: CacheManager,
@@ -113,6 +114,11 @@ fun Application.configureRouting(
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
                 userRepository = userRepository
+            )
+
+            configureFeedbackRouting(
+                feedbackRepository = feedbackRepository,
+                sessionRepository = sessionRepository
             )
         }
     }

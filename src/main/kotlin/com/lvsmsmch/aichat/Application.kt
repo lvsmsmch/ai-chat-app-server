@@ -16,6 +16,8 @@ import com.lvsmsmch.aichat.chat.database.ChatDbo
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.chat.database.MessageRepository
+import com.lvsmsmch.aichat.feedback.database.FeedbackDbo
+import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
@@ -141,6 +143,9 @@ fun Application.module() {
     )
     val characterListCopyRepository = CharacterListCopyRepository(
         database.getCollection<CharacterListCopyDbo>("character_list_copy_dbo")
+    )
+    val feedbackRepository = FeedbackRepository(
+        database.getCollection<FeedbackDbo>("feedbacks")
     )
 
     val cacheManager = CacheManager(
@@ -271,6 +276,7 @@ fun Application.module() {
         reportRepository = reportRepository,
         reviewLikeRepository = reviewLikeRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
+        feedbackRepository = feedbackRepository,
         idGenerator = idGenerator,
         usernameGenerator = usernameGenerator,
         cacheManager = cacheManager,

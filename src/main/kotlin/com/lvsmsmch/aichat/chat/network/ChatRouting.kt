@@ -503,7 +503,7 @@ fun Route.configureChatRouting(
          */
         post("/messages/{messageId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
-            val messageClientId = call.parameters["id"]
+            val messageClientId = call.parameters["messageId"]
                 ?: throw BadRequestException("Missing messageId parameter")
             val request = call.receive<ReportMessageRequest>()
 

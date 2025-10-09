@@ -306,10 +306,10 @@ class UserRepository(
 
 
     companion object {
-        const val DAILY_LIMIT_MESSAGES_REGULAR = 90
-        const val HOURLY_LIMIT_MESSAGES_REGULAR = 30
-        const val DAILY_LIMIT_MESSAGES_PREMIUM = 900
-        const val HOURLY_LIMIT_MESSAGES_PREMIUM = 300
-        const val EXTRA_AMOUNT_FOR_REWARD = 15
+        const val DAILY_LIMIT_MESSAGES_REGULAR = 100
+        const val HOURLY_LIMIT_MESSAGES_REGULAR = 50
+        const val DAILY_LIMIT_MESSAGES_PREMIUM = 1000
+        const val HOURLY_LIMIT_MESSAGES_PREMIUM = 500
+        const val EXTRA_AMOUNT_FOR_REWARD = 25
     }
 }
