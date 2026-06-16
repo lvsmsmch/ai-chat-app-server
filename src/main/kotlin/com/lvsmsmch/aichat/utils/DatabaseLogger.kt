@@ -5,7 +5,6 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
 
     val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(java.util.Date())
 
-    // Extract ID
     val extractedId = try {
         val field = event.latestObject.javaClass.declaredFields.find { it.name == "id" }
         if (field != null) {
@@ -18,42 +17,34 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
         "unknown"
     }
 
-    // Get entity type name
     val entityType = T::class.simpleName ?: "UnknownType"
 
-    // Operation type with visual indicator
     val operationType = when (event) {
         is DatabaseEvent.Created -> "[+] INSERT"
         is DatabaseEvent.Updated -> "[*] UPDATE"
         is DatabaseEvent.Deleted -> "[-] DELETE"
     }
 
-    // Build log message without helper functions
     val logMsg = buildString {
         appendLine(".")
         appendLine("+----------------------------------------------------------------------------------------+")
         appendLine("|                             DATABASE $operationType                                        |")
         appendLine("+----------------------------------------------------------------------------------------+")
         appendLine("| Collection: $collectionName                                                                          |")
-//        appendLine("| ID: $extractedId")
-//        appendLine("| Time: $timestamp")
         appendLine("+----------------------------------------------------------------------------------------+")
 
         when (event) {
             is DatabaseEvent.Created -> {
                 appendLine("| NEW DATA:")
-                // Remove class name from toString output
                 val newData = event.new.toString()
                     .replaceFirst("${event.new.javaClass.simpleName}(", "")
                     .removeSuffix(")")
                 appendLine("| $newData")
             }
             is DatabaseEvent.Updated -> {
-                // Show changed fields manually
                 appendLine("|")
                 appendLine("| CHANGED FIELDS:")
                 var hasChanges = false
-                // Manually inspect the fields
                 try {
                     for (field in event.old.javaClass.declaredFields) {
                         field.isAccessible = true
@@ -83,6 +74,5 @@ inline fun <reified T : Any> logDatabaseEvent(event: DatabaseEvent<T>, collectio
         appendLine("+------------------------------------------------+")
     }
 
-    // Log the formatted message
     logger.info(logMsg)
 }

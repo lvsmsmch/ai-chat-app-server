@@ -146,7 +146,6 @@ suspend fun CharacterDbo.toCharacterFullInfoDto(mapper: Mapper, demanderId: Stri
 }
 
 
-// В mapper
 suspend fun ReviewDbo.toReviewDto(mapper: Mapper, currentUserId: String? = null): ReviewDto {
     val author = mapper.userRepository.getUserById(this.authorId)?.toUserDto(mapper)
         ?: throw UserNotFoundException(this.authorId)

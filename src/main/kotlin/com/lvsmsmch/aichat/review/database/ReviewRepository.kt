@@ -14,9 +14,6 @@ class ReviewRepository(
     private val collection: CoroutineCollection<ReviewDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -57,22 +54,13 @@ class ReviewRepository(
         }
     }
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE
-     */
     suspend fun addReview(session: ClientSession, reviewDbo: ReviewDbo) {
         collection.insertOne(session, reviewDbo)
     }
 
-    /**
-     * READ
-     */
     suspend fun getReviews(
         characterId: String,
         sortCriteria: Int,
@@ -148,9 +136,6 @@ class ReviewRepository(
         return totalRating.toFloat() / reviews.size
     }
 
-    /**
-     * UPDATE
-     */
     suspend fun updateReview(
         session: ClientSession,
         id: String,
@@ -173,7 +158,6 @@ class ReviewRepository(
         updates.add(setValue(ReviewDbo::editedAt, UtcTimestamp.now().toString()))
 
         collection.updateOneById(session, id, combine(updates))
-        // No need to manually emit updates - the changeEventsFlow will handle it
     }
 
     suspend fun incrementLikesCount(session: ClientSession, reviewId: String, increment: Int) {
@@ -181,9 +165,6 @@ class ReviewRepository(
     }
 
 
-    /**
-     * DELETE
-     */
 
     suspend fun deleteReviewById(session: ClientSession, reviewId: String) {
         collection.deleteOneById(session, reviewId)

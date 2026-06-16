@@ -6,7 +6,7 @@ import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class ReviewLikeDbo(
-    @BsonId val id: String, // "${userId}_${reviewId}"
+    @BsonId val id: String,
     val userId: String,
     val reviewId: String,
     val likedAt: String = UtcTimestamp.now().toString()

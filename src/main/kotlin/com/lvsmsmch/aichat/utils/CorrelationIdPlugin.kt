@@ -1,4 +1,3 @@
-// CorrelationIdPlugin.kt (new file)
 package com.lvsmsmch.aichat.utils
 
 import io.ktor.server.application.*

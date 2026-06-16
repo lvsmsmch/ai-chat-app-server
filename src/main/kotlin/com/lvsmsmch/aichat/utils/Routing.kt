@@ -53,9 +53,6 @@ fun Application.configureRouting(
             call.respond(HttpStatusCode.OK, "Test successful")
         }
 
-//        rateLimit(RateLimitName("auth-strict")) {
-//
-//        }
 
         rateLimit(RateLimitName("ip-based")) {
             configureAuthRouting(

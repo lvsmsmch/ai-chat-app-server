@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.character.network.CharacterDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ============= БАЗОВЫЕ СУЩНОСТИ =============
 
 @Serializable
 data class ChatDto(
@@ -29,7 +28,6 @@ data class MessageDto(
     @SerialName("nsfw") val nsfw: Boolean
 )
 
-// ============= ВСПОМОГАТЕЛЬНЫЕ МОДЕЛИ СООБЩЕНИЙ =============
 
 @Serializable
 data class UserMessage(
@@ -43,7 +41,6 @@ data class CharacterMessage(
     @SerialName("characterId") val characterId: String
 )
 
-// ============= СИНХРОНИЗАЦИЯ =============
 
 @Serializable
 data class ChatSyncRequest(
@@ -87,7 +84,6 @@ data class BatchSyncResponse(
     @SerialName("limitsResponse") val limitsResponse: LimitsResponse
 )
 
-// ============= СОЗДАНИЕ ЧАТА =============
 
 @Serializable
 data class CreateChatRequest(
@@ -105,7 +101,6 @@ data class CreateChatResponse(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
-// ============= ОБНОВЛЕНИЕ ЧАТА =============
 
 @Serializable
 data class UpdateChatRequest(
@@ -119,7 +114,6 @@ data class UpdateChatResponse(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
-// ============= УДАЛЕНИЕ ЧАТОВ =============
 
 @Serializable
 data class DeleteChatsRequest(
@@ -131,7 +125,6 @@ data class DeleteChatsResponse(
     @SerialName("isSuccess") val isSuccess: Boolean
 )
 
-// ============= ОТПРАВКА СООБЩЕНИЙ =============
 
 @Serializable
 data class SendMessageRequest(
@@ -147,7 +140,6 @@ data class SendMessageResponse(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
-// ============= ПЕРЕГЕНЕРАЦИЯ СООБЩЕНИЙ =============
 
 @Serializable
 data class ReloadMessageRequest(
@@ -162,7 +154,6 @@ data class ReloadMessageResponse(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
-// ============= СТРИМИНГ СООБЩЕНИЙ =============
 
 @Serializable
 data class StreamMessageRequest(
@@ -178,7 +169,6 @@ data class StreamMessageChunk(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse? = null
 )
 
-// ============= ПОЛУЧЕНИЕ СООБЩЕНИЙ =============
 
 @Serializable
 data class GetMessagesRequest(
@@ -193,7 +183,6 @@ data class GetMessagesResponse(
 )
 
 
-// ============= РЕПОРТ СООБЩЕНИЯ =============
 
 @Serializable
 data class ReportMessageRequest(
@@ -202,7 +191,6 @@ data class ReportMessageRequest(
 )
 
 
-// ============= УДАЛЕНИЕ СООБЩЕНИЙ =============
 
 @Serializable
 data class DeleteMessagesRequest(
@@ -217,7 +205,6 @@ data class DeleteMessagesResponse(
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse
 )
 
-// ============= ПРОЧЕЕ =============
 
 
 @Serializable

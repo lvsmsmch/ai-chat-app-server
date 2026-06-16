@@ -36,12 +36,7 @@ fun Route.configureChatRouting(
 
     route("/chats") {
 
-        // ========== BATCH СИНХРОНИЗАЦИЯ ЧАТОВ ==========
 
-        /**
-         * POST /chats/sync
-         * Универсальная batch синхронизация чатов и сообщений
-         */
         post("/sync") {
             val userId = sessionRepository.verifyToken(call).userId
             val request = call.receive<BatchSyncRequest>()
@@ -51,7 +46,6 @@ fun Route.configureChatRouting(
 
             val allUserChats = chatRepository.getChatsByUserId(userId)
 
-            // Обрабатываем каждый запрос на синхронизацию
             request.chatSyncRequests.forEach { chatSyncRequest ->
                 val chat = chatRepository.getChatByClientId(chatSyncRequest.chatId)
 
@@ -64,7 +58,6 @@ fun Route.configureChatRouting(
                         mapper = mapper
                     )
 
-                    // Добавляем response только если есть изменения
                     if (syncResponse.chatUpdatedResponse != null || syncResponse.messageListUpdatedResponse != null) {
                         chatSyncResponses.add(syncResponse)
                     }
@@ -74,7 +67,6 @@ fun Route.configureChatRouting(
             allUserChats
                 .filter { it.clientId !in requestedChatIds }
                 .forEach { chat ->
-                    // Создаем фиктивный запрос для fullSync с очень старой датой
                     val fullSyncRequest = ChatSyncRequest(
                         chatId = chat.clientId,
                         lastChatSyncTimestamp = UtcTimestamp.year1900().toString(),
@@ -91,7 +83,6 @@ fun Route.configureChatRouting(
                         mapper = mapper
                     )
 
-                    // Для fullSync всегда добавляем, но ограничиваем сообщения
                     if (!chat.isDeleted) {
                         val limitedMessages = messageRepository.getMessagesPaginated(
                             chatId = chat.id,
@@ -126,7 +117,6 @@ fun Route.configureChatRouting(
             )
         }
 
-        // ========== УПРАВЛЕНИЕ ЧАТАМИ ==========
 
         post("/new") {
             val userId = sessionRepository.verifyToken(call).userId
@@ -170,7 +160,6 @@ fun Route.configureChatRouting(
 
             val shouldAddInitMessage = userRepository.getLimits(userId).limitUntil == null
 
-            // Создаем начальное сообщение если указано
             if (request.initialMessageId != null && shouldAddInitMessage) {
                 val characterId = request.characterIds.first()
                 MessageDbo(
@@ -188,7 +177,6 @@ fun Route.configureChatRouting(
                 }
             }
 
-            // Создаем полный sync response с учетом всех возможных изменений
             val chatSyncRequest = ChatSyncRequest(
                 chatId = chatDbo.clientId,
                 lastChatSyncTimestamp = UtcTimestamp.year1900().toString(),
@@ -215,10 +203,6 @@ fun Route.configureChatRouting(
             )
         }
 
-        /**
-         * GET /chats/{chatId}
-         * Получение деталей конкретного чата
-         */
         get("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -235,10 +219,6 @@ fun Route.configureChatRouting(
             call.respondSuccess(chatDto)
         }
 
-        /**
-         * PUT /chats/{chatId}
-         * Обновление настроек чата
-         */
         put("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -254,7 +234,6 @@ fun Route.configureChatRouting(
 
             request.customName?.let { validateCustomChatName(it) }
 
-            // Обновляем чат
             chatRepository.updateChat(
                 chatId = chat.id,
                 customName = request.customName?.takeIf { it.isNotBlank() }
@@ -262,7 +241,6 @@ fun Route.configureChatRouting(
 
             val updatedChat = chatRepository.getChatById(chat.id)!!
 
-            // Генерируем полный sync response
             val chatSyncResponse = generateChatSyncResponse(
                 chat = updatedChat,
                 chatSyncRequest = request.chatSyncRequest,
@@ -279,10 +257,6 @@ fun Route.configureChatRouting(
             )
         }
 
-        /**
-         * DELETE /chats/{chatId}
-         * Удаление чата
-         */
         delete("/{chatId}") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatClientId = call.parameters["chatId"]
@@ -300,10 +274,6 @@ fun Route.configureChatRouting(
             call.respondSuccess()
         }
 
-        /**
-         * DELETE /chats
-         * Удаление списка чатов
-         */
         post("/delete") {
             val userId = sessionRepository.verifyToken(call).userId
             val request = call.receive<DeleteChatsRequest>()
@@ -319,21 +289,18 @@ fun Route.configureChatRouting(
             val chatClientIds = request.chatIds.distinct()
             val chats = chatRepository.getChatsByClientIds(chatClientIds)
 
-            // Проверяем, что все чаты найдены
             val foundChatIds = chats.map { it.clientId }.toSet()
             val notFoundChatIds = chatClientIds.toSet() - foundChatIds
             if (notFoundChatIds.isNotEmpty()) {
                 throw BadRequestException("Chats not found: ${notFoundChatIds.joinToString(", ")}")
             }
 
-            // Проверяем, что все чаты принадлежат пользователю
             val unauthorizedChats = chats.filter { it.userId != userId }
             if (unauthorizedChats.isNotEmpty()) {
                 val unauthorizedIds = unauthorizedChats.map { it.clientId }
                 throw ForbiddenException("Access denied to chats: ${unauthorizedIds.joinToString(", ")}")
             }
 
-            // Удаляем чаты
             chatRepository.deleteChatsByIds(chats.map { it.id })
 
             call.respondSuccess(
@@ -341,12 +308,7 @@ fun Route.configureChatRouting(
             )
         }
 
-        // ========== СООБЩЕНИЯ ==========
 
-        /**
-         * GET /chats/{chatId}/messages
-         * Получение сообщений с курсорной пагинацией
-         */
         get("/{chatId}/messages") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -387,10 +349,6 @@ fun Route.configureChatRouting(
             )
         }
 
-        /**
-         * POST /chats/{chatId}/messages
-         * Отправка нового сообщения
-         */
         post("/{chatId}/messages") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatClientId = call.parameters["chatId"]
@@ -404,7 +362,6 @@ fun Route.configureChatRouting(
                 throw ForbiddenException("Access denied to this chat")
             }
 
-            // Проверяем, не существует ли уже пользовательское сообщение
             request.userMessage?.let { userMessage ->
                 val existingMessage = messageRepository.findByClientId(userMessage.id)
                 if (existingMessage != null) {
@@ -497,10 +454,6 @@ fun Route.configureChatRouting(
             )
         }
 
-        /**
-         * POST /chats/messages/{messageId}/report
-         * Репорт сообщения
-         */
         post("/messages/{messageId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val messageClientId = call.parameters["messageId"]
@@ -523,32 +476,17 @@ fun Route.configureChatRouting(
             call.respondSuccess()
         }
 
-        /**
-         * DELETE /chats/{chatId}/messages
-         * Удаление сообщений
-         */
         post("/messages/delete") {
             val userId = sessionRepository.verifyToken(call).userId
             val request = call.receive<DeleteMessagesRequest>()
 
-            logger.debug(">>>")
-            logger.debug(">>>")
-            logger.debug(">>>")
-            logger.debug(">>> /messages/delete")
-            logger.debug(">>>")
-            logger.debug(">>>")
-            logger.debug(">>>")
-            logger.debug("request: ${request}")
-
             val messageClientIds = request.messageIds.distinct()
             val messageDbos = messageRepository.getMessagesByClientIds(messageClientIds)
 
-            // Проверяем, что все сообщения существуют
             if (messageDbos.size != messageClientIds.size) {
                 throw BadRequestException("Some messages not found")
             }
 
-            // Проверяем, что все сообщения принадлежат одному чату
             val chatIds = messageDbos.map { it.chatId }.toSet()
             if (chatIds.size != 1) {
                 throw BadRequestException("All messages must belong to the same chat")
@@ -558,20 +496,15 @@ fun Route.configureChatRouting(
             val chat = chatRepository.getChatById(chatId)
                 ?: throw BadRequestException("Chat not found")
 
-            // Проверяем, что чат принадлежит пользователю
             if (chat.userId != userId) {
                 throw ForbiddenException("Access denied to this chat")
             }
 
-            // Удаляем сообщения
-            logger.debug("delete messages...")
             messageRepository.deleteMessagesByIds(
                 chatId = chatId,
                 messageIds = messageDbos.map { it.id }
             )
-            logger.debug("delete messages done")
 
-            // Используем метод для генерации полного sync response
             val chatSyncResponse = generateChatSyncResponse(
                 chat = chat,
                 chatSyncRequest = request.chatSyncRequest,
@@ -579,8 +512,6 @@ fun Route.configureChatRouting(
                 messageRepository = messageRepository,
                 mapper = mapper
             )
-
-            logger.debug("Done, chatSyncResponse: $chatSyncResponse")
 
             call.respondSuccess(
                 DeleteMessagesResponse(
@@ -591,21 +522,8 @@ fun Route.configureChatRouting(
         }
 
 
-        // ========== SSE СТРИМИНГ ==========
 
-        /**
-         * POST /chats/{chatId}/messages/{messageId}/stream
-         * Подписка на стрим обновлений сообщения через SSE с поддержкой синхронизации
-         */
         post("/{chatId}/messages/{messageId}/stream") {
-            logger.info(">>>")
-            logger.info(">>>")
-            logger.info(">>>")
-            logger.info(">>> SSE request")
-            logger.info(">>>")
-            logger.info(">>>")
-            logger.info(">>>")
-
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
                 ?: throw BadRequestException("Chat ID is required")
@@ -632,8 +550,6 @@ fun Route.configureChatRouting(
                 throw BadRequestException("Cannot stream user messages")
             }
 
-            logger.info("SSE request passed")
-
             call.response.cacheControl(CacheControl.NoCache(null))
             call.response.header(HttpHeaders.Connection, "keep-alive")
             call.response.header(HttpHeaders.ContentType, ContentType.Text.EventStream.toString())
@@ -642,29 +558,10 @@ fun Route.configureChatRouting(
 
             call.respondTextWriter(contentType = ContentType.Text.EventStream) {
                 try {
-                    logger.info("SSE 1")
-
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
-                    logger.info(
-                        "SSE 2,current status ${currentMessage.status}"
-                    )
-
-//                    val initialChunk = StreamMessageChunk(
-//                        chunk = currentMessage.text,
-//                        isComplete = currentMessage.status == MessageStatus.COMPLETED.value,
-//                        isFailed = currentMessage.status == MessageStatus.FAILED.value,
-//                        nsfw = false
-//                    )
-//
-//                    logger.info("SSE 3")
-//
-//                    write("data: ${defaultJson.encodeToString(initialChunk)}\n\n")
-//                    flush()
-
 
                     if (currentMessage.status == MessageStatus.COMPLETED.value) {
-                        logger.info("SSE 3")
                         val finalSyncResponse = generateChatSyncResponse(
                             chat = chat,
                             chatSyncRequest = request.chatSyncRequest,
@@ -691,12 +588,6 @@ fun Route.configureChatRouting(
                     }
 
                     if (currentMessage.status == MessageStatus.FAILED.value) {
-                        logger.info("SSE 4")
-//                        messageRepository.updateMessage(
-//                            messageId = message.id,
-//                            text = "",
-//                            status = MessageStatus.STREAMING.value,
-//                        )
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
@@ -706,7 +597,6 @@ fun Route.configureChatRouting(
 
                     messageRepository.streamMessageUpdates(message.id)
                         .collect { update ->
-//                            logger.info("SSE 10, ${update}")
                             val chunk = if (update.isComplete || update.isFailed) {
                                 val finalSyncResponse = generateChatSyncResponse(
                                     chat = chat,
@@ -765,19 +655,10 @@ fun Route.configureChatRouting(
         }
 
 
-        // ========== ПРОЧЕЕ ==========
 
-        /**
-         * POST /chats/rewarded
-         * Юзер получил ревард для увеличения лимитов
-         */
         post("/rewarded") {
             val userId = sessionRepository.verifyToken(call).userId
             val request = call.receive<UserRewardedRequest>()
-
-            logger.debug(">>>")
-            logger.debug(">>> /rewarded")
-            logger.debug(">>>")
 
             userRepository.addUserLimitsAfterRewardedWasWatched(userId)
             delay(100)
@@ -792,7 +673,6 @@ fun Route.configureChatRouting(
 }
 
 
-// Вспомогательная функция для генерации ChatSyncResponse
 suspend fun generateChatSyncResponse(
     chat: ChatDbo,
     chatSyncRequest: ChatSyncRequest,
@@ -801,7 +681,6 @@ suspend fun generateChatSyncResponse(
     mapper: Mapper
 ): ChatSyncResponse {
 
-    // Определяем временные метки для синхронизации
     val chatSyncTimestamp = chatSyncRequest.lastChatSyncTimestamp?.let {
         UtcTimestamp.parse(it)
     } ?: UtcTimestamp.year1900()
@@ -813,7 +692,6 @@ suspend fun generateChatSyncResponse(
     val oldestLoaded = chatSyncRequest.oldestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
     val newestLoaded = chatSyncRequest.newestLoadedMessageTime?.let { UtcTimestamp.parse(it) }
 
-    // Проверяем изменения чата
     var chatUpdatedResponse: ChatUpdatedResponse? = null
     if (chat.lastModifiedAt > chatSyncTimestamp.toString() || chat.isDeleted) {
         chatUpdatedResponse = ChatUpdatedResponse(
@@ -823,17 +701,14 @@ suspend fun generateChatSyncResponse(
         )
     }
 
-    // Проверяем изменения сообщений
     var messageListUpdatedResponse: MessageListUpdatedResponse? = null
 
-    // Новые сообщения
     val newMessages = if (newestLoaded != null) {
         messageRepository.getMessagesCreatedAfter(chat.id, newestLoaded)
     } else {
         messageRepository.getMessagesCreatedAfter(chat.id, messagesSyncTimestamp)
     }
 
-    // Обновленные сообщения в загруженном диапазоне
     val updatedMessages = if (oldestLoaded != null && newestLoaded != null) {
         messageRepository.getMessagesUpdatedInRange(
             chatId = chat.id,
@@ -845,7 +720,6 @@ suspend fun generateChatSyncResponse(
         messageRepository.getMessagesUpdatedAfter(chat.id, messagesSyncTimestamp)
     }
 
-    // Удаленные сообщения в загруженном диапазоне
     val deletedMessageIds = if (oldestLoaded != null && newestLoaded != null) {
         messageRepository.getDeletedMessageIdsInRange(
             chatId = chat.id,
@@ -857,7 +731,6 @@ suspend fun generateChatSyncResponse(
         messageRepository.getDeletedMessageIdsAfter(chat.id, messagesSyncTimestamp)
     }
 
-    // Создаем response для сообщений если есть изменения
     if (newMessages.isNotEmpty() || updatedMessages.isNotEmpty() || deletedMessageIds.isNotEmpty()) {
         messageListUpdatedResponse = MessageListUpdatedResponse(
             lastMessagesSyncTimestamp = UtcTimestamp.now().toString(),

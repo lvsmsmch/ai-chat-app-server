@@ -14,7 +14,6 @@ class UsernameGenerator(
         private const val MAX_USERNAME_LENGTH = 20
         private const val FALLBACK_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-        // Аниме персонажи (50)
         private val animeCharacters = listOf(
             "naruto", "sasuke", "goku", "luffy", "ichigo", "natsu", "edward", "alphonse",
             "light", "ryuk", "saitama", "genos", "tanjiro", "zenitsu", "deku", "bakugo",
@@ -25,7 +24,6 @@ class UsernameGenerator(
             "piccolo", "gohan", "trunks"
         )
 
-        // Фэнтези существа (40)
         private val fantasyCreatures = listOf(
             "dragon", "phoenix", "griffin", "basilisk", "wyvern", "chimera", "hydra",
             "kraken", "leviathan", "behemoth", "unicorn", "pegasus", "sphinx", "minotaur",
@@ -35,7 +33,6 @@ class UsernameGenerator(
             "undine", "sylph", "gnome"
         )
 
-        // Аниме термины (30)
         private val animeTerms = listOf(
             "senpai", "kohai", "otaku", "ninja", "samurai", "shinobi", "sensei", "chan",
             "kun", "san", "sama", "baka", "tsundere", "yandere", "kawaii", "sugoi",
@@ -43,7 +40,6 @@ class UsernameGenerator(
             "hime", "ouji", "ronin", "yokai", "kami"
         )
 
-        // Фэнтези предметы (30)
         private val fantasyItems = listOf(
             "sword", "blade", "staff", "wand", "crystal", "orb", "shield", "armor",
             "bow", "arrow", "rune", "scroll", "potion", "elixir", "tome", "grimoire",
@@ -51,7 +47,6 @@ class UsernameGenerator(
             "ring", "pendant", "cloak", "boots", "gauntlet", "helm"
         )
 
-        // Прилагательные (40)
         private val adjectives = listOf(
             "brave", "swift", "dark", "light", "fire", "ice", "storm", "shadow", "mystic",
             "arcane", "noble", "wild", "fierce", "calm", "wise", "strong", "quick", "silent",
@@ -60,17 +55,12 @@ class UsernameGenerator(
             "ember", "thunder", "wind", "earth", "ocean", "star"
         )
 
-        // Объединяем все слова
         private val allWords = animeCharacters + fantasyCreatures + animeTerms + fantasyItems + adjectives
 
         private val secureRandom = java.security.SecureRandom()
     }
 
-    /**
-     * Генерирует уникальный юзернейм
-     */
     suspend fun generateUniqueUsername(): String {
-        // Попытки стандартной генерации
         repeat(MAX_STANDARD_ATTEMPTS) {
             val username = generateRandomUsername()
             if (isUsernameAvailable(username)) {
@@ -78,7 +68,6 @@ class UsernameGenerator(
             }
         }
 
-        // Fallback генерация
         repeat(MAX_FALLBACK_ATTEMPTS) {
             val username = generateFallbackUsername()
             if (isUsernameAvailable(username)) {
@@ -89,30 +78,22 @@ class UsernameGenerator(
         throw InternalServerErrorException("Failed to generate unique username after ${MAX_STANDARD_ATTEMPTS + MAX_FALLBACK_ATTEMPTS} attempts")
     }
 
-    /**
-     * Стандартная генерация: word1_word2_XX
-     */
     private fun generateRandomUsername(): String {
         val word1 = allWords[secureRandom.nextInt(allWords.size)]
         val word2 = allWords[secureRandom.nextInt(allWords.size)]
-        val number = secureRandom.nextInt(90) + 10 // 10-99
+        val number = secureRandom.nextInt(90) + 10
 
         val username = "${word1}_${word2}_$number"
 
-        // Проверяем длину
         return if (username.length in MIN_USERNAME_LENGTH..MAX_USERNAME_LENGTH) {
             username
         } else {
-            // Если слишком длинный, используем только одно слово
             val shortWords = allWords.filter { it.length <= 15 }
             val singleWord = shortWords[secureRandom.nextInt(shortWords.size)]
             "${singleWord}_$number"
         }
     }
 
-    /**
-     * Fallback генерация: user_XXXXXX (6 случайных символов)
-     */
     private fun generateFallbackUsername(): String {
         val randomSuffix = (1..6)
             .map { FALLBACK_CHARS[secureRandom.nextInt(FALLBACK_CHARS.length)] }
@@ -121,20 +102,14 @@ class UsernameGenerator(
         return "user_$randomSuffix"
     }
 
-    /**
-     * Проверяет доступность юзернейма
-     */
     private suspend fun isUsernameAvailable(username: String): Boolean {
         return userRepository.findByUsername(username) == null
     }
 
-    /**
-     * Статистика для анализа
-     */
     fun getGenerationStats(): UsernameGenerationStats {
         val totalWords = allWords.size
-        val wordCombinations = totalWords * (totalWords - 1) // без повторений
-        val numberVariants = 90 // 10-99
+        val wordCombinations = totalWords * (totalWords - 1)
+        val numberVariants = 90
         val totalPossibleUsernames = wordCombinations * numberVariants
 
         return UsernameGenerationStats(
@@ -153,9 +128,6 @@ class UsernameGenerator(
     }
 }
 
-/**
- * Статистика генерации юзернеймов
- */
 data class UsernameGenerationStats(
     val totalWords: Int,
     val wordCombinations: Int,

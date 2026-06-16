@@ -21,14 +21,8 @@ class DefaultRecommendationsCacheRepository(
     private val collection: CoroutineCollection<DefaultRecommendationsCacheDbo>
 ) {
 
-    /**
-     * FLOW
-     */
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * UPDATE
-     */
     suspend fun updateDefaultCache(characterIds: List<String>) {
         val cache = DefaultRecommendationsCacheDbo(
             characterIds = characterIds,
@@ -38,9 +32,6 @@ class DefaultRecommendationsCacheRepository(
         collection.replaceOneById("default_recommendations_cache", cache, ReplaceOptions().upsert(true))
     }
 
-    /**
-     * READ
-     */
     suspend fun getDefaultRecommendations(): List<String> {
         val cache = collection.findOneById("default_recommendations_cache")
         return cache?.characterIds ?: emptyList()

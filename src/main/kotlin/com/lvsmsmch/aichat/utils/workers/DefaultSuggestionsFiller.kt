@@ -36,14 +36,11 @@ fun fillDefaultSuggestions(
 
 private fun getInitialSuggestions(): List<String> {
     return listOf(
-        // english
         "anime", "cute", "funny", "cool", "hot", "beautiful",
         "warrior", "princess", "hero", "villain", "robot",
 
-        // japanese
         "アニメ", "かわいい", "美少女", "戦士",
 
-        // russian
         "аниме", "милая", "крутой", "принцесса", "девушка"
     )
 }

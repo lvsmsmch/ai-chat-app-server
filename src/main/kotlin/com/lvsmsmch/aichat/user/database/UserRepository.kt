@@ -14,9 +14,6 @@ class UserRepository(
     private val collection: CoroutineCollection<UserDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -35,16 +32,10 @@ class UserRepository(
     }
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
-    /**
-     * CREATE
-     */
 
     suspend fun addUser(userDbo: UserDbo) {
         collection.insertOne(userDbo)
@@ -54,9 +45,6 @@ class UserRepository(
         collection.insertOne(session, userDbo)
     }
 
-    /**
-     * READ
-     */
 
     suspend fun getUserById(userId: String): UserDbo? {
         return collection.findOneById(userId)
@@ -90,7 +78,6 @@ class UserRepository(
     }
 
     suspend fun getLimits(userId: String): LimitsResponse {
-        logger.debug(">>> getLimits $userId")
         val user = getUserById(userId) ?: throw UserNotFoundException()
 
         val dailyLimit = if (user.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
@@ -120,14 +107,9 @@ class UserRepository(
             extraAmountForReward = EXTRA_AMOUNT_FOR_REWARD
         )
 
-        logger.debug("Limits: $limitsResponse")
-
         return limitsResponse
     }
 
-    /**
-     * UPDATE
-     */
     suspend fun updateUser(
         session: ClientSession,
         userId: String,
@@ -155,7 +137,7 @@ class UserRepository(
                 updates.add(setValue(UserDbo::profilePictureUrlThumbnail, null))
             }
         }
-        if (updates.isEmpty()) return // Nothing to update
+        if (updates.isEmpty()) return
         collection.updateOneById(session, userId, combine(*updates.toTypedArray()))
     }
 
@@ -210,7 +192,7 @@ class UserRepository(
     suspend fun incrementFollowingCountForUsers(session: ClientSession, userIds: List<String>, increment: Int) {
         collection.updateMany(
             session,
-            UserDbo::id `in` userIds,  // ← KMongo синтаксис
+            UserDbo::id `in` userIds,
             inc(UserDbo::followingCount, increment)
         )
     }
@@ -246,10 +228,6 @@ class UserRepository(
     }
 
     suspend fun notifyCharacterMessageWasSent(session: ClientSession, userId: String) {
-        logger.debug("> incrementMessageCounters for ${userId}")
-        logger.debug("before, extra count for ${userId} : ${getUserById(userId)?.extraFreeMessagesCount}")
-        logger.debug("before, hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
-
         val userDbo = getUserById(session, userId) ?: return
         val messagesUpdateBson = if (userDbo.extraFreeMessagesCount > 0) {
             inc(UserDbo::extraFreeMessagesCount, -1)
@@ -270,12 +248,9 @@ class UserRepository(
             )
         )
 
-        logger.debug("after, extra count for ${userId} : ${getUserById(userId)?.extraFreeMessagesCount}")
-        logger.debug("after,  hourly count for ${userId} : ${getUserById(userId)?.hourlyMessageCount}")
     }
 
     suspend fun notifyChatWasCreated(session: ClientSession, userId: String) {
-        logger.debug("incrementChatCounters by 1")
         collection.updateOneById(
             session,
             userId,
@@ -296,9 +271,6 @@ class UserRepository(
     }
 
 
-    /**
-     * DELETE
-     */
     suspend fun deleteUser(session: ClientSession, userId: String): Boolean {
         val deleteResult = collection.deleteOneById(session, userId)
         return deleteResult.deletedCount > 0

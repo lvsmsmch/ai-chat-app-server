@@ -30,10 +30,6 @@ fun Route.configureAuthRouting(
 ) {
     route("/auth") {
 
-        /**
-         * POST /auth/google
-         * Авторизация через Google OAuth
-         */
         post("/google") {
             val request = call.receive<GoogleAuthRequest>()
 
@@ -62,16 +58,10 @@ fun Route.configureAuthRouting(
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
                     userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
-                ).also {
-                    logger.debug("Google login successful: ${it}")
-                }
+                )
             )
         }
 
-        /**
-         * POST /auth/guest
-         * Авторизация как гость
-         */
         post("/guest") {
             val request = call.receive<GuestAuthRequest>()
 
@@ -79,7 +69,6 @@ fun Route.configureAuthRouting(
 
             val userDbo =
                 null
-//                userRepository.findByUsername("lvsm")
                 ?: userRepository.findByDeviceId(request.deviceId)
                 ?: UserDbo(
                     id = idGenerator.generateId(EntityType.USER),
@@ -97,17 +86,11 @@ fun Route.configureAuthRouting(
                     userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                     userDto = userDbo.toUserDto(mapper),
                     userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
-                ).also {
-                    logger.debug("Guest login successful: ${it}")
-                }
+                )
             )
         }
 
 
-        /**
-         * POST /auth/subscription
-         * Уведомление что юзер подписался
-         */
         post("/subscription") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val request = call.receive<SubscriptionStatusRequest>()
@@ -120,10 +103,6 @@ fun Route.configureAuthRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /auth/link-google
-         * Присоединить гугл
-         */
         post("/link-google") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val request = call.receive<GoogleConnectRequest>()
@@ -133,10 +112,7 @@ fun Route.configureAuthRouting(
 
             val oauthUserData = getOauthUserData(request.googleToken)
 
-            logger.debug("Google link to user ${userDbo.id}")
-
             val existingUser = userRepository.findByGoogleId(oauthUserData.id)
-            logger.debug("Existing user with google id: ${existingUser?.id}")
             if (existingUser != null) {
                 throw GoogleAccountAlreadyInUseException()
             }
@@ -147,16 +123,10 @@ fun Route.configureAuthRouting(
                 email = oauthUserData.email,
             )
 
-            logger.debug("Google linked to user ${userDbo.id}")
-
             call.respondSuccess()
         }
 
 
-        /**
-         * POST /auth/logout
-         * Выход из системы
-         */
         post("/logout") {
             val sessionDbo = sessionRepository.verifyToken(call)
             sessionRepository.delete(sessionDbo.token)

@@ -25,10 +25,6 @@ fun Route.configureReviewRouting(
 ) {
     route("/notifications") {
 
-        /**
-         * GET /reviews
-         * Получение списка отзывов с пагинацией
-         */
         post("/sync") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -44,7 +40,6 @@ fun Route.configureReviewRouting(
             val response = SyncNotificationsResponse(
                 items = listOf(
                     recommendationDtos,
-                    // todo reviews, followers, etc
                 ).flatten()
             )
 

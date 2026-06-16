@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.user.network.UserDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ============= RESPONSE MODELS =============
 
 @Serializable
 data class ReviewDto(
@@ -30,7 +29,6 @@ data class ReviewLikesResponse(
     @SerialName("users") val users: List<UserDto>
 )
 
-// ============= REQUEST MODELS =============
 
 @Serializable
 data class CreateReviewRequest(

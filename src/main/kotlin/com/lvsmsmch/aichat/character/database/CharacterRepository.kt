@@ -16,9 +16,6 @@ class CharacterRepository(
     private val collection: CoroutineCollection<CharacterDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -62,23 +59,14 @@ class CharacterRepository(
         }
     }
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE
-     */
 
     suspend fun addCharacter(session: ClientSession, character: CharacterDbo) {
         collection.insertOne(session, character)
     }
 
-    /**
-     * READ
-     */
     suspend fun getCharacters(
         searchQuery: String = "",
         sortCriteria: Int? = null,
@@ -137,7 +125,6 @@ class CharacterRepository(
 
         val characters = collection.find(filters).toList()
 
-        // Сохраняем порядок из recommendedIds
         return characterIds.mapNotNull { id ->
             characters.find { it.id == id }
         }
@@ -220,7 +207,6 @@ class CharacterRepository(
         )
     }
 
-    // Также добавить data class для результата:
     data class CursorResult<T>(
         val items: List<T>,
         val nextCursor: String?,
@@ -263,9 +249,6 @@ class CharacterRepository(
     }
 
 
-    /**
-     * UPDATE
-     */
     suspend fun updateCharacter(
         session: ClientSession,
         characterId: String,
@@ -349,9 +332,6 @@ class CharacterRepository(
         collection.updateOneById(session, characterId, inc(CharacterDbo::totalMessages, increment))
     }
 
-    /**
-     * DELETE
-     */
     suspend fun deleteCharacter(session: ClientSession, characterId: String) {
         collection.deleteOneById(session, characterId)
     }

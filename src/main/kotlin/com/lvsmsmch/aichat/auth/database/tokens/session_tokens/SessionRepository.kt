@@ -29,9 +29,6 @@ class SessionRepository(
         initializeIndexes()
     }
 
-    /**
-     * Initialize indexes for the collection
-     */
     private fun initializeIndexes() {
         runBlocking {
             collection.ensureIndex(SessionDbo::token)
@@ -41,16 +38,10 @@ class SessionRepository(
     }
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
-    /**
-     * Add a session to the collection
-     */
     suspend fun createSession(userId: String, ipAddress: String): SessionDbo {
         val token = generateToken()
         val obj = SessionDbo(token = token, userId = userId, ipAddress = ipAddress)

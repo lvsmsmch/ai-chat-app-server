@@ -25,10 +25,6 @@ fun Route.configureUserRouting(
 ) {
     route("/users") {
 
-        /**
-         * GET /users/{userId}
-         * Получение основной информации о пользователе
-         */
         get("/{userId}") {
             sessionRepository.verifyToken(call)
 
@@ -41,10 +37,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = userDbo.toUserDto(mapper))
         }
 
-        /**
-         * GET /users/{userId}/details
-         * Получение детальной информации о пользователе
-         */
         get("/{userId}/details") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -58,10 +50,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = userDetails)
         }
 
-        /**
-         * GET /users/{userId}/characters
-         * Получение персонажей пользователя с поддержкой курсорной пагинации
-         */
         get("/{userId}/characters") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -99,10 +87,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = response)
         }
 
-        /**
-         * GET /users/{userId}/followers
-         * Получение подписчиков пользователя
-         */
         get("/{userId}/followers") {
             val userId = call.parameters["userId"]
                 ?: throw BadRequestException("Missing userId parameter")
@@ -143,10 +127,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = response)
         }
 
-        /**
-         * GET /users/{userId}/following
-         * Получение подписок пользователя
-         */
         get("/{userId}/following") {
             val userId = call.parameters["userId"]
                 ?: throw BadRequestException("Missing userId parameter")
@@ -187,10 +167,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = response)
         }
 
-        /**
-         * PATCH /users/{userId}
-         * Обновление профиля пользователя (multipart/form-data)
-         */
         patch("/{userId}") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -201,13 +177,11 @@ fun Route.configureUserRouting(
                 throw ForbiddenException("You can only edit your own profile")
             }
 
-            // Check content type to ensure it's multipart/form-data
             val contentType = call.request.contentType()
             if (!contentType.match(ContentType.MultiPart.FormData)) {
                 throw BadRequestException("Content-Type must be multipart of form data")
             }
 
-            // Process multipart form data
             var username: String? = null
             var name: String? = null
             var bio: String? = null
@@ -228,8 +202,6 @@ fun Route.configureUserRouting(
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
                             val file = File.createTempFile("upload_", ".tmp")
-                            logger.debug("new file name: ${file.name}")
-
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -239,14 +211,11 @@ fun Route.configureUserRouting(
                         }
                     }
 
-                    else -> {} // Ignore other part types
+                    else -> {}
                 }
-                part.dispose() // Don't forget to dispose the part after handling
+                part.dispose()
             }
 
-//            if (username == null && name == null && bio == null && pictureFile == null) {
-//                throw NoUpdateFieldsProvidedException()
-//            }
 
             username?.let {
                 validateUserUsername(it)
@@ -278,10 +247,6 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = updatedUser.toUserFullInfoDto(mapper, demanderId = sessionDbo.userId))
         }
 
-        /**
-         * POST /users/{userId}/follow
-         * Подписка на пользователя
-         */
         post("/{userId}/follow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -304,10 +269,6 @@ fun Route.configureUserRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /users/{userId}/unfollow
-         * Отписка от пользователя
-         */
         post("/{userId}/unfollow") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -330,10 +291,6 @@ fun Route.configureUserRouting(
             call.respondSuccess()
         }
 
-        /**
-         * DELETE /users/{userId}
-         * Удаление пользователя
-         */
         delete("/{userId}") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -349,10 +306,6 @@ fun Route.configureUserRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /users/{userId}/report
-         * Жалоба на пользователя
-         */
         post("/{userId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 

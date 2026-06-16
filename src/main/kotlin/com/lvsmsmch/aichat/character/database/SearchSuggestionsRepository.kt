@@ -13,9 +13,6 @@ class SearchSuggestionsRepository(
     private val collection: CoroutineCollection<SearchSuggestionDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -23,13 +20,10 @@ class SearchSuggestionsRepository(
 
     private fun initializeIndexes() {
         runBlocking {
-            // Основной индекс для regex поиска по префиксу
             collection.ensureIndex(ascending(SearchSuggestionDbo::term))
 
-            // Для сортировки по популярности
             collection.ensureIndex(descending(SearchSuggestionDbo::searchCount))
 
-            // Compound индекс для оптимальной производительности
             collection.ensureIndex(
                 compoundIndex(
                     ascending(SearchSuggestionDbo::term),
@@ -39,9 +33,6 @@ class SearchSuggestionsRepository(
         }
     }
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
@@ -90,25 +81,21 @@ class SearchSuggestionsRepository(
         val oldNormalizedTerm = oldText.trim().lowercase()
         val newNormalizedTerm = newText.trim().lowercase()
 
-        // Если термины одинаковые, ничего не делаем
         if (oldNormalizedTerm == newNormalizedTerm) return
 
-        // Удаляем старое предложение
         collection.deleteOneById(session, oldNormalizedTerm)
 
-        // Добавляем новое предложение
         val existing = collection.findOneById(newNormalizedTerm)
         if (existing == null) {
             val suggestion = SearchSuggestionDbo(
                 term = newNormalizedTerm,
-                displayText = newText.trim(), // Сохраняем оригинальный регистр для отображения
+                displayText = newText.trim(),
                 searchCount = 1,
                 isCharacterName = true,
                 lastSearchedAt = UtcTimestamp.now().toString()
             )
             collection.insertOne(session, suggestion)
         } else {
-            // Если новое предложение уже существует, просто обновляем его
             collection.replaceOneById(
                 session,
                 newNormalizedTerm,

@@ -10,12 +10,10 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 import kotlinx.coroutines.reactive.asFlow
 
 inline fun <reified T : Any> CoroutineCollection<T>.watchAsFlow(): Flow<DatabaseEvent<T>> {
-    // Get the underlying reactive publisher
     val reactivePublisher = this.collection.watch(emptyList(), T::class.java)
         .fullDocument(FullDocument.UPDATE_LOOKUP)
         .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED)
 
-    // Convert the reactive publisher to a Flow using kotlinx-coroutines-reactive
     return reactivePublisher.asFlow().let { reactiveFlow ->
         flow {
             reactiveFlow.collect { change ->

@@ -19,25 +19,16 @@ class FeedbackRepository(
         }
     }
 
-    /**
-     * Сохранение нового фидбека
-     */
     suspend fun addFeedback(feedback: FeedbackDbo) {
         collection.insertOne(feedback)
     }
 
-    /**
-     * Получение всех фидбеков пользователя
-     */
     suspend fun getFeedbacksByUserId(userId: String): List<FeedbackDbo> {
         return collection.find(FeedbackDbo::userId eq userId)
             .sort(descending(FeedbackDbo::createdAt))
             .toList()
     }
 
-    /**
-     * Получение всех фидбеков (для админки)
-     */
     suspend fun getAllFeedbacks(limit: Int = 100): List<FeedbackDbo> {
         return collection.find()
             .sort(descending(FeedbackDbo::createdAt))

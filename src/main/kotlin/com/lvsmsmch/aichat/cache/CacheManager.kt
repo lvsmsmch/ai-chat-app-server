@@ -27,7 +27,6 @@ class CacheManager(
         }
     }
 
-    // Обработка поисковых запросов
     private suspend fun handleSearchRequest(
         userId: String,
         deviceId: String,
@@ -36,15 +35,12 @@ class CacheManager(
         cursorPosition: Int
     ): CachedCharactersResult {
         return if (cursorPosition == 0) {
-            // Новый поиск - удаляем старые и создаем новый
             characterListCopyRepository.deleteAllSearchCopiesForUserDevice(userId, deviceId)
             createFreshSearchCopy(userId, deviceId, listType)
             takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
         } else {
-            // Продолжение поиска
             takeItemsAndMoveCursor(userId, deviceId, listType, cursorPosition, size).let { result ->
                 if (result.items.isEmpty() && !doesCopyExist(userId, deviceId, listType)) {
-                    // Копия удалена - создаем новую
                     createFreshSearchCopy(userId, deviceId, listType)
                     takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
                 } else {
@@ -54,7 +50,6 @@ class CacheManager(
         }
     }
 
-    // Обработка обычных запросов (категории, персонализация)
     private suspend fun handleRegularRequest(
         userId: String,
         deviceId: String,
@@ -82,15 +77,9 @@ class CacheManager(
     ): CachedCharactersResult {
         updateCopyWithFreshList(userId, deviceId, listType)
 
-//        if (!doesCopyExist(userId, deviceId, listType) || doesNewerVersionExist(userId, deviceId, listType)) {
-//            updateCopyWithFreshList(userId, deviceId, listType)
-//        } else {
-//            moveViewedToEnd(userId, deviceId, listType)
-//        }
         return takeItemsAndMoveCursor(userId, deviceId, listType, 0, size).copy(refreshed = true)
     }
 
-    // Создание новой копии для поиска
     private suspend fun createFreshSearchCopy(
         userId: String,
         deviceId: String,
@@ -163,11 +152,11 @@ class CacheManager(
         characterListCopyRepository.updatePosition(userId, deviceId, listType.code, currentCursorPos)
 
         val nextCursorPos = if (currentCursorPos == cursorPosition) {
-            null // не нашли ни одного персонажа
+            null
         } else if (hasMoreValid) {
-            currentCursorPos // есть еще валидные персонажи
+            currentCursorPos
         } else {
-            null // валидных персонажей больше нет
+            null
         }
 
         return CachedCharactersResult(false, validCharacters.toList(), nextCursorPos)
@@ -231,7 +220,7 @@ class CacheManager(
                     .getCategoryCache(listType.category)?.characterIds
             }
 
-            is CacheListType.Search -> null // поиск не использует предкэшированные списки
+            is CacheListType.Search -> null
         }
     }
 
@@ -247,7 +236,7 @@ class CacheManager(
                     .getCategoryCache(listType.category)?.version
             }
 
-            is CacheListType.Search -> null // поиск не использует версии
+            is CacheListType.Search -> null
         }
     }
 }

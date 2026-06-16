@@ -28,9 +28,6 @@ class ReportRepository(
     private val collection: CoroutineCollection<ReportDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -47,18 +44,11 @@ class ReportRepository(
     }
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
-    /**
-     * CREATE
-     */
     suspend fun addReport(reportDbo: ReportDbo) {
-        // Проверяем, что пользователь еще не жаловался на эту сущность
         val existingReport = collection.findOne(
             and(
                 ReportDbo::reportedBy eq reportDbo.reportedBy,
@@ -72,9 +62,6 @@ class ReportRepository(
         }
     }
 
-    /**
-     * READ
-     */
 
     suspend fun getReportsFor(entityId: String): List<ReportDbo> {
         return collection.find(ReportDbo::entityId eq entityId)
@@ -123,30 +110,21 @@ class ReportRepository(
         return collection.countDocuments(ReportDbo::reportedBy eq userId).toInt()
     }
 
-    /**
-     * UPDATE
-     */
 
 
-    /**
-     * DELETE
-     */
     suspend fun removeReport(reportId: String) {
         collection.deleteOne(ReportDbo::id eq reportId)
     }
 
     suspend fun removeAllReportsByUserId(userId: String) {
-        // Удаляем все жалобы, поданные этим пользователем
         collection.deleteMany(ReportDbo::reportedBy eq userId)
     }
 
     suspend fun removeAllReportsForEntity(entityId: String) {
-        // Удаляем все жалобы на конкретную сущность
         collection.deleteMany(ReportDbo::entityId eq entityId)
     }
 
     suspend fun removeAllReportsForEntityType(entityType: String) {
-        // Удаляем все жалобы определенного типа сущности
         collection.deleteMany(ReportDbo::entityType eq entityType)
     }
 }

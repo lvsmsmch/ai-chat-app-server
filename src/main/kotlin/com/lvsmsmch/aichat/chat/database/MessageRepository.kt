@@ -50,9 +50,6 @@ class MessageRepository(
         }
     }
 
-    /**
-     * FLOW для стриминга обновлений сообщений
-     */
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
     fun streamMessageUpdates(messageId: String): Flow<MessageUpdateEvent> {
@@ -71,7 +68,6 @@ class MessageRepository(
                     isComplete = message.status == MessageStatus.COMPLETED.value,
                     isFailed = message.status == MessageStatus.FAILED.value
                 ).also {
-//                    logger.info("DB event: ${it}")
                 }
             }
             .distinctUntilChanged()
@@ -84,16 +80,10 @@ class MessageRepository(
         val isFailed: Boolean
     )
 
-    /**
-     * CREATE
-     */
     suspend fun insertMessage(session: ClientSession, messageDbo: MessageDbo) {
         collection.insertOne(session, messageDbo)
     }
 
-    /**
-     * READ - основные методы
-     */
     suspend fun getMessageById(messageId: String): MessageDbo? {
         return collection.findOneById(messageId)
     }
@@ -118,15 +108,12 @@ class MessageRepository(
             and(
                 MessageDbo::chatId eq chatId,
                 MessageDbo::isRead eq false,
-                MessageDbo::senderId ne userId, // Не считаем собственные сообщения
+                MessageDbo::senderId ne userId,
                 MessageDbo::isDeleted eq false
             )
         ).toInt()
     }
 
-    /**
-     * READ - методы для курсорной пагинации
-     */
     suspend fun getMessagesPaginated(
         chatId: String,
         cursor: String? = null,
@@ -150,9 +137,6 @@ class MessageRepository(
             .toList()
     }
 
-    /**
-     * READ - методы для синхронизации по времени
-     */
 
     suspend fun getMessagesCreatedBefore(chatId: String, timestamp: UtcTimestamp): List<MessageDbo> {
         return collection.find(
@@ -192,12 +176,9 @@ class MessageRepository(
                 MessageDbo::deletedAt gt timestamp.toString(),
                 MessageDbo::isDeleted eq true
             )
-        ).toList().map { it.clientId } // Возвращаем clientId для клиента
+        ).toList().map { it.clientId }
     }
 
-    /**
-     * READ - методы для умной синхронизации в диапазоне
-     */
     suspend fun getMessagesUpdatedInRange(
         chatId: String,
         afterTimestamp: UtcTimestamp,
@@ -278,9 +259,6 @@ class MessageRepository(
         ) > 0
     }
 
-    /**
-     * READ - вспомогательные методы
-     */
     suspend fun getAllMessagesByChatId(
         chatId: String,
         descending: Boolean = true,
@@ -300,9 +278,6 @@ class MessageRepository(
         return collection.find(and(MessageDbo::clientId `in` clientIds)).toList()
     }
 
-    /**
-     * UPDATE
-     */
     suspend fun updateMessage(
         messageId: String,
         imageUrl: String? = null,
@@ -318,7 +293,7 @@ class MessageRepository(
         status?.let { updates.add(setValue(MessageDbo::status, it)) }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
         nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
-        if (updates.isEmpty()) return // Nothing to update
+        if (updates.isEmpty()) return
         val result = collection.updateOneById(
             messageId,
             combine(
@@ -345,22 +320,11 @@ class MessageRepository(
         return result.modifiedCount.toInt()
     }
 
-//    suspend fun markMessageAsStreaming(messageId: String) {
-//        val messageDbo = getMessageById(messageId) ?: return
-//        val newMessageDbo = messageDbo.copy(
-//            status = MessageStatus.STREAMING.value
-//        )
-//    }
 
-    /**
-     * DELETE
-     */
 
     suspend fun deleteMessagesByIds(chatId: String, messageIds: List<String>) {
-        logger.debug("DB delete messages 0")
         if (messageIds.isEmpty()) return
-        logger.debug("DB delete messages 1")
-        val result = collection.updateMany(
+        collection.updateMany(
             and(
                 MessageDbo::id `in` messageIds,
                 MessageDbo::chatId eq chatId,
@@ -371,7 +335,6 @@ class MessageRepository(
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
-        logger.debug("DB delete messages 2 (result=$result)")
     }
 
     suspend fun deleteMessagesByIds(messageIds: List<String>) {

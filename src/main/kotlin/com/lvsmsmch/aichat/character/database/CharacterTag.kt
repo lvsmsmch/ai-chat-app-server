@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.character.database
 import com.lvsmsmch.aichat.utils.ValidationException
 
 enum class CharacterTag(val code: String) {
-    // Relationship Type
     BOYFRIEND("boyfriend"),
     GIRLFRIEND("girlfriend"),
     FRIEND("friend"),
@@ -17,7 +16,6 @@ enum class CharacterTag(val code: String) {
     COWORKER("coworker"),
     STRANGER("stranger"),
 
-    // Personality
     ROMANTIC("romantic"),
     FLIRTY("flirty"),
     SHY("shy"),
@@ -29,7 +27,6 @@ enum class CharacterTag(val code: String) {
     CHEERFUL("cheerful"),
     SERIOUS("serious"),
 
-    // Role
     HERO("hero"),
     VILLAIN("villain"),
     ANTI_HERO("anti_hero"),
@@ -40,7 +37,6 @@ enum class CharacterTag(val code: String) {
     TEACHER("teacher"),
     BOSS("boss"),
 
-    // Appearance
     DARK_HAIR("dark_hair"),
     LIGHT_HAIR("light_hair"),
     TALL("tall"),
@@ -48,7 +44,6 @@ enum class CharacterTag(val code: String) {
     CUTE("cute"),
     ELEGANT("elegant"),
 
-    // Special Traits
     STRONG("strong"),
     SMART("smart"),
     RICH("rich"),
@@ -63,8 +58,8 @@ enum class CharacterTag(val code: String) {
                 emptyList()
             } else {
                 tags.split(",")
-                    .map { it.trim() }  // убираем пробелы
-                    .filter { it.isNotBlank() }  // убираем пустые
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
                     .map { tag ->
                         try {
                             CharacterTag.getByCode(tag)

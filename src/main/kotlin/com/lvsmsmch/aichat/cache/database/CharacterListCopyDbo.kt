@@ -6,10 +6,10 @@ import org.bson.codecs.pojo.annotations.BsonId
 
 @Serializable
 data class CharacterListCopyDbo(
-    @BsonId val id: String, // "${userId}_${deviceId}_${listType.code}"
+    @BsonId val id: String,
     val userId: String,
     val deviceId: String,
-    val listType: String, // "personalized" | "category_anime" | "search_abc123def456"
+    val listType: String,
     val characterIds: List<String>,
     val currentPosition: Int = 0,
     val baseListVersion: String,

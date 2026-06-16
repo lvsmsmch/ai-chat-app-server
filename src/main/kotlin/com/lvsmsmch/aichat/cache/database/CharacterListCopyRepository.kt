@@ -10,7 +10,6 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    // ========== CREATE / UPDATE ==========
 
     suspend fun upsert(characterListCopyDbo: CharacterListCopyDbo) {
         collection.replaceOneById(characterListCopyDbo.id, characterListCopyDbo, ReplaceOptions().upsert(true))
@@ -27,13 +26,11 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
         )
     }
 
-    // ========== READ ==========
 
     suspend fun getExistingCopy(userId: String, deviceId: String, listType: String): CharacterListCopyDbo? {
         return collection.findOneById("${userId}_${deviceId}_${listType}")
     }
 
-    // ========== DELETE ==========
 
     suspend fun deleteSessionCopy(userId: String, deviceId: String, listType: String) {
         val id = "${userId}_${deviceId}_${listType}"
@@ -62,7 +59,6 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
         return result.deletedCount
     }
 
-    // ========== UTILITY ==========
 
     suspend fun getCopyStats(): SessionCopyStats {
         val totalCopies = collection.countDocuments()
@@ -98,7 +94,6 @@ class CharacterListCopyRepository(private val collection: CoroutineCollection<Ch
         )
     }
 
-    // ========== DATA CLASSES ==========
 
     data class SessionCopyResult(
         val characterIds: List<String>,

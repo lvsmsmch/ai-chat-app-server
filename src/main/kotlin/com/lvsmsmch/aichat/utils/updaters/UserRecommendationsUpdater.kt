@@ -19,7 +19,7 @@ fun configureUserRecommendationsUpdater(
     characterRepository: CharacterRepository,
     chatRepository: ChatRepository,
     userCacheRepository: UserRecommendationsCacheRepository,
-    updateIntervalMinutes: Long = 60 // каждый час
+    updateIntervalMinutes: Long = 60
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)
@@ -29,16 +29,13 @@ fun configureUserRecommendationsUpdater(
             try {
                 logger.info("Starting user base cache update")
 
-                // Загружаем всех персонажей один раз
                 val allCharacters = characterRepository.getAllPublicCharacters()
                 val charactersById = allCharacters.associateBy { it.id }
                 logger.info("Loaded ${allCharacters.size} characters for base cache update")
 
-                // Получаем пользователей, которым нужно обновить базовый кеш
                 val usersToUpdate = getUsersNeedingBaseCacheUpdate(userRepository, userCacheRepository)
                 logger.info("Found ${usersToUpdate.size} users needing base cache update")
 
-                // Обрабатываем пакетами
                 usersToUpdate.chunked(50).forEach { batch ->
                     batch.forEach { user ->
                         val recommendedIds = generateBaseRecommendationsForUser(
@@ -51,10 +48,9 @@ fun configureUserRecommendationsUpdater(
                         userCacheRepository.upsertUserCache(user.id, recommendedIds)
 
                     }
-                    delay(100) // Пауза между пакетами
+                    delay(100)
                 }
 
-                // Очистка старых кешей
                 val deletedCount = userCacheRepository.deleteInactiveUserCaches()
                 if (deletedCount > 0) {
                     logger.info("Cleaned up $deletedCount inactive user base caches")
@@ -83,17 +79,16 @@ private suspend fun getUsersNeedingBaseCacheUpdate(
     val now = UtcTimestamp.now()
     val monthAgo = now.subtractDays(30)
 
-    // Получаем активных пользователей
     val activeUsers = userRepository.getActiveUsersSince(monthAgo)
 
     return activeUsers.filter { user ->
         val cache = userBaseCacheRepository.getUserCache(user.id)
         if (cache == null) {
-            true // Нет кеша - нужно создать
+            true
         } else {
             val ttl = determineTTL(UtcTimestamp.parse(user.lastActiveAt), now)
             val expirationTime = UtcTimestamp.parse(cache.updatedAt).addHours(ttl)
-            expirationTime.isBefore(now) // Кеш устарел
+            expirationTime.isBefore(now)
         }
     }
 }
@@ -110,10 +105,8 @@ private suspend fun generateBaseRecommendationsForUser(
     val availableCharacters = allCharacters.filter { !userCharacterIds.contains(it.id) }
 
     return if (userCharacterIds.isEmpty()) {
-        // Новый пользователь
         availableCharacters.getRecommendations()
     } else {
-        // Персонализированные рекомендации
         val userCharacters = userCharacterIds.mapNotNull { charactersById[it] }
 
         val scoredCharacters = availableCharacters.map { character ->

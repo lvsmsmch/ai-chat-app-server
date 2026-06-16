@@ -7,16 +7,10 @@ import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 
-/**
- * Репозиторий для нотификаций о новых персонажах
- */
 class RecommendationsRepository(
     private val collection: CoroutineCollection<RecommendationsDbo>
 ) {
 
-    /**
-     * Инициализация индексов
-     */
     init {
         initializeIndexes()
     }
@@ -35,14 +29,8 @@ class RecommendationsRepository(
         }
     }
 
-    /**
-     * Flow для мониторинга изменений
-     */
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE
-     */
 
     suspend fun insertNotification(
         session: ClientSession? = null,
@@ -57,9 +45,6 @@ class RecommendationsRepository(
 
 
 
-    /**
-     * READ
-     */
 
     suspend fun getNotificationById(notificationId: String): RecommendationsDbo? {
         return collection.findOneById(notificationId)
@@ -80,13 +65,7 @@ class RecommendationsRepository(
     }
 
 
-    /**
-     * UPDATE - пометка как прочитанные
-     */
 
-    /**
-     * DELETE
-     */
     suspend fun deleteNotification(notificationId: String) {
         collection.deleteOneById(notificationId)
     }

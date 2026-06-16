@@ -16,11 +16,9 @@ repositories {
 }
 
 dependencies {
-    // Force coroutines version to be consistent
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.8.0")
 
-    // Ktor - all using the same version
     val ktorVersion = "2.3.10"
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
@@ -34,24 +32,19 @@ dependencies {
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
     implementation("io.ktor:ktor-server-rate-limit:$ktorVersion")
 
-    // KMongo - downgrade to version compatible with Kotlin 1.8.x
     implementation("org.litote.kmongo:kmongo:5.2.0")
     implementation("org.litote.kmongo:kmongo-coroutine:5.2.0")
 
-    // Amazon S3
     implementation("software.amazon.awssdk:s3:2.20.45")
     implementation("software.amazon.awssdk:aws-core:2.20.45")
 
-    // Other dependencies
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2") // Instead of 1.5.1
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     implementation("ch.qos.logback:logback-classic:1.4.12")
     implementation("org.mindrot:jbcrypt:0.4")
     implementation("com.sun.mail:jakarta.mail:2.0.1")
 
-    // Google Auth (for subscriptions)
     implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
 
-    // Tests
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.0.20")
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("io.mockk:mockk:1.13.7")
@@ -73,7 +66,6 @@ tasks.withType<JavaCompile> {
     targetCompatibility = "17"
 }
 
-// Force consistent coroutines version
 configurations.all {
     resolutionStrategy {
         force("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")

@@ -16,9 +16,6 @@ class FollowRepository(
     private val collection: CoroutineCollection<FollowDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -34,23 +31,15 @@ class FollowRepository(
     }
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
-    /**
-     * CREATE
-     */
     suspend fun addConnection(session: ClientSession, followerId: String, followeeId: String) {
-        // Проверяем, что пользователь не подписывается на самого себя
         if (followerId == followeeId) {
             throw IllegalArgumentException("User cannot follow themselves")
         }
 
-        // Проверяем, что связь еще не существует
         val existingConnection = collection.findOne(
             and(
                 FollowDbo::followerId eq followerId,
@@ -70,9 +59,6 @@ class FollowRepository(
         }
     }
 
-    /**
-     * READ
-     */
 
     suspend fun getFollowers(userId: String, beforeTime: UtcTimestamp?, size: Int): List<FollowDbo> {
         return collection.find(
@@ -129,14 +115,8 @@ class FollowRepository(
         ) != null
     }
 
-    /**
-     * UPDATE
-     */
 
 
-    /**
-     * DELETE
-     */
     suspend fun removeConnection(session: ClientSession, followerId: String, followeeId: String) {
         collection.deleteOne(
             session,
@@ -148,7 +128,6 @@ class FollowRepository(
     }
 
     suspend fun removeAllConnectionsContainingUserId(session: ClientSession, userId: String) {
-        // Удаляем все связи, где пользователь является подписчиком или тем, на кого подписаны
         collection.deleteMany(
             session,
             or(

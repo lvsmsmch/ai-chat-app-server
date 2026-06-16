@@ -10,7 +10,7 @@ fun configureCharacterCoOccurrenceUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     chatRepository: ChatRepository,
-    updateIntervalMinutes: Long = 24 * 60, // раз в день
+    updateIntervalMinutes: Long = 24 * 60,
     minimumUsersThreshold: Int = 3,
     maxConnectionsPerCharacter: Int = 100,
     minimumScoreThreshold: Float = 0.01f
@@ -23,20 +23,17 @@ fun configureCharacterCoOccurrenceUpdater(
             try {
                 logger.info("Starting co-occurrence score calculation")
                 
-                // Получаем все чаты пользователей (не удаленные)
                 val allChats = chatRepository.getAllNonDeletedChats()
                 
-                // Группируем по пользователям и их персонажам
                 val userCharacterSets = allChats
                     .groupBy { it.userId }
                     .mapValues { (_, chats) -> 
                         chats.flatMap { it.characterIds }.toSet() 
                     }
-                    .filter { it.value.size > 1 } // только пользователи с >1 персонажем
+                    .filter { it.value.size > 1 }
                 
                 logger.info("Processing ${userCharacterSets.size} users with multiple characters")
                 
-                // Находим пары персонажей
                 val characterPairCounts = mutableMapOf<Pair<String, String>, Int>()
                 
                 userCharacterSets.values.forEach { characterSet ->
@@ -50,13 +47,11 @@ fun configureCharacterCoOccurrenceUpdater(
                     }
                 }
                 
-                // Фильтруем пары с минимальным количеством совпадений
                 val significantPairs = characterPairCounts
                     .filter { it.value >= minimumUsersThreshold }
                 
                 logger.info("Found ${significantPairs.size} significant character pairs")
                 
-                // Обновляем co-occurrence scores
                 val allCharacters = characterRepository.getAllPublicCharacters()
                 val totalUsers = userCharacterSets.size.toFloat()
                 
@@ -77,7 +72,6 @@ fun configureCharacterCoOccurrenceUpdater(
                         }
                     }
                     
-                    // Ограничиваем до максимума самых сильных связей
                     val topConnections = coOccurrenceScores
                         .toList()
                         .sortedByDescending { it.second }
@@ -91,11 +85,9 @@ fun configureCharacterCoOccurrenceUpdater(
                 
                 logger.info("Co-occurrence score calculation completed for ${allCharacters.size} characters")
                 
-                // Wait for the next scheduled update
                 delay(TimeUnit.MINUTES.toMillis(updateIntervalMinutes))
                 
             } catch (e: CancellationException) {
-                // Expected during cancellation
                 logger.debug("Co-occurrence updater cancelled")
                 break
             } catch (e: Exception) {

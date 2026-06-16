@@ -21,14 +21,8 @@ class UserRecommendationsCacheRepository(
     private val collection: CoroutineCollection<UserRecommendationsCacheDbo>
 ) {
 
-    /**
-     * FLOW
-     */
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE / UPDATE
-     */
     suspend fun upsertUserCache(userId: String, characterIds: List<String>) {
         val cache = UserRecommendationsCacheDbo(
             userId = userId,
@@ -39,9 +33,6 @@ class UserRecommendationsCacheRepository(
         collection.replaceOneById(userId, cache, ReplaceOptions().upsert(true))
     }
 
-    /**
-     * READ
-     */
     suspend fun getUserCache(userId: String): UserRecommendationsCacheDbo? {
         return collection.findOneById(userId)
     }
@@ -56,9 +47,6 @@ class UserRecommendationsCacheRepository(
         return expirationTime.isAfter(UtcTimestamp.now())
     }
 
-    /**
-     * DELETE
-     */
     suspend fun deleteUserCache(userId: String) {
         collection.deleteOneById(userId)
     }
@@ -71,9 +59,6 @@ class UserRecommendationsCacheRepository(
         return result.deletedCount
     }
 
-    /**
-     * UTILITY
-     */
     suspend fun getCacheStats(): CacheStats {
         val totalCaches = collection.countDocuments()
         val now = UtcTimestamp.now()

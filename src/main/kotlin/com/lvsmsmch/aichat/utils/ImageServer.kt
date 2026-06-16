@@ -23,13 +23,6 @@ data class UploadedImages(
 
 object ImageServer {
 
-    /**
-     * Uploads an image file to Amazon S3 and returns URLs of both original and thumbnail images.
-     * Converts PNG to JPEG if needed and creates a 100x100 thumbnail.
-     *
-     * @param image The image file to upload
-     * @return UploadedImages containing URLs of original and thumbnail images
-     */
     suspend fun uploadImageOnServer(image: File): UploadedImages {
         val accessKey = System.getenv("AWS_ACCESS_KEY") ?: throw Exception("Missing AWS_ACCESS_KEY key")
         val secretKey = System.getenv("AWS_SECRET_KEY") ?: throw Exception("Missing AWS_SECRET_KEY key")
@@ -46,7 +39,6 @@ object ImageServer {
         val originalFileName = "$baseUuid.jpg"
         val thumbnailFileName = "${baseUuid}_thumb.jpg"
 
-        // Configure S3 client
         val credentialsProvider = StaticCredentialsProvider.create(
             AwsBasicCredentials.create(accessKey, secretKey)
         )
@@ -60,17 +52,14 @@ object ImageServer {
         var thumbnailFile: File? = null
 
         try {
-            // Step 1: Convert to JPEG if needed (keep original dimensions)
             originalFile = if (detectedFormat == "png") {
                 convertToJpeg(image, 0.85f)
             } else {
-                image // Already JPEG
+                image
             }
 
-            // Step 2: Create 100x100 thumbnail
             thumbnailFile = createThumbnail(originalFile, 100, 100, 0.85f)
 
-            // Step 3: Upload both files to S3
             val originalUrl = uploadToS3(s3Client, originalFile, bucketName, originalFileName)
             val thumbnailUrl = uploadToS3(s3Client, thumbnailFile, bucketName, thumbnailFileName)
 
@@ -83,7 +72,6 @@ object ImageServer {
             logger.error("Failed to process and upload image", e)
             throw Exception("Image processing failed: ${e.message}", e)
         } finally {
-            // Clean up temporary files
             if (originalFile != image && originalFile?.exists() == true) {
                 originalFile.delete()
             }
@@ -97,17 +85,14 @@ object ImageServer {
             val image = ImageIO.read(inputFile)
                 ?: throw Exception("Could not read image file")
 
-            // Create RGB image (remove alpha channel for JPEG)
             val jpegImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
             jpegImage.graphics.apply {
                 drawImage(image, 0, 0, null)
                 dispose()
             }
 
-            // Create temporary file
             val tempFile = createTempFile("converted", ".jpg").toFile()
 
-            // Write JPEG with specified quality
             val writers = ImageIO.getImageWritersByFormatName("jpg")
             val writer = writers.next()
             val writeParam = writer.defaultWriteParam.apply {
@@ -132,17 +117,14 @@ object ImageServer {
             val originalImage = ImageIO.read(inputFile)
                 ?: throw Exception("Could not read image file for thumbnail")
 
-            // Create thumbnail with fast rendering
             val thumbnail = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
             thumbnail.graphics.apply {
                 drawImage(originalImage.getScaledInstance(width, height, java.awt.Image.SCALE_FAST), 0, 0, null)
                 dispose()
             }
 
-            // Create temporary file for thumbnail
             val tempFile = createTempFile("thumbnail", ".jpg").toFile()
 
-            // Write JPEG thumbnail
             val writers = ImageIO.getImageWritersByFormatName("jpg")
             val writer = writers.next()
             val writeParam = writer.defaultWriteParam.apply {
@@ -187,12 +169,10 @@ object ImageServer {
         val bytes = file.readBytes().take(4).toByteArray()
 
         return when {
-            // JPEG: FF D8
             bytes.size >= 2 &&
                     bytes[0] == 0xFF.toByte() &&
                     bytes[1] == 0xD8.toByte() -> "jpg"
 
-            // PNG: 89 50 4E 47
             bytes.size >= 4 &&
                     bytes[0] == 0x89.toByte() &&
                     bytes[1] == 0x50.toByte() &&

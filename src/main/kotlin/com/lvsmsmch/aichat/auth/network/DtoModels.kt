@@ -5,7 +5,6 @@ import com.lvsmsmch.aichat.user.network.UserDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ============= RESPONSE MODELS =============
 
 @Serializable
 data class UserLoginInfoDto(
@@ -27,7 +26,6 @@ data class SuccessfulLoginDto(
     @SerialName("userDetailsDto") val userDetailsDto: UserDetailsDto,
 )
 
-// ============= REQUEST MODELS =============
 
 @Serializable
 data class GoogleAuthRequest(
@@ -50,7 +48,6 @@ data class SubscriptionStatusRequest(
     @SerialName("hasSubscription") val hasSubscription: Boolean
 )
 
-// ============= INTERNAL MODELS =============
 
 data class OAuthUserData(
     val id: String,

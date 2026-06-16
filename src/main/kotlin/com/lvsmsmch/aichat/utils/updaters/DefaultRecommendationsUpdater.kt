@@ -11,7 +11,7 @@ fun configureDefaultRecommendationsUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     defaultRecommendationsCacheRepository: DefaultRecommendationsCacheRepository,
-    updateIntervalMinutes: Long = 60 // каждый час
+    updateIntervalMinutes: Long = 60
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)

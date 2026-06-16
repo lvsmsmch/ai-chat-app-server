@@ -31,15 +31,9 @@ class CharacterActivityLogRepository(
 ) {
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE
-     */
     suspend fun logActivity(
         session: ClientSession,
         activityType: ActivityType,
@@ -56,9 +50,6 @@ class CharacterActivityLogRepository(
 
 
 
-    /**
-     * READ
-     */
 
     suspend fun getActivity(
         activityType: ActivityType,
@@ -101,16 +92,8 @@ class CharacterActivityLogRepository(
         val count: Int
     )
 
-    /**
-     * UPDATE
-     */
 
-    /** nothing **/
 
-    /**
-     * DELETE
-     */
 
-    /** nothing **/
 
 }

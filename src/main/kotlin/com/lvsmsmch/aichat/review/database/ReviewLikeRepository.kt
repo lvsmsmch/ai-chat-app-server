@@ -13,9 +13,6 @@ class ReviewLikeRepository(
     private val collection: CoroutineCollection<ReviewLikeDbo>
 ) {
 
-    /**
-     * Initialize indexes for the collection
-     */
 
     init {
         initializeIndexes()
@@ -30,16 +27,10 @@ class ReviewLikeRepository(
     }
 
 
-    /**
-     * FLOW
-     */
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
-    /**
-     * CREATE
-     */
 
     suspend fun likeReview(session: ClientSession, userId: String, reviewId: String) {
         val likeId = "${userId}_${reviewId}"
@@ -59,9 +50,6 @@ class ReviewLikeRepository(
     
 
 
-    /**
-     * READ
-     */
 
 
     suspend fun isReviewLikedByUser(userId: String, reviewId: String): Boolean {
@@ -91,13 +79,7 @@ class ReviewLikeRepository(
     }
 
 
-    /**
-     * UPDATE
-     */
 
-    /**
-     * DELETE
-     */
 
     suspend fun unlikeReview(session: ClientSession, userId: String, reviewId: String) {
         val likeId = "${userId}_${reviewId}"

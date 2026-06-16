@@ -17,11 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import java.io.File
 import kotlin.random.Random
-import kotlin.system.measureTimeMillis
 
 object AiMessageGeneratorUtil {
 
@@ -83,14 +80,9 @@ object AiMessageGeneratorUtil {
                 val key = if (useGroq) groqApiKey else openAiApiKey
                 val model = if (useGroq) groqModel else openAiModel
 
-                logger.debug("API Key starts with: ${key.take(10)}...")
-                logger.debug("API URL: $url")
-
                 val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
                 val requestBody = buildRequestBody(messages, model = model, stream = false)
 
-                logger.debug("Sending request to: $url")
-                logger.debug("Request body: ${Json.encodeToString(requestBody)}")
                 logger.debug("Messages count: ${messages.size}")
 
                 var lastException: Exception? = null
@@ -104,18 +96,14 @@ object AiMessageGeneratorUtil {
                         attempt++
                         logger.debug("Attempt ${attempt} of $maxRetries")
 
-                        val response = httpClient.post(groqApiUrl) {
-                            header(HttpHeaders.Authorization, "Bearer $groqApiKey")
+                        val response = httpClient.post(url) {
+                            header(HttpHeaders.Authorization, "Bearer $key")
                             header(HttpHeaders.Accept, "text/event-stream")
                             contentType(ContentType.Application.Json)
                             setBody(requestBody)
                         }
 
                         logger.debug("Response status: ${response.status}")
-                        logger.debug("Response headers: ${response.headers}")
-                        logger.debug("Response body: ${response.bodyAsText()}")
-
-//                        processStreamingResponse(response, onMsgTextUpdate, onFinished)
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
@@ -143,7 +131,6 @@ object AiMessageGeneratorUtil {
                 val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo)
 
                 logger.debug("Sending request to Gemini API")
-                logger.debug("Request body: ${Json.encodeToString(requestBody)}")
 
                 val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
                     contentType(ContentType.Application.Json)
@@ -151,8 +138,6 @@ object AiMessageGeneratorUtil {
                 }
 
                 logger.debug("Response status: ${response.status}")
-                logger.debug("Response headers: ${response.headers}")
-                logger.debug("Response body: ${response.bodyAsText()}")
 
                 val fullMessage = processGeminiResponse(response, characterDbo)
                 simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
@@ -165,9 +150,6 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    /**
-     * Строим историю сообщений для OpenAI API
-     */
     private fun buildMessageHistory(
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
@@ -180,26 +162,22 @@ object AiMessageGeneratorUtil {
             "content" to buildSystemPrompt(chatDbo, characterDbo)
         )
 
-        // Берем сообщения с конца до достижения лимита
         val selectedMessages = mutableListOf<MessageDbo>()
         var currentCharacterCount = 0
 
-        // Идем от последнего к первому
         for (message in messagesHistory.reversed()) {
-            if (message.text.isBlank()) continue // Пропускаем пустые
+            if (message.text.isBlank()) continue
 
             val messageLength = message.text.length
 
-            // Проверяем, не превысим ли лимит
             if (currentCharacterCount + messageLength > maxCharacters) {
-                break // Достигли лимита, останавливаемся
+                break
             }
 
             selectedMessages.add(message)
             currentCharacterCount += messageLength
         }
 
-        // Переворачиваем обратно (от старых к новым)
         val historyMessages = selectedMessages.reversed().map { message ->
             val messageMap = mutableMapOf<String, String>()
 
@@ -226,9 +204,6 @@ object AiMessageGeneratorUtil {
         return listOf(systemMessage) + historyMessages
     }
 
-    /**
-     * Строим системный промпт
-     */
     private fun buildSystemPrompt(chatDbo: ChatDbo, characterDbo: CharacterDbo): String {
         val template = aiPrompt + if (chatDbo.characterIds.size > 1) aiGroupChatPrompt else ""
 
@@ -237,9 +212,6 @@ object AiMessageGeneratorUtil {
             .replace("{USER_PROMPT}", characterDbo.prompt.takeIf { it.isNotBlank() } ?: "")
     }
 
-    /**
-     * Строим тело запроса
-     */
     private fun buildRequestBody(
         messages: List<Map<String, String>>,
         model: String,
@@ -252,17 +224,12 @@ object AiMessageGeneratorUtil {
                     addJsonObject {
                         put("role", message["role"]!!)
                         put("content", message["content"]!!)
-//                        message["name"]?.let { put("name", it) }
                     }
                 }
             }
             put("max_completion_tokens", 1000)
             put("temperature", temperature)
-//            put("top_p", 1.0)
-//            put("frequency_penalty", 0.3)
-//            put("presence_penalty", 0.3)
             put("stream", stream)
-//            put("tool_choice", "auto")
         }
     }
 
@@ -283,9 +250,6 @@ object AiMessageGeneratorUtil {
         return content ?: throw Exception("Null content in response")
     }
 
-    /**
-     * Обрабатываем стриминг ответ от OpenAI
-     */
     private suspend fun processStreamingResponse(
         response: HttpResponse,
         onMsgTextUpdate: suspend (String) -> Unit,
@@ -297,7 +261,7 @@ object AiMessageGeneratorUtil {
             throw Exception("API error: ${response.status} - $errorBody")
         }
 
-        val channel = response.bodyAsChannel() // ← ОСТАВЛЯЕМ!
+        val channel = response.bodyAsChannel()
         val fullMessage = StringBuilder()
         var hasContent = false
 
@@ -308,7 +272,6 @@ object AiMessageGeneratorUtil {
                 .filter { data -> data.isNotBlank() }
                 .collect { data ->
                     try {
-//                        logger.debug("Received chunk: $data")
 
                         val jsonData = Json.parseToJsonElement(data).jsonObject
                         val choices = jsonData["choices"]?.jsonArray
@@ -321,10 +284,6 @@ object AiMessageGeneratorUtil {
                                 hasContent = true
                                 fullMessage.append(content)
 
-                                // ✅ ДОБАВЬ ОТЛАДКУ КОДИРОВКИ:
-//                                logger.debug("Raw content: '$content'")
-//                                logger.debug("Content bytes: ${content.toByteArray(Charsets.UTF_8).contentToString()}")
-//                                logger.debug("Full message so far: '${fullMessage.toString()}'")
 
                                 onMsgTextUpdate(fullMessage.toString())
                             }
@@ -351,9 +310,6 @@ object AiMessageGeneratorUtil {
     }
 
 
-    /**
-     * Строим историю сообщений для Gemini API
-     */
     private fun buildGeminiMessageHistory(
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
@@ -361,7 +317,6 @@ object AiMessageGeneratorUtil {
         messagesHistory: List<MessageDbo>,
         maxCharacters: Int = 1000
     ): List<Map<String, Any>> {
-        // Берем сообщения с конца до достижения лимита
         val selectedMessages = mutableListOf<MessageDbo>()
         var currentCharacterCount = 0
 
@@ -379,7 +334,6 @@ object AiMessageGeneratorUtil {
 
         val isGroupChat = chatDbo.characterIds.size > 1
 
-        // Переворачиваем обратно (от старых к новым)
         val history = selectedMessages.reversed().map { message ->
             val role = if (message.isSentByUser) "user" else "model"
             val content = if (!message.isSentByUser && isGroupChat) {
@@ -407,9 +361,6 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    /**
-     * Строим тело запроса для Gemini
-     */
     private fun buildGeminiRequestBody(
         messages: List<Map<String, Any>>,
         chatDbo: ChatDbo,
@@ -446,9 +397,6 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    /**
-     * Обрабатываем ответ от Gemini
-     */
     private suspend fun processGeminiResponse(response: HttpResponse, characterDbo: CharacterDbo): String {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
@@ -456,10 +404,7 @@ object AiMessageGeneratorUtil {
             throw Exception("Gemini API error: ${response.status} - $errorBody")
         }
 
-        val responseBody = response.bodyAsText()
-        logger.debug("Gemini response: $responseBody")
-
-        val jsonResponse = Json.parseToJsonElement(responseBody).jsonObject
+        val jsonResponse = Json.parseToJsonElement(response.bodyAsText()).jsonObject
         val candidates = jsonResponse["candidates"]?.jsonArray
         val content = candidates?.get(0)?.jsonObject
             ?.get("content")?.jsonObject
@@ -476,26 +421,19 @@ object AiMessageGeneratorUtil {
             .replace("\n", "")
     }
 
-    /**
-     * Расширение для чтения UTF8 строк из канала
-     */
     private suspend fun ByteReadChannel.readUTF8LineSequence(): Flow<String> = flow {
-        val buffer = ByteArray(8192) // Буфер для байтов
+        val buffer = ByteArray(8192)
         val stringBuilder = StringBuilder()
 
         while (!isClosedForRead) {
             try {
-                // Читаем доступные байты
                 val bytesRead = readAvailable(buffer, 0, buffer.size)
                 if (bytesRead > 0) {
-                    // Правильно декодируем UTF-8
                     val text = String(buffer, 0, bytesRead, Charsets.UTF_8)
                     stringBuilder.append(text)
 
-                    // Разбиваем на строки
                     val lines = stringBuilder.toString().split('\n')
 
-                    // Отправляем все строки кроме последней (она может быть неполной)
                     for (i in 0 until lines.size - 1) {
                         val line = lines[i].trimEnd('\r')
                         if (line.isNotEmpty()) {
@@ -503,7 +441,6 @@ object AiMessageGeneratorUtil {
                         }
                     }
 
-                    // Оставляем последнюю (возможно неполную) строку в буфере
                     stringBuilder.clear()
                     stringBuilder.append(lines.last())
                 }
@@ -512,7 +449,6 @@ object AiMessageGeneratorUtil {
             }
         }
 
-        // Отправляем оставшуюся строку
         val remaining = stringBuilder.toString().trimEnd('\r')
         if (remaining.isNotEmpty()) {
             emit(remaining)
@@ -534,12 +470,8 @@ object AiMessageGeneratorUtil {
             currentMessage.append(words[i])
             onChunk(currentMessage.toString())
             delay(Random.nextLong(50, 150))
-//            delay(Random.nextLong(1000, 3000))
         }
 
-//        if ((1..5).random() == 5) {
-//            throw Exception("Fake exception")
-//        }
 
         delay(100)
         onFinished(currentMessage.toString())
@@ -587,25 +519,6 @@ object AiMessageGeneratorUtil {
                 "*nods enthusiastically* Yes, yes! I totally agree! " +
                 "Ehehe~ you always know just what to say! ♪"
     )
-
-    private fun getPromptTemplate(fileName: String): String {
-        return try {
-            val currentDir = System.getProperty("user.dir")
-            val jarLocation =
-                File(AiMessageGeneratorUtil::class.java.protectionDomain.codeSource.location.toURI()).parent
-
-            logger.debug("=== FILE DEBUG INFO ===")
-            logger.debug("Current working directory: $currentDir")
-            logger.debug("JAR location: $jarLocation")
-            logger.debug("Files in current dir: ${File(".").listFiles()?.map { it.name }}")
-            logger.debug("=======================")
-
-            File("resources/prompts/${fileName}").readText(Charsets.UTF_8)
-        } catch (e: Exception) {
-            logger.error("Failed to load external prompt file $fileName", e)
-            ""
-        }
-    }
 
     private fun String.removePrefixIgnoringCase(prefix: String): String {
         if (startsWith(prefix, ignoreCase = true)) {

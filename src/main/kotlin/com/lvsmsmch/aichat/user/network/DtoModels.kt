@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.character.network.CharacterDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ============= RESPONSE MODELS =============
 
 @Serializable
 data class UserDto(
@@ -66,7 +65,6 @@ data class UserCharactersResponse(
     @SerialName("nextCursor") val nextCursor: String? = null
 )
 
-// ============= REQUEST MODELS =============
 
 @Serializable
 data class GetUserCharactersRequest(

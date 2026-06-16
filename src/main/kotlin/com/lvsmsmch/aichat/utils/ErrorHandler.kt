@@ -6,15 +6,12 @@ import io.ktor.server.request.*
 
 fun Application.configureErrorHandling() {
     install(StatusPages) {
-        // Handle our custom application exceptions
         exception<ApiException> { call, exception ->
-            // Log the error with context
             logger.error(
                 "Application exception: ${exception.errorCode} (${exception.httpStatus}) - " +
                         "Path: ${call.request.path()}, Message: ${exception.errorMessage}"
             )
 
-            // Respond with specific error details
             call.respondError(
                 httpStatusCode = exception.httpStatus,
                 code = exception.errorCode,
@@ -22,7 +19,6 @@ fun Application.configureErrorHandling() {
             )
         }
 
-        // General catch-all for unexpected exceptions
         exception<Throwable> { call, exception ->
             logger.error(
                 "Unhandled exception for ${call.request.path()}: ${exception.message}",

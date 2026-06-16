@@ -48,7 +48,6 @@ class ForbiddenException(
     errorMessage = errorMessage
 )
 
-// Validation errors
 class UsernameAlreadyTakenException(
     username: String? = null,
     errorMessage: String = "Username $username is already taken"
@@ -66,7 +65,6 @@ class ValidationException(
     errorMessage = errorMessage
 )
 
-// User-specific errors
 class UserNotFoundException(
     id: String? = null,
     errorMessage: String = if (id != null) "User with id $id not found" else "User not found"
@@ -76,7 +74,6 @@ class UserNotFoundException(
     errorMessage = errorMessage
 )
 
-// Character-specific errors
 class CharacterNotFoundException(
     id: String? = null,
     errorMessage: String = if (id != null) "Character with id $id not found" else "Character not found"
@@ -86,7 +83,6 @@ class CharacterNotFoundException(
     errorMessage = errorMessage
 )
 
-// Chat-specific errors
 class ChatNotFoundException(
     id: String? = null,
     errorMessage: String = if (id != null) "Chat with id $id not found" else "Chat not found"
@@ -96,7 +92,6 @@ class ChatNotFoundException(
     errorMessage = errorMessage
 )
 
-// Review-specific errors
 class ReviewNotFoundException(
     id: String? = null,
     errorMessage: String = if (id != null) "Review with id $id not found" else "Review not found"
@@ -122,7 +117,6 @@ class GoogleAccountAlreadyInUseException(
     errorMessage = errorMessage
 )
 
-// Uncategorized errors
 class InternalServerErrorException(
     errorMessage: String = "An unexpected error occurred"
 ) : ApiException(

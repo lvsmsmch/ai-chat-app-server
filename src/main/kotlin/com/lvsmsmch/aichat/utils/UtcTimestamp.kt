@@ -1,4 +1,3 @@
-// UtcTimestamp.kt
 package com.lvsmsmch.aichat.utils
 
 import kotlinx.serialization.Serializable
@@ -7,11 +6,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-/**
- * A custom timestamp class that wraps `Instant` for better serialization.
- * 🔹 **Stored in MongoDB as:** ISO-8601 format string (e.g., `"2025-03-12T14:30:00Z"`).
- * 🔹 **Output (toString) format:** ISO-8601 (e.g., `"2025-03-12T14:30:00Z"`).
- */
 @Serializable(with = UtcTimestampSerializer::class)
 class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
 
@@ -33,7 +27,6 @@ class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
     fun isBefore(utcTimestamp: UtcTimestamp) = instant.isBefore(utcTimestamp.instant)
     fun isAfter(utcTimestamp: UtcTimestamp) = instant.isAfter(utcTimestamp.instant)
 
-    // Format the timestamp as an ISO-8601 string
     override fun toString(): String {
         return DateTimeFormatter.ISO_INSTANT.format(instant)
     }
@@ -42,7 +35,6 @@ class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
         return instant.compareTo(other.instant)
     }
 
-    // Format with a custom pattern
     fun format(pattern: String, zoneId: ZoneId = ZoneId.systemDefault()): String {
         val formatter = DateTimeFormatter.ofPattern(pattern).withZone(zoneId)
         return formatter.format(instant)
@@ -53,7 +45,6 @@ class UtcTimestamp(val instant: Instant) : Comparable<UtcTimestamp> {
 
         fun year1900(): UtcTimestamp = UtcTimestamp(Instant.parse("1900-01-01T00:00:00Z"))
 
-        // Parse from ISO-8601 string
         fun parse(isoString: String): UtcTimestamp {
             return UtcTimestamp(Instant.parse(isoString))
         }

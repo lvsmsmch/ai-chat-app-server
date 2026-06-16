@@ -29,10 +29,6 @@ fun Route.configureCharacterRouting(
 
     route("/characters") {
 
-        /**
-         * POST /characters
-         * Создание нового персонажа (multipart/form-data)
-         */
         post {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -67,8 +63,6 @@ fun Route.configureCharacterRouting(
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
                             val file = File.createTempFile("upload_", ".tmp")
-                            logger.debug("new file name: ${file.name}")
-
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -78,7 +72,7 @@ fun Route.configureCharacterRouting(
                         }
                     }
 
-                    else -> {} // Ignore other part types
+                    else -> {}
                 }
                 part.dispose()
             }
@@ -97,8 +91,6 @@ fun Route.configureCharacterRouting(
             validateCharacterCategory(category!!)
             if (tags == null) throw BadRequestException("Missing tags field")
             validateCharacterTags(tags!!)
-//            if (pictureFile == null) throw BadRequestException("Missing pictureFile field")
-//            validateCharacterPicture(pictureFile!!)
 
             pictureFile?.let { validateCharacterPicture(it) }
 
@@ -133,10 +125,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }
 
-        /**
-         * GET /characters/search
-         * Поиск персонажей
-         */
         get("/search") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -180,10 +168,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = result.toDto(mapper))
         }
 
-        /**
-         * GET /characters/search/suggestions
-         * Получение подсказок для поиска
-         */
         get("/search/suggestions") {
             val request = GetSearchSuggestionsRequest(
                 query = call.request.queryParameters["query"] ?: "",
@@ -197,10 +181,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = SearchSuggestionsResponse(suggestions = suggestions))
         }
 
-        /**
-         * GET /characters/category/{category}
-         * Получение персонажей по категории
-         */
         get("/category/{category}") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -255,10 +235,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = result.toDto(mapper))
         }
 
-        /**
-         * GET /characters/{id}
-         * Получение основной информации о персонаже
-         */
         get("/{id}") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -275,10 +251,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = characterDbo.toCharacterDto(mapper))
         }
 
-        /**
-         * GET /characters/{id}/details
-         * Получение детальной информации о персонаже
-         */
         get("/{id}/details") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -295,10 +267,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = characterDbo.toCharacterDetailsDto(mapper, currentUserId))
         }
 
-        /**
-         * GET /characters/{id}/private
-         * Получение приватной информации о персонаже (только для автора)
-         */
         get("/{id}/private") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -315,10 +283,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = characterDbo.toCharacterPrivateInfoDto(mapper))
         }
 
-        /**
-         * GET /characters/{characterId}/similar
-         * Получение похожих персонажей
-         */
         get("/{characterId}/similar") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -344,10 +308,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))
         }
 
-        /**
-         * PATCH /characters/{characterId}
-         * Обновление персонажа (multipart/form-data)
-         */
         patch("/{characterId}") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -394,8 +354,6 @@ fun Route.configureCharacterRouting(
                     is PartData.FileItem -> {
                         if (part.name == "picture") {
                             val file = File.createTempFile("upload_", ".tmp")
-                            logger.debug("new file name: ${file.name}")
-
                             part.streamProvider().use { input ->
                                 file.outputStream().buffered().use { output ->
                                     input.copyTo(output)
@@ -405,16 +363,11 @@ fun Route.configureCharacterRouting(
                         }
                     }
 
-                    else -> {} // Ignore other part types
+                    else -> {}
                 }
                 part.dispose()
             }
 
-//            if (name == null && description == null && prompt == null && initialMessage == null &&
-//                visibility == null && pictureFile == null && category == null
-//            ) {
-//                throw NoUpdateFieldsProvidedException()
-//            }
 
             name?.let { validateCharacterName(it) }
             description?.let { validateCharacterDescription(it) }
@@ -447,10 +400,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(data = updatedCharacter.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }
 
-        /**
-         * DELETE /characters/{characterId}
-         * Удаление персонажа
-         */
         delete("/{characterId}") {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -469,10 +418,6 @@ fun Route.configureCharacterRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /characters/{characterId}/report
-         * Жалоба на персонажа
-         */
         post("/{characterId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 

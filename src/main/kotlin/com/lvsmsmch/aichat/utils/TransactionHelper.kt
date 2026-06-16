@@ -16,7 +16,6 @@ class TransactionHelper(val client: CoroutineClient) {
             val result = transactions(session)
 
             session.commitTransactionAndAwait()
-//            session.commitTransaction()
             logger.info("TRANSACTION FINISHED")
 
             return result
@@ -25,7 +24,6 @@ class TransactionHelper(val client: CoroutineClient) {
             logger.error("Error: ${e.message}", e)
             logger.error("Error type: ${e::class.simpleName}")
             session.abortTransactionAndAwait()
-//            session.abortTransaction()
             throw e
         } finally {
             session.close()

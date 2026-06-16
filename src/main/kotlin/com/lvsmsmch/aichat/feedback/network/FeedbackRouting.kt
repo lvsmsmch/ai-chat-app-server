@@ -16,10 +16,6 @@ fun Route.configureFeedbackRouting(
 
     route("/feedback") {
 
-        /**
-         * POST /feedback
-         * Отправка фидбека
-         */
         post {
             val sessionDbo = sessionRepository.verifyToken(call)
             val request = call.receive<SendFeedbackRequest>()

@@ -29,7 +29,6 @@ class ComplexQueryHelper(
 ) {
 
 
-    // REVIEWS
 
 
     suspend fun addReview(reviewDbo: ReviewDbo) {
@@ -107,7 +106,6 @@ class ComplexQueryHelper(
     }
 
 
-    // CHARACTERS
 
 
     suspend fun addCharacter(characterDbo: CharacterDbo) {
@@ -118,10 +116,6 @@ class ComplexQueryHelper(
             } else {
                 userRepository.incrementPrivateCharacterCount(session, characterDbo.authorId, 1)
             }
-//            searchSuggestionsRepository.addCharacterName(
-//                session = session,
-//                originalText = characterDbo.name,
-//            )
         }
     }
 
@@ -157,13 +151,6 @@ class ComplexQueryHelper(
                 tags = tags?.let { CharacterTag.fromString(tags) }
             )
 
-//            if (name != null && oldName != name) {
-//                searchSuggestionsRepository.updateCharacterName(
-//                    session = session,
-//                    newText = name,
-//                    oldText = oldName,
-//                )
-//            }
 
             if (visibility != null && oldVisibility != visibility) {
                 chatRepository.deleteChatsForWhoIsNotAuthor(
@@ -189,44 +176,30 @@ class ComplexQueryHelper(
 
     suspend fun deleteCharacter(characterId: String) {
         transactionHelper.withTransaction { session ->
-            logger.info("1")
             val character = characterRepository.getCharacter(session, characterId)!!
             val userId = character.authorId
-            logger.info("2")
             characterRepository.deleteCharacter(session, characterId)
-            logger.info("3")
             deletedIdsStatsRepository.entityWasDeleted(session, EntityType.CHARACTER, characterId)
-            logger.info("4")
             if (character.visibility == CharacterVisibility.PUBLIC.code) {
                 userRepository.incrementPublicCharacterCount(session, userId, -1)
             } else {
                 userRepository.incrementPrivateCharacterCount(session, userId, -1)
             }
-            logger.info("5")
             chatRepository.deleteAllChatsByCharacterId(session, characterId)
-            // we do not delete messages, because we use soft delete for chat and messages
 
-            logger.info("6")
             val reviewIds = reviewRepository.getReviewIdsByCharacterId(session, characterId)
-            logger.info("7")
             reviewRepository.deleteReviewsByIds(session, reviewIds)
-            logger.info("8")
             deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.REVIEW, reviewIds)
-            logger.info("9")
             reviewLikeRepository.removeAllLikesForReviews(session, reviewIds)
-            logger.info("10")
         }
     }
 
 
-    // USERS
 
 
     suspend fun addUser(userDbo: UserDbo) {
         transactionHelper.withTransaction { session ->
             userRepository.addUser(session, userDbo)
-//            val userInTransaction = userRepository.getUserById(session, "testUser001")
-//            logger.info("User exists in transaction: ${userInTransaction != null}")
         }
     }
 
@@ -284,7 +257,6 @@ class ComplexQueryHelper(
             deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.CHARACTER, characterIds)
 
             chatRepository.deleteAllChatsByCharacterIds(session, characterIds)
-            // we do not delete messages, because we use soft delete for chat and messages
 
             val reviewForCharactersIds = reviewRepository.getReviewIdsByCharacterIds(session, characterIds)
             val reviewByUserIds = reviewRepository.getReviewIdsByUserId(session, userId)
@@ -301,7 +273,6 @@ class ComplexQueryHelper(
     }
 
 
-    // CHATS & MESSAGES
 
 
     suspend fun addChat(chatDbo: ChatDbo) {

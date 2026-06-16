@@ -5,13 +5,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * A thread-safe buffer that collects items and flushes them after a period of inactivity.
- * Uses a periodic checking mechanism rather than per-item timers.
- */
 class InactivityBuffer<T>(
     private val inactivityTimeoutMs: Long = 50,
-    private val checkIntervalMs: Long = 20,  // How often to check for inactivity
+    private val checkIntervalMs: Long = 20,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val onBatchReady: suspend (items: List<T>) -> Unit,
 ) {
@@ -21,10 +17,6 @@ class InactivityBuffer<T>(
     private var checkerJob: Job? = null
     private var isCheckerRunning = false
 
-    /**
-     * Adds an item to the buffer and updates the timestamp.
-     * Starts the checker if not already running.
-     */
     suspend fun add(item: T) {
         mutex.withLock {
             buffer.add(item)
@@ -36,9 +28,6 @@ class InactivityBuffer<T>(
         }
     }
 
-    /**
-     * Manually flush the buffer regardless of timing.
-     */
     suspend fun flushNow() {
         mutex.withLock {
             if (buffer.isNotEmpty()) {
@@ -47,9 +36,6 @@ class InactivityBuffer<T>(
         }
     }
 
-    /**
-     * Releases resources and flushes any remaining items.
-     */
     suspend fun close() {
         stopPeriodicChecker()
         flushNow()
@@ -69,16 +55,15 @@ class InactivityBuffer<T>(
 
                     if (buffer.isNotEmpty() && timeSinceLastItem >= inactivityTimeoutMs) {
                         flush()
-                        // Stop checking until new items arrive
                         isCheckerRunning = false
-                        true  // Signal to stop the loop
+                        true
                     } else {
-                        false  // Continue the loop
+                        false
                     }
                 }
 
                 if (shouldStop) {
-                    break  // Now break is outside the lambda
+                    break
                 }
             }
         }

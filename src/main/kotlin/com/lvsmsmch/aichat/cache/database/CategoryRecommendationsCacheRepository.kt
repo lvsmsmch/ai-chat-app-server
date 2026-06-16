@@ -22,14 +22,8 @@ class CategoryRecommendationsCacheRepository(
     private val collection: CoroutineCollection<CategoryRecommendationsCacheDbo>
 ) {
 
-    /**
-     * FLOW
-     */
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
-    /**
-     * CREATE / UPDATE
-     */
     suspend fun upsertCategoryCache(category: CharacterCategory, characterIds: List<String>) {
         val cache = CategoryRecommendationsCacheDbo(
             categoryCode = category.code,
@@ -39,9 +33,6 @@ class CategoryRecommendationsCacheRepository(
         collection.replaceOneById(category.code, cache, ReplaceOptions().upsert(true))
     }
 
-    /**
-     * READ
-     */
     suspend fun getCategoryCache(category: CharacterCategory): CategoryRecommendationsCacheDbo? {
         return collection.findOneById(category.code)
     }
@@ -55,7 +46,6 @@ class CategoryRecommendationsCacheRepository(
         
         val needingUpdate = mutableListOf<CharacterCategory>()
         
-        // Проверяем все комбинации категорий и сидов
         CharacterCategory.entries.forEach { category ->
                 val cache = getCategoryCache(category)
                 if (cache == null || UtcTimestamp.parse(cache.updatedAt).isBefore(cutoff)) {
@@ -66,9 +56,6 @@ class CategoryRecommendationsCacheRepository(
         return needingUpdate
     }
 
-    /**
-     * DELETE
-     */
 
     suspend fun deleteAllCacheForCategory(category: CharacterCategory) {
         collection.deleteMany(
@@ -76,9 +63,6 @@ class CategoryRecommendationsCacheRepository(
         )
     }
 
-    /**
-     * UTILITY
-     */
     suspend fun getCacheStats(): CategoryCacheStats {
         val totalCaches = collection.countDocuments()
         val now = UtcTimestamp.now()

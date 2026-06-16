@@ -8,7 +8,7 @@ import com.lvsmsmch.aichat.chat.network.AiMessageGeneratorUtil
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
-import kotlinx.coroutines.withTimeout // ✅ Правильно
+import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
 class MessageFinisher(

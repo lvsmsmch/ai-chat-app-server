@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.user.network.UserDto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ============= RESPONSE MODELS =============
 
 @Serializable
 data class CharacterDto(
@@ -79,7 +78,6 @@ data class SimilarCharactersResponse(
     @SerialName("characters") val characters: List<CharacterDto>
 )
 
-// ============= REQUEST MODELS =============
 
 @Serializable
 data class SearchCharactersRequest(

@@ -26,10 +26,6 @@ fun Route.configureReviewRouting(
 ) {
     route("/reviews") {
 
-        /**
-         * POST /reviews
-         * Создание нового отзыва
-         */
         post {
             val sessionDbo = sessionRepository.verifyToken(call)
             val request = call.receive<CreateReviewRequest>()
@@ -59,10 +55,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess(data = reviewDbo.toReviewDto(mapper))
         }
 
-        /**
-         * GET /reviews
-         * Получение списка отзывов с пагинацией
-         */
         get {
             val sessionDbo = sessionRepository.verifyToken(call)
 
@@ -83,7 +75,7 @@ fun Route.configureReviewRouting(
                 characterId = request.characterId,
                 sortCriteria = request.sortCriteria,
                 beforeTime = beforeTime,
-                size = request.size + 1 // +1 для проверки hasMore
+                size = request.size + 1
             )
 
             val hasMore = reviewsDbos.size > request.size
@@ -99,10 +91,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess(data = response)
         }
 
-        /**
-         * PATCH /reviews/{id}
-         * Обновление отзыва
-         */
         patch("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
@@ -132,10 +120,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess(data = updatedReview.toReviewDto(mapper))
         }
 
-        /**
-         * DELETE /reviews/{id}
-         * Удаление отзыва
-         */
         delete("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
@@ -154,10 +138,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /reviews/{id}/report
-         * Жалоба на отзыв
-         */
         post("/{id}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val reviewId = call.parameters["id"]
@@ -177,10 +157,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /reviews/{id}/like
-         * Лайк отзыва
-         */
         post("/{id}/like") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
@@ -199,10 +175,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess()
         }
 
-        /**
-         * POST /reviews/{id}/unlike
-         * Убрать лайк с отзыва
-         */
         post("/{id}/unlike") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]
@@ -220,10 +192,6 @@ fun Route.configureReviewRouting(
             call.respondSuccess()
         }
 
-        /**
-         * GET /reviews/{id}/likes
-         * Получение пользователей, лайкнувших отзыв
-         */
         get("/{id}/likes") {
             sessionRepository.verifyToken(call)
             val reviewId = call.parameters["id"]

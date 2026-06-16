@@ -13,8 +13,8 @@ fun configureCharacterTrendingScoreUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     characterActivityLogRepository: CharacterActivityLogRepository,
-    updateIntervalMinutes: Long = 60, // Default to once an hour
-    includeIntervalMinutes: Long = 7 * 24 * 60  // Default to a week
+    updateIntervalMinutes: Long = 60,
+    includeIntervalMinutes: Long = 7 * 24 * 60
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)
@@ -64,10 +64,8 @@ fun configureCharacterTrendingScoreUpdater(
                 }
                 logger.info("Trending score calculation completed successfully")
 
-                // Wait for the next scheduled update
                 delay(TimeUnit.MINUTES.toMillis(updateIntervalMinutes))
             } catch (e: CancellationException) {
-                // Expected during cancellation
                 logger.debug("Trending score updater cancelled")
                 break
             } catch (e: Exception) {
@@ -88,16 +86,12 @@ private fun calculateTrendingScore(
 ): Float {
     var score = 0f
 
-    // Активность создания чатов (25%)
     score += min(uniqueUsersThatCreatedChat / 50f, 1f) * 0.25f
 
-    // Активность пользователей в сообщениях (25%)
     score += min(uniqueUsersThatSentMessage / 100f, 1f) * 0.25f
 
-    // Общее количество сообщений (30%)
     score += min(messagesCount / 500f, 1f) * 0.30f
 
-    // Активность отзывов (20%)
     score += min(uniqueUsersThatLeftReview / 20f, 1f) * 0.20f
 
     return score
