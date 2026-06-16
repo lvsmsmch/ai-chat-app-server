@@ -1,51 +1,25 @@
 # AI Chat App Server
 
-Ktor-based backend for an AI character chat application. The service provides authentication, character management, chats, messages, reviews, feedback, recommendations, and image upload support.
+Backend server for an AI character chat application. It handles user accounts, authentication, character profiles, chats, messages, reviews, feedback, recommendations, and image uploads.
 
-## Tech Stack
+The project is built around a Kotlin/Ktor API with MongoDB persistence. It supports AI message generation through external model providers and includes background jobs for recommendation and activity updates.
 
-- Kotlin JVM 17
+## Main Features
+
+- User authentication with guest and Google-based flows
+- Character creation, editing, search, tags, categories, and visibility settings
+- One-on-one and group chat support
+- Message streaming and chat synchronization
+- Reviews, likes, reports, feedback, and follow relationships
+- Recommendation caches and character ranking updates
+- Image upload and storage integration
+
+## Built With
+
+- Kotlin
 - Ktor
-- KMongo / MongoDB
+- MongoDB with KMongo
 - kotlinx.serialization
+- Kotlin coroutines
 - AWS S3 SDK
 - Gradle
-
-## Requirements
-
-- JDK 17+
-- MongoDB
-- API credentials for at least one supported model provider if AI responses are enabled
-- AWS S3 credentials if image uploads are enabled
-
-## Configuration
-
-Runtime configuration is provided through environment variables. Use `.env.example` as a template and keep real secrets out of git.
-
-Key variables:
-
-- `MONGODB_URI` - MongoDB connection string
-- `USE_GROQ`, `GROQ_API_URL`, `GROQ_API_KEY`, `GROQ_MODEL`
-- `USE_OPEN_AI`, `OPEN_AI_API_URL`, `OPEN_AI_API_KEY`, `OPEN_AI_MODEL`
-- `USE_GEMINI`, `GEMINI_API_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`
-- `AI_TEMPERATURE`, `AI_PROMPT`, `AI_GROUP_CHAT_PROMPT`
-- `GOOGLE_OAUTH_TOKEN_INFO_URL`
-- `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_S3_BUCKET_NAME`, `AWS_REGION`
-
-## Run Locally
-
-```bash
-./gradlew run
-```
-
-The server starts on port `8080`.
-
-## Build
-
-```bash
-./gradlew build
-```
-
-## Repository Hygiene
-
-Do not commit local `.env` files, IDE metadata, build output, logs, API keys, service account files, or private certificates. The Gradle wrapper JAR is intentionally allowed in git.
