@@ -157,6 +157,18 @@ private suspend fun getOauthUserData(googleToken: String): OAuthUserData {
         }
         val responseBody = response.bodyAsText()
         val json = Json.parseToJsonElement(responseBody).jsonObject
+
+        // Reject tokens issued to other applications. Enforced only when the
+        // expected client id is configured, so the variable stays optional.
+        val expectedClientId = System.getenv("GOOGLE_OAUTH_CLIENT_ID")
+        if (!expectedClientId.isNullOrBlank()) {
+            val audience = json["aud"]?.jsonPrimitive?.content
+            if (audience != expectedClientId) {
+                logger.error("OAuth token audience mismatch: $audience")
+                throw OAuthException()
+            }
+        }
+
         OAuthUserData(
             id = json["sub"]?.jsonPrimitive?.content
                 ?: throw Exception("Google response missing 'sub' field"),
