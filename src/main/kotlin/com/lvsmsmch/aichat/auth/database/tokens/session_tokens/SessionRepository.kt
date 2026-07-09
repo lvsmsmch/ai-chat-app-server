@@ -5,7 +5,6 @@ import com.lvsmsmch.aichat.auth.database.tokens.TokenRepository
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.lvsmsmch.aichat.utils.generateToken
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -25,16 +24,11 @@ class SessionRepository(
     override val collection: CoroutineCollection<SessionDbo>
 ): TokenRepository<SessionDbo> {
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(SessionDbo::token)
-            collection.ensureIndex(SessionDbo::userId)
-            collection.ensureIndex(SessionDbo::ipAddress)
-        }
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(SessionDbo::token)
+        collection.ensureIndex(SessionDbo::userId)
+        collection.ensureIndex(SessionDbo::ipAddress)
     }
 
 

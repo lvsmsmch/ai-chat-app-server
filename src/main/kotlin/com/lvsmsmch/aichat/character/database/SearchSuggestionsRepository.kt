@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.client.model.Indexes.compoundIndex
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.coroutine.insertOne
@@ -14,23 +13,18 @@ class SearchSuggestionsRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(SearchSuggestionDbo::term))
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(SearchSuggestionDbo::term))
 
-            collection.ensureIndex(descending(SearchSuggestionDbo::searchCount))
+        collection.ensureIndex(descending(SearchSuggestionDbo::searchCount))
 
-            collection.ensureIndex(
-                compoundIndex(
-                    ascending(SearchSuggestionDbo::term),
-                    descending(SearchSuggestionDbo::searchCount)
-                )
+        collection.ensureIndex(
+            compoundIndex(
+                ascending(SearchSuggestionDbo::term),
+                descending(SearchSuggestionDbo::searchCount)
             )
-        }
+        )
     }
 
 

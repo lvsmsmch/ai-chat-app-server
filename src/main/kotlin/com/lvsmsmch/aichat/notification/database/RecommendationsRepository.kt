@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.notification.database
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
 
@@ -11,22 +10,17 @@ class RecommendationsRepository(
     private val collection: CoroutineCollection<RecommendationsDbo>
 ) {
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(RecommendationsDbo::userId))
-            collection.ensureIndex(descending(RecommendationsDbo::createdAt))
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(RecommendationsDbo::userId))
+        collection.ensureIndex(descending(RecommendationsDbo::createdAt))
 
-            collection.ensureIndex(
-                ascending(
-                    RecommendationsDbo::userId,
-                    RecommendationsDbo::createdAt
-                )
+        collection.ensureIndex(
+            ascending(
+                RecommendationsDbo::userId,
+                RecommendationsDbo::createdAt
             )
-        }
+        )
     }
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)

@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.character.database
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Filters.regex
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.conversions.Bson
@@ -17,46 +16,41 @@ class CharacterRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(CharacterDbo::authorId))
-            collection.ensureIndex(ascending(CharacterDbo::visibility))
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(CharacterDbo::authorId))
+        collection.ensureIndex(ascending(CharacterDbo::visibility))
 
-            collection.ensureIndex(
-                ascending(
-                    CharacterDbo::visibility,
-                    CharacterDbo::category
-                )
+        collection.ensureIndex(
+            ascending(
+                CharacterDbo::visibility,
+                CharacterDbo::category
             )
+        )
 
-            collection.ensureIndex(descending(CharacterDbo::createdAt))
-            collection.ensureIndex(descending(CharacterDbo::averageRating))
-            collection.ensureIndex(descending(CharacterDbo::totalMessages))
-            collection.ensureIndex(descending(CharacterDbo::trendingScore))
-            collection.ensureIndex(descending(CharacterDbo::recommendationScore))
+        collection.ensureIndex(descending(CharacterDbo::createdAt))
+        collection.ensureIndex(descending(CharacterDbo::averageRating))
+        collection.ensureIndex(descending(CharacterDbo::totalMessages))
+        collection.ensureIndex(descending(CharacterDbo::trendingScore))
+        collection.ensureIndex(descending(CharacterDbo::recommendationScore))
 
-            collection.ensureIndex(ascending(CharacterDbo::name))
-            collection.ensureIndex(ascending(CharacterDbo::description))
+        collection.ensureIndex(ascending(CharacterDbo::name))
+        collection.ensureIndex(ascending(CharacterDbo::description))
 
-            collection.ensureIndex(
-                ascending(
-                    CharacterDbo::authorId,
-                    CharacterDbo::visibility
-                )
+        collection.ensureIndex(
+            ascending(
+                CharacterDbo::authorId,
+                CharacterDbo::visibility
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    CharacterDbo::visibility,
-                    CharacterDbo::recommendationScore
-                )
+        collection.ensureIndex(
+            ascending(
+                CharacterDbo::visibility,
+                CharacterDbo::recommendationScore
             )
-        }
+        )
     }
 
 

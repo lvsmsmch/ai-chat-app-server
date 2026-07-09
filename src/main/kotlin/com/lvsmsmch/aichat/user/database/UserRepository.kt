@@ -4,7 +4,6 @@ import com.lvsmsmch.aichat.chat.network.LimitsResponse
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.client.model.Updates
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import org.bson.conversions.Bson
 import org.litote.kmongo.*
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -15,20 +14,15 @@ class UserRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(UserDbo::email))
-            collection.ensureIndex(ascending(UserDbo::googleOauthId))
-            collection.ensureIndex(ascending(UserDbo::facebookOauthId))
-            collection.ensureIndex(ascending(UserDbo::username))
-            collection.ensureIndex(ascending(UserDbo::lastActiveAt))
-            collection.ensureIndex(ascending(UserDbo::deviceId))
-        }
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(UserDbo::email))
+        collection.ensureIndex(ascending(UserDbo::googleOauthId))
+        collection.ensureIndex(ascending(UserDbo::facebookOauthId))
+        collection.ensureIndex(ascending(UserDbo::username))
+        collection.ensureIndex(ascending(UserDbo::lastActiveAt))
+        collection.ensureIndex(ascending(UserDbo::deviceId))
     }
 
 

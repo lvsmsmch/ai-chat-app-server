@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.auth.database.tokens
 
+import com.lvsmsmch.aichat.utils.InvalidTokenException
 import com.lvsmsmch.aichat.utils.TokenExpiredException
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import io.ktor.server.application.*
@@ -39,7 +40,10 @@ interface TokenRepository<T : TokenDbo> {
         }
 
         val authToken = collection.findOne(TokenDbo::token eq token)
-        if (authToken == null || UtcTimestamp.parse(authToken.expiresAt).isInPast()) {
+            ?: throw InvalidTokenException()
+
+        if (UtcTimestamp.parse(authToken.expiresAt).isInPast()) {
+            delete(authToken.token)
             throw TokenExpiredException("Authentication token has expired")
         }
 

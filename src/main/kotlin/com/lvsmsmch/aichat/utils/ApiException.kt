@@ -32,6 +32,14 @@ class TokenExpiredException(
     errorMessage = errorMessage
 )
 
+class InvalidTokenException(
+    errorMessage: String = "Authentication token is invalid"
+) : ApiException(
+    httpStatus = HttpStatusCode.Unauthorized,
+    errorCode = "invalid_token",
+    errorMessage = errorMessage
+)
+
 class NoUpdateFieldsProvidedException(
     errorMessage: String = "No update fields provided"
 ) : ApiException(

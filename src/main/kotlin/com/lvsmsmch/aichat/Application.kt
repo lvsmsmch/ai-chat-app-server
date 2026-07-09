@@ -81,6 +81,13 @@ fun Application.module() {
                 call.request.origin.remoteHost
             }
         }
+
+        register(RateLimitName("rewarded")) {
+            rateLimiter(limit = 3, refillPeriod = 1.minutes)
+            requestKey { call ->
+                call.request.headers["Authorization"] ?: call.request.origin.remoteHost
+            }
+        }
     }
 
     install(CorrelationIdPlugin)
@@ -147,6 +154,25 @@ fun Application.module() {
     val feedbackRepository = FeedbackRepository(
         database.getCollection<FeedbackDbo>("feedbacks")
     )
+
+    databaseScope.launch {
+        try {
+            sessionRepository.ensureIndexes()
+            userRepository.ensureIndexes()
+            followRepository.ensureIndexes()
+            reportRepository.ensureIndexes()
+            characterRepository.ensureIndexes()
+            searchSuggestionsRepository.ensureIndexes()
+            chatRepository.ensureIndexes()
+            messageRepository.ensureIndexes()
+            reviewRepository.ensureIndexes()
+            reviewLikeRepository.ensureIndexes()
+            feedbackRepository.ensureIndexes()
+            logger.info("Database indexes ensured")
+        } catch (e: Exception) {
+            logger.error("Failed to ensure database indexes: ${e.message}", e)
+        }
+    }
 
     val cacheManager = CacheManager(
         characterRepository = characterRepository,
@@ -241,6 +267,11 @@ fun Application.module() {
         updateIntervalMinutes = 60
     )
 
+    val stuckMessagesUpdaterJob = configureStuckMessagesUpdater(
+        databaseScope = databaseScope,
+        messageRepository = messageRepository
+    )
+
     val hourlyCounterUpdaterJob = configureHourlyCountersUpdater(
         databaseScope = databaseScope,
         userRepository = userRepository
@@ -293,6 +324,7 @@ fun Application.module() {
             userRecommendationsUpdaterJob.cancelAndJoin()
             categoryCacheUpdaterJob.cancelAndJoin()
             defaultPersonalizedUpdaterJob.cancelAndJoin()
+            stuckMessagesUpdaterJob.cancelAndJoin()
             hourlyCounterUpdaterJob.cancelAndJoin()
             dailyCounterUpdaterJob.cancelAndJoin()
             fillDefaultSuggestionsJob.cancelAndJoin()

@@ -2,7 +2,6 @@ package com.lvsmsmch.aichat.user.database
 
 import com.lvsmsmch.aichat.utils.*
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -17,17 +16,12 @@ class FollowRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(FollowDbo::followerId))
-            collection.ensureIndex(ascending(FollowDbo::followeeId))
-            collection.ensureIndex(ascending(FollowDbo::followerId, FollowDbo::followeeId))
-            collection.ensureIndex(descending(FollowDbo::followedAt))
-        }
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(FollowDbo::followerId))
+        collection.ensureIndex(ascending(FollowDbo::followeeId))
+        collection.ensureIndex(ascending(FollowDbo::followerId, FollowDbo::followeeId))
+        collection.ensureIndex(descending(FollowDbo::followedAt))
     }
 
 

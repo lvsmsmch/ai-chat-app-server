@@ -15,51 +15,46 @@ class ChatRepository(
     private val collection: CoroutineCollection<ChatDbo>
 ) {
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(ChatDbo::userId))
-            collection.ensureIndex(ascending(ChatDbo::clientId))
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::lastModifiedAt
-                )
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(ChatDbo::userId))
+        collection.ensureIndex(ascending(ChatDbo::clientId))
+        collection.ensureIndex(
+            ascending(
+                ChatDbo::userId,
+                ChatDbo::lastModifiedAt
             )
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::isDeleted
-                )
+        )
+        collection.ensureIndex(
+            ascending(
+                ChatDbo::userId,
+                ChatDbo::isDeleted
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::type,
-                    ChatDbo::characterIds
-                )
+        collection.ensureIndex(
+            ascending(
+                ChatDbo::userId,
+                ChatDbo::type,
+                ChatDbo::characterIds
             )
+        )
 
-            collection.ensureIndex(ascending(ChatDbo::characterIds))
+        collection.ensureIndex(ascending(ChatDbo::characterIds))
 
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::createdAt
-                )
+        collection.ensureIndex(
+            ascending(
+                ChatDbo::userId,
+                ChatDbo::createdAt
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    ChatDbo::userId,
-                    ChatDbo::deletedAt
-                )
+        collection.ensureIndex(
+            ascending(
+                ChatDbo::userId,
+                ChatDbo::deletedAt
             )
-        }
+        )
     }
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)

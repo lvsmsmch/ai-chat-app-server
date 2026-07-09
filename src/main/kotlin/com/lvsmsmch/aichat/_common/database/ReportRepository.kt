@@ -1,7 +1,6 @@
 package com.lvsmsmch.aichat._common.database
 
 import com.lvsmsmch.aichat.utils.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
@@ -29,18 +28,13 @@ class ReportRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(ReportDbo::entityId))
-            collection.ensureIndex(ascending(ReportDbo::entityType))
-            collection.ensureIndex(ascending(ReportDbo::reportedBy))
-            collection.ensureIndex(ascending(ReportDbo::reportedAt))
-            collection.ensureIndex(ascending(ReportDbo::entityType, ReportDbo::entityId))
-        }
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(ReportDbo::entityId))
+        collection.ensureIndex(ascending(ReportDbo::entityType))
+        collection.ensureIndex(ascending(ReportDbo::reportedBy))
+        collection.ensureIndex(ascending(ReportDbo::reportedAt))
+        collection.ensureIndex(ascending(ReportDbo::entityType, ReportDbo::entityId))
     }
 
 

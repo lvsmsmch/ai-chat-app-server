@@ -2,7 +2,6 @@ package com.lvsmsmch.aichat.review.database
 
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import org.litote.kmongo.ascending
 import org.litote.kmongo.coroutine.CoroutineCollection
 import org.litote.kmongo.descending
@@ -14,16 +13,11 @@ class ReviewLikeRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
     
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(ReviewLikeDbo::userId))
-            collection.ensureIndex(ascending(ReviewLikeDbo::reviewId))
-            collection.ensureIndex(descending(ReviewLikeDbo::likedAt))
-        }
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(ReviewLikeDbo::userId))
+        collection.ensureIndex(ascending(ReviewLikeDbo::reviewId))
+        collection.ensureIndex(descending(ReviewLikeDbo::likedAt))
     }
 
 

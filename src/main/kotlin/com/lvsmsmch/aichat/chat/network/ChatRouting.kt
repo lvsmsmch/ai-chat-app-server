@@ -13,6 +13,7 @@ import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.utils.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -160,7 +161,10 @@ fun Route.configureChatRouting(
 
             val shouldAddInitMessage = userRepository.getLimits(userId).limitUntil == null
 
-            if (request.initialMessageId != null && shouldAddInitMessage) {
+            val initMessageAlreadyExists = request.initialMessageId != null &&
+                    messageRepository.findByClientId(request.initialMessageId) != null
+
+            if (request.initialMessageId != null && shouldAddInitMessage && !initMessageAlreadyExists) {
                 val characterId = request.characterIds.first()
                 MessageDbo(
                     id = idGenerator.generateId(EntityType.MESSAGE),
@@ -587,10 +591,6 @@ fun Route.configureChatRouting(
                         return@respondTextWriter
                     }
 
-                    if (currentMessage.status == MessageStatus.FAILED.value) {
-                        messageFinisher.finishMessageAsync(message.id)
-                    }
-
                     if (!messageFinisher.isFinishing(message.id)) {
                         messageFinisher.finishMessageAsync(message.id)
                     }
@@ -656,18 +656,20 @@ fun Route.configureChatRouting(
 
 
 
-        post("/rewarded") {
-            val userId = sessionRepository.verifyToken(call).userId
-            val request = call.receive<UserRewardedRequest>()
+        rateLimit(RateLimitName("rewarded")) {
+            post("/rewarded") {
+                val userId = sessionRepository.verifyToken(call).userId
+                val request = call.receive<UserRewardedRequest>()
 
-            userRepository.addUserLimitsAfterRewardedWasWatched(userId)
-            delay(100)
+                userRepository.addUserLimitsAfterRewardedWasWatched(userId)
+                delay(100)
 
-            call.respondSuccess(
-                UserRewardedResponse(
-                    limitsResponse = userRepository.getLimits(userId)
+                call.respondSuccess(
+                    UserRewardedResponse(
+                        limitsResponse = userRepository.getLimits(userId)
+                    )
                 )
-            )
+            }
         }
     }
 }

@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.review.database
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.runBlocking
 import org.bson.Document
 import org.bson.conversions.Bson
 import org.litote.kmongo.*
@@ -15,43 +14,38 @@ class ReviewRepository(
 ) {
 
 
-    init {
-        initializeIndexes()
-    }
 
-    private fun initializeIndexes() {
-        runBlocking {
-            collection.ensureIndex(ascending(ReviewDbo::characterId))
-            collection.ensureIndex(
-                ascending(
-                    ReviewDbo::characterId,
-                    ReviewDbo::createdAt
-                )
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(ascending(ReviewDbo::characterId))
+        collection.ensureIndex(
+            ascending(
+                ReviewDbo::characterId,
+                ReviewDbo::createdAt
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    ReviewDbo::characterId,
-                    ReviewDbo::rating
-                )
+        collection.ensureIndex(
+            ascending(
+                ReviewDbo::characterId,
+                ReviewDbo::rating
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    ReviewDbo::characterId,
-                    ReviewDbo::likesCount
-                )
+        collection.ensureIndex(
+            ascending(
+                ReviewDbo::characterId,
+                ReviewDbo::likesCount
             )
+        )
 
-            collection.ensureIndex(
-                ascending(
-                    ReviewDbo::authorId,
-                    ReviewDbo::characterId
-                )
+        collection.ensureIndex(
+            ascending(
+                ReviewDbo::authorId,
+                ReviewDbo::characterId
             )
+        )
 
-            collection.ensureIndex(ascending(ReviewDbo::authorId))
-        }
+        collection.ensureIndex(ascending(ReviewDbo::authorId))
     }
 
 

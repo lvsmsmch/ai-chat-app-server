@@ -9,6 +9,7 @@ import com.lvsmsmch.aichat.utils.UtcTimestamp
 import com.lvsmsmch.aichat.utils.logger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 
 class MessageFinisher(
@@ -19,15 +20,14 @@ class MessageFinisher(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private var currentlyFinishingMessages = mutableMapOf<String, Job>()
+    private val currentlyFinishingMessages = ConcurrentHashMap<String, Job>()
 
     fun isFinishing(messageId: String): Boolean {
         return currentlyFinishingMessages[messageId]?.isActive == true
     }
 
     fun finishMessageAsync(messageId: String, timeoutSeconds: Int = 30) {
-        currentlyFinishingMessages[messageId]?.cancel()
-        currentlyFinishingMessages[messageId] = scope.launch {
+        val newJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 val messageDbo = messageRepository.getMessageById(messageId) ?: return@launch
                 val chatDbo = chatRepository.getChatById(messageDbo.chatId) ?: return@launch
@@ -85,6 +85,9 @@ class MessageFinisher(
                     text = "",
                     status = MessageStatus.FAILED.value
                 )
+            } catch (e: CancellationException) {
+                logger.debug("finishMessageAsync cancelled, another job took over (${e.message})")
+                throw e
             } catch (e: Exception) {
                 logger.debug("finishMessageAsync error, upd msg (${e.message})")
                 messageRepository.updateMessage(
@@ -92,9 +95,14 @@ class MessageFinisher(
                     text = "",
                     status = MessageStatus.FAILED.value
                 )
-            } finally {
-                currentlyFinishingMessages.remove(messageId)
             }
         }
+
+        newJob.invokeOnCompletion {
+            currentlyFinishingMessages.remove(messageId, newJob)
+        }
+
+        currentlyFinishingMessages.put(messageId, newJob)?.cancel()
+        newJob.start()
     }
 }

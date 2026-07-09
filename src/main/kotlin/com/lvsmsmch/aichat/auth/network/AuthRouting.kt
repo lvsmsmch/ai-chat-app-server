@@ -13,6 +13,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
@@ -30,64 +31,66 @@ fun Route.configureAuthRouting(
 ) {
     route("/auth") {
 
-        post("/google") {
-            val request = call.receive<GoogleAuthRequest>()
+        rateLimit(RateLimitName("auth-strict")) {
+            post("/google") {
+                val request = call.receive<GoogleAuthRequest>()
 
-            validateDeviceId(request.deviceId)
+                validateDeviceId(request.deviceId)
 
-            val oauthUserData = getOauthUserData(request.googleToken)
+                val oauthUserData = getOauthUserData(request.googleToken)
 
-            val userDbo = userRepository.findByGoogleId(oauthUserData.id)
-                ?: UserDbo(
-                    id = idGenerator.generateId(EntityType.USER),
-                    username = usernameGenerator.generateUniqueUsername(),
-                    googleOauthId = oauthUserData.id,
-                    email = oauthUserData.email,
-                    name = oauthUserData.name,
-                    profilePictureUrl = null,
-                    accountType = AccountType.REGISTERED
-                ).also {
-                    complexQueryHelper.addUser(it)
-                }
+                val userDbo = userRepository.findByGoogleId(oauthUserData.id)
+                    ?: UserDbo(
+                        id = idGenerator.generateId(EntityType.USER),
+                        username = usernameGenerator.generateUniqueUsername(),
+                        googleOauthId = oauthUserData.id,
+                        email = oauthUserData.email,
+                        name = oauthUserData.name,
+                        profilePictureUrl = null,
+                        accountType = AccountType.REGISTERED
+                    ).also {
+                        complexQueryHelper.addUser(it)
+                    }
 
-            val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
+                val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
 
-            call.respondSuccess(
-                SuccessfulLoginDto(
-                    userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
-                    userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
-                    userDto = userDbo.toUserDto(mapper),
-                    userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                call.respondSuccess(
+                    SuccessfulLoginDto(
+                        userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
+                        userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
+                        userDto = userDbo.toUserDto(mapper),
+                        userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                    )
                 )
-            )
-        }
+            }
 
-        post("/guest") {
-            val request = call.receive<GuestAuthRequest>()
+            post("/guest") {
+                val request = call.receive<GuestAuthRequest>()
 
-            validateDeviceId(request.deviceId)
+                validateDeviceId(request.deviceId)
 
-            val userDbo =
-                null
-                ?: userRepository.findByDeviceId(request.deviceId)
-                ?: UserDbo(
-                    id = idGenerator.generateId(EntityType.USER),
-                    username = usernameGenerator.generateUniqueUsername(),
-                    deviceId = request.deviceId
-                ).also {
-                    complexQueryHelper.addUser(it)
-                }
+                val userDbo =
+                    null
+                    ?: userRepository.findByDeviceId(request.deviceId)
+                    ?: UserDbo(
+                        id = idGenerator.generateId(EntityType.USER),
+                        username = usernameGenerator.generateUniqueUsername(),
+                        deviceId = request.deviceId
+                    ).also {
+                        complexQueryHelper.addUser(it)
+                    }
 
-            val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
+                val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
 
-            call.respondSuccess(
-                SuccessfulLoginDto(
-                    userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
-                    userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
-                    userDto = userDbo.toUserDto(mapper),
-                    userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                call.respondSuccess(
+                    SuccessfulLoginDto(
+                        userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
+                        userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
+                        userDto = userDbo.toUserDto(mapper),
+                        userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                    )
                 )
-            )
+            }
         }
 
 
@@ -103,27 +106,29 @@ fun Route.configureAuthRouting(
             call.respondSuccess()
         }
 
-        post("/link-google") {
-            val sessionDbo = sessionRepository.verifyToken(call)
-            val request = call.receive<GoogleConnectRequest>()
+        rateLimit(RateLimitName("auth-strict")) {
+            post("/link-google") {
+                val sessionDbo = sessionRepository.verifyToken(call)
+                val request = call.receive<GoogleConnectRequest>()
 
-            val userDbo = userRepository.getUserById(sessionDbo.userId)
-                ?: throw BadRequestException("User does not exist")
+                val userDbo = userRepository.getUserById(sessionDbo.userId)
+                    ?: throw BadRequestException("User does not exist")
 
-            val oauthUserData = getOauthUserData(request.googleToken)
+                val oauthUserData = getOauthUserData(request.googleToken)
 
-            val existingUser = userRepository.findByGoogleId(oauthUserData.id)
-            if (existingUser != null) {
-                throw GoogleAccountAlreadyInUseException()
+                val existingUser = userRepository.findByGoogleId(oauthUserData.id)
+                if (existingUser != null) {
+                    throw GoogleAccountAlreadyInUseException()
+                }
+
+                userRepository.linkGoogleToUser(
+                    userId = sessionDbo.userId,
+                    googleId = oauthUserData.id,
+                    email = oauthUserData.email,
+                )
+
+                call.respondSuccess()
             }
-
-            userRepository.linkGoogleToUser(
-                userId = sessionDbo.userId,
-                googleId = oauthUserData.id,
-                email = oauthUserData.email,
-            )
-
-            call.respondSuccess()
         }
 
 

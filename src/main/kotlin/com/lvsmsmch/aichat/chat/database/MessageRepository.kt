@@ -13,41 +13,40 @@ class MessageRepository(
     private val collection: CoroutineCollection<MessageDbo>
 ) {
 
-    init {
-        runBlocking {
-            collection.ensureIndex(
-                ascending(
-                    MessageDbo::chatId,
-                    MessageDbo::createdAt
-                )
+    suspend fun ensureIndexes() {
+        collection.ensureIndex(
+            ascending(
+                MessageDbo::chatId,
+                MessageDbo::createdAt
             )
-            collection.ensureIndex(MessageDbo::clientId)
-            collection.ensureIndex(MessageDbo::senderId)
-            collection.ensureIndex(
-                ascending(
-                    MessageDbo::chatId,
-                    MessageDbo::isDeleted
-                )
+        )
+        collection.ensureIndex(MessageDbo::clientId)
+        collection.ensureIndex(MessageDbo::senderId)
+        collection.ensureIndex(
+            ascending(
+                MessageDbo::chatId,
+                MessageDbo::isDeleted
             )
-            collection.ensureIndex(
-                ascending(
-                    MessageDbo::chatId,
-                    MessageDbo::lastModifiedAt
-                )
+        )
+        collection.ensureIndex(
+            ascending(
+                MessageDbo::chatId,
+                MessageDbo::lastModifiedAt
             )
-            collection.ensureIndex(
-                ascending(
-                    MessageDbo::chatId,
-                    MessageDbo::deletedAt
-                )
+        )
+        collection.ensureIndex(
+            ascending(
+                MessageDbo::chatId,
+                MessageDbo::deletedAt
             )
-            collection.ensureIndex(
-                ascending(
-                    MessageDbo::isRead,
-                    MessageDbo::senderId
-                )
+        )
+        collection.ensureIndex(
+            ascending(
+                MessageDbo::isRead,
+                MessageDbo::senderId
             )
-        }
+        )
+        collection.ensureIndex(MessageDbo::status)
     }
 
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
@@ -301,6 +300,21 @@ class MessageRepository(
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )
+    }
+
+    suspend fun failStuckStreamingMessages(stuckSince: UtcTimestamp): Long {
+        val result = collection.updateMany(
+            and(
+                MessageDbo::status eq MessageStatus.STREAMING.value,
+                MessageDbo::lastModifiedAt lt stuckSince.toString()
+            ),
+            combine(
+                setValue(MessageDbo::status, MessageStatus.FAILED.value),
+                setValue(MessageDbo::text, ""),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
+            )
+        )
+        return result.modifiedCount
     }
 
     suspend fun markMessagesAsRead(messageIds: List<String>): Int {
