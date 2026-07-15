@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.chat.database
 
+import com.lvsmsmch.aichat._common.AvatarColors
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -20,4 +21,5 @@ data class ChatDbo(
     val isFirstChatWithThisCharacter: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: String = UtcTimestamp.now().toString(),
+    val color: String = AvatarColors.random()
 )

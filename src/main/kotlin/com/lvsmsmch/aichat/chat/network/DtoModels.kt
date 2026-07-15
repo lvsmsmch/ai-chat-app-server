@@ -11,7 +11,8 @@ data class ChatDto(
     @SerialName("chatType") val chatType: String,
     @SerialName("customName") val customName: String? = null,
     @SerialName("characters") val characters: List<CharacterDto>,
-    @SerialName("createdAt") val createdAt: String
+    @SerialName("createdAt") val createdAt: String,
+    @SerialName("color") val color: String = ""
 )
 
 @Serializable

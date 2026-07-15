@@ -38,7 +38,8 @@ suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
         id = id,
         username = username,
         name = name,
-        profilePicUrlThumbnail = profilePictureUrlThumbnail ?: profilePictureUrl
+        profilePicUrlThumbnail = profilePictureUrlThumbnail ?: profilePictureUrl,
+        color = color,
     )
 }
 
@@ -107,6 +108,7 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
         averageRating = averageRating,
         picUrl = picUrl,
         picUrlThumbnail = picUrlThumbnail ?: picUrl,
+        color = color,
     )
 }
 
@@ -179,7 +181,8 @@ suspend fun ChatDbo.toChatDto(
         chatType = type.code,
         customName = customName,
         characters = characters,
-        createdAt = createdAt
+        createdAt = createdAt,
+        color = color,
     )
 }
 

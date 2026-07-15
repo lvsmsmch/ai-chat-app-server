@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.character.database
 
+import com.lvsmsmch.aichat._common.AvatarColors
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -30,4 +31,5 @@ data class CharacterDbo(
     val recommendationsScoreMultiplier: Float? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
     val coOccurrenceScoreUpdatedAt: String? = null,
+    val color: String = AvatarColors.random()
 )

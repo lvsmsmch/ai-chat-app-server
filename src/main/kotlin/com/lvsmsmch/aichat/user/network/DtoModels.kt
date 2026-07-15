@@ -10,7 +10,8 @@ data class UserDto(
     @SerialName("id") val id: String,
     @SerialName("username") val username: String,
     @SerialName("name") val name: String? = null,
-    @SerialName("profilePicUrlThumbnail") val profilePicUrlThumbnail: String? = null
+    @SerialName("profilePicUrlThumbnail") val profilePicUrlThumbnail: String? = null,
+    @SerialName("color") val color: String = ""
 )
 
 @Serializable

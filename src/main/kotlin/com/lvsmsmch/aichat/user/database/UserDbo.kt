@@ -1,5 +1,6 @@
 package com.lvsmsmch.aichat.user.database
 
+import com.lvsmsmch.aichat._common.AvatarColors
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
@@ -29,5 +30,6 @@ data class UserDbo(
     val dailyMessageCount: Int = 0,
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
-    val extraFreeMessagesCount: Int = 0
+    val extraFreeMessagesCount: Int = 0,
+    val color: String = AvatarColors.random()
 )
