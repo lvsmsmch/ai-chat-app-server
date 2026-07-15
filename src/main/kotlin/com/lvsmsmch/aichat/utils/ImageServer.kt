@@ -1,13 +1,5 @@
 package com.lvsmsmch.aichat.utils
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
-import software.amazon.awssdk.core.sync.RequestBody
-import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.GetUrlRequest
-import software.amazon.awssdk.services.s3.model.PutObjectRequest
-import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.FileOutputStream
@@ -21,16 +13,23 @@ data class UploadedImages(
     val thumbnailUrl: String
 )
 
+/**
+ * Хранение картинок на локальном диске сервера (вместо S3).
+ * Файлы кладутся в IMAGES_DIR и раздаются Ktor-ом по /images/<file>
+ * (см. configureRouting → staticFiles). Публичный URL строится из IMAGES_BASE_URL.
+ */
 object ImageServer {
 
-    suspend fun uploadImageOnServer(image: File): UploadedImages {
-        val accessKey = System.getenv("AWS_ACCESS_KEY") ?: throw Exception("Missing AWS_ACCESS_KEY key")
-        val secretKey = System.getenv("AWS_SECRET_KEY") ?: throw Exception("Missing AWS_SECRET_KEY key")
-        val bucketName = System.getenv("AWS_S3_BUCKET_NAME") ?: throw Exception("Missing AWS_S3_BUCKET_NAME key")
-        val region = System.getenv("AWS_REGION") ?: throw Exception("Missing AWS_REGION key")
+    val imagesDir: File by lazy {
+        File(System.getenv("IMAGES_DIR") ?: "/opt/chat/uploads").apply { mkdirs() }
+    }
 
+    private val baseUrl: String by lazy {
+        (System.getenv("IMAGES_BASE_URL") ?: "http://161.35.210.53:8080/images").trimEnd('/')
+    }
+
+    suspend fun uploadImageOnServer(image: File): UploadedImages {
         logger.debug("image name: ${image.name}")
-        logger.debug("image ext: ${image.extension}")
 
         val detectedFormat = detectImageFormat(image)
         logger.debug("detected format: $detectedFormat")
@@ -38,15 +37,6 @@ object ImageServer {
         val baseUuid = UUID.randomUUID().toString()
         val originalFileName = "$baseUuid.jpg"
         val thumbnailFileName = "${baseUuid}_thumb.jpg"
-
-        val credentialsProvider = StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(accessKey, secretKey)
-        )
-
-        val s3Client = S3Client.builder()
-            .region(Region.of(region))
-            .credentialsProvider(credentialsProvider)
-            .build()
 
         var originalFile: File? = null
         var thumbnailFile: File? = null
@@ -58,10 +48,13 @@ object ImageServer {
                 image
             }
 
-            thumbnailFile = createThumbnail(originalFile, 100, 100, 0.85f)
+            thumbnailFile = createThumbnail(originalFile, 256, 256, 0.85f)
 
-            val originalUrl = uploadToS3(s3Client, originalFile, bucketName, originalFileName)
-            val thumbnailUrl = uploadToS3(s3Client, thumbnailFile, bucketName, thumbnailFileName)
+            originalFile.copyTo(File(imagesDir, originalFileName), overwrite = true)
+            thumbnailFile.copyTo(File(imagesDir, thumbnailFileName), overwrite = true)
+
+            val originalUrl = "$baseUrl/$originalFileName"
+            val thumbnailUrl = "$baseUrl/$thumbnailFileName"
 
             logger.debug("Original URL: $originalUrl")
             logger.debug("Thumbnail URL: $thumbnailUrl")
@@ -69,14 +62,13 @@ object ImageServer {
             return UploadedImages(originalUrl, thumbnailUrl)
 
         } catch (e: Exception) {
-            logger.error("Failed to process and upload image", e)
+            logger.error("Failed to process and store image", e)
             throw Exception("Image processing failed: ${e.message}", e)
         } finally {
             if (originalFile != image && originalFile?.exists() == true) {
                 originalFile.delete()
             }
             thumbnailFile?.delete()
-            s3Client.close()
         }
     }
 
@@ -92,20 +84,7 @@ object ImageServer {
             }
 
             val tempFile = createTempFile("converted", ".jpg").toFile()
-
-            val writers = ImageIO.getImageWritersByFormatName("jpg")
-            val writer = writers.next()
-            val writeParam = writer.defaultWriteParam.apply {
-                compressionMode = ImageWriteParam.MODE_EXPLICIT
-                compressionQuality = quality
-            }
-
-            FileOutputStream(tempFile).use { fos ->
-                writer.output = ImageIO.createImageOutputStream(fos)
-                writer.write(null, javax.imageio.IIOImage(jpegImage, null, null), writeParam)
-            }
-            writer.dispose()
-
+            writeJpeg(jpegImage, tempFile, quality)
             return tempFile
         } catch (e: Exception) {
             throw Exception("Failed to convert PNG to JPEG: ${e.message}", e)
@@ -119,50 +98,31 @@ object ImageServer {
 
             val thumbnail = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
             thumbnail.graphics.apply {
-                drawImage(originalImage.getScaledInstance(width, height, java.awt.Image.SCALE_FAST), 0, 0, null)
+                // SMOOTH — без «лесенки», миниатюры показываются и на плитках
+                drawImage(originalImage.getScaledInstance(width, height, java.awt.Image.SCALE_SMOOTH), 0, 0, null)
                 dispose()
             }
 
             val tempFile = createTempFile("thumbnail", ".jpg").toFile()
-
-            val writers = ImageIO.getImageWritersByFormatName("jpg")
-            val writer = writers.next()
-            val writeParam = writer.defaultWriteParam.apply {
-                compressionMode = ImageWriteParam.MODE_EXPLICIT
-                compressionQuality = quality
-            }
-
-            FileOutputStream(tempFile).use { fos ->
-                writer.output = ImageIO.createImageOutputStream(fos)
-                writer.write(null, javax.imageio.IIOImage(thumbnail, null, null), writeParam)
-            }
-            writer.dispose()
-
+            writeJpeg(thumbnail, tempFile, quality)
             return tempFile
         } catch (e: Exception) {
             throw Exception("Failed to create thumbnail: ${e.message}", e)
         }
     }
 
-    private fun uploadToS3(s3Client: S3Client, file: File, bucketName: String, fileName: String): String {
-        try {
-            val putObjectRequest = PutObjectRequest.builder()
-                .bucket(bucketName)
-                .key(fileName)
-                .contentType("image/jpeg")
-                .build()
-
-            s3Client.putObject(putObjectRequest, RequestBody.fromFile(file))
-
-            val getUrlRequest = GetUrlRequest.builder()
-                .bucket(bucketName)
-                .key(fileName)
-                .build()
-
-            return s3Client.utilities().getUrl(getUrlRequest).toString()
-        } catch (e: Exception) {
-            throw Exception("Failed to upload to S3: ${e.message}", e)
+    private fun writeJpeg(image: BufferedImage, target: File, quality: Float) {
+        val writers = ImageIO.getImageWritersByFormatName("jpg")
+        val writer = writers.next()
+        val writeParam = writer.defaultWriteParam.apply {
+            compressionMode = ImageWriteParam.MODE_EXPLICIT
+            compressionQuality = quality
         }
+        FileOutputStream(target).use { fos ->
+            writer.output = ImageIO.createImageOutputStream(fos)
+            writer.write(null, javax.imageio.IIOImage(image, null, null), writeParam)
+        }
+        writer.dispose()
     }
 
     private fun detectImageFormat(file: File): String {

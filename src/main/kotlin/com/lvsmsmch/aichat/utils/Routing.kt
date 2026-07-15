@@ -26,6 +26,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.response.*
+import io.ktor.server.http.content.staticFiles
 import io.ktor.server.routing.*
 
 fun Application.configureRouting(
@@ -52,6 +53,9 @@ fun Application.configureRouting(
             logger.info("\"test\" called!")
             call.respond(HttpStatusCode.OK, "Test successful")
         }
+
+        // Картинки с локального диска (см. ImageServer): /images/<uuid>.jpg
+        staticFiles("/images", ImageServer.imagesDir)
 
 
         rateLimit(RateLimitName("ip-based")) {
