@@ -28,48 +28,65 @@ object ImageServer {
         (System.getenv("IMAGES_BASE_URL") ?: "http://161.35.210.53:8080/images").trimEnd('/')
     }
 
-    suspend fun uploadImageOnServer(image: File): UploadedImages {
-        logger.debug("image name: ${image.name}")
+    /** Целевой размер файла: пережимаем всё, что тяжелее (~500КБ), к ~300-400КБ. */
+    private const val TARGET_BYTES = 500_000
+    private const val MAX_SIDE = 1024
 
-        val detectedFormat = detectImageFormat(image)
-        logger.debug("detected format: $detectedFormat")
+    suspend fun uploadImageOnServer(image: File): UploadedImages {
+        logger.debug("image name: ${image.name}, size: ${image.length()}")
+
+        detectImageFormat(image) // валидация: только JPEG/PNG
 
         val baseUuid = UUID.randomUUID().toString()
-        val originalFileName = "$baseUuid.jpg"
-        val thumbnailFileName = "${baseUuid}_thumb.jpg"
+        val fileName = "$baseUuid.jpg"
 
-        var originalFile: File? = null
-        var thumbnailFile: File? = null
-
+        var processed: File? = null
         try {
-            originalFile = if (detectedFormat == "png") {
-                convertToJpeg(image, 0.85f)
-            } else {
-                image
-            }
+            // Всегда прогоняем через рекомпрессию: PNG→JPEG, даунскейл до 1024,
+            // качество подбирается до попадания в TARGET_BYTES
+            processed = recompress(image)
 
-            thumbnailFile = createThumbnail(originalFile, 256, 256, 0.85f)
+            processed.copyTo(File(imagesDir, fileName), overwrite = true)
 
-            originalFile.copyTo(File(imagesDir, originalFileName), overwrite = true)
-            thumbnailFile.copyTo(File(imagesDir, thumbnailFileName), overwrite = true)
+            val url = "$baseUrl/$fileName"
+            logger.debug("Stored image: $url (${File(imagesDir, fileName).length()} bytes)")
 
-            val originalUrl = "$baseUrl/$originalFileName"
-            val thumbnailUrl = "$baseUrl/$thumbnailFileName"
-
-            logger.debug("Original URL: $originalUrl")
-            logger.debug("Thumbnail URL: $thumbnailUrl")
-
-            return UploadedImages(originalUrl, thumbnailUrl)
+            // Миниатюры больше не используем: thumbnail = оригинал
+            return UploadedImages(url, url)
 
         } catch (e: Exception) {
             logger.error("Failed to process and store image", e)
             throw Exception("Image processing failed: ${e.message}", e)
         } finally {
-            if (originalFile != image && originalFile?.exists() == true) {
-                originalFile.delete()
+            if (processed != image && processed?.exists() == true) {
+                processed.delete()
             }
-            thumbnailFile?.delete()
         }
+    }
+
+    /** PNG/JPEG → JPEG ≤1024px и ~≤500КБ (ступенчатое снижение качества). */
+    private fun recompress(input: File): File {
+        val src = ImageIO.read(input) ?: throw Exception("Could not read image file")
+
+        val scale = MAX_SIDE.toFloat() / maxOf(src.width, src.height)
+        val (w, h) = if (scale < 1f)
+            (src.width * scale).toInt().coerceAtLeast(1) to (src.height * scale).toInt().coerceAtLeast(1)
+        else src.width to src.height
+
+        val canvas = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
+        canvas.graphics.apply {
+            drawImage(src.getScaledInstance(w, h, java.awt.Image.SCALE_SMOOTH), 0, 0, null)
+            dispose()
+        }
+
+        var quality = 0.85f
+        var out = createTempFile("processed", ".jpg").toFile()
+        while (true) {
+            writeJpeg(canvas, out, quality)
+            if (out.length() <= TARGET_BYTES || quality <= 0.45f) break
+            quality -= 0.1f
+        }
+        return out
     }
 
     private fun convertToJpeg(inputFile: File, quality: Float): File {
@@ -88,26 +105,6 @@ object ImageServer {
             return tempFile
         } catch (e: Exception) {
             throw Exception("Failed to convert PNG to JPEG: ${e.message}", e)
-        }
-    }
-
-    private fun createThumbnail(inputFile: File, width: Int, height: Int, quality: Float): File {
-        try {
-            val originalImage = ImageIO.read(inputFile)
-                ?: throw Exception("Could not read image file for thumbnail")
-
-            val thumbnail = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
-            thumbnail.graphics.apply {
-                // SMOOTH — без «лесенки», миниатюры показываются и на плитках
-                drawImage(originalImage.getScaledInstance(width, height, java.awt.Image.SCALE_SMOOTH), 0, 0, null)
-                dispose()
-            }
-
-            val tempFile = createTempFile("thumbnail", ".jpg").toFile()
-            writeJpeg(thumbnail, tempFile, quality)
-            return tempFile
-        } catch (e: Exception) {
-            throw Exception("Failed to create thumbnail: ${e.message}", e)
         }
     }
 
