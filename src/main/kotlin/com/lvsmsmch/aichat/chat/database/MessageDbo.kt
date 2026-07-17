@@ -20,6 +20,8 @@ data class MessageDbo(
     val imageUrl: String? = null,
     val isRead: Boolean = false,
     val status: String,
+    // Причина FAILED: "censored" (фильтр контента) или "error" (сбой генерации/сервера)
+    val failReason: String? = null,
     val nsfw: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: String = UtcTimestamp.now().toString(),

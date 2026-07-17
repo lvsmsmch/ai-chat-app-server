@@ -65,7 +65,8 @@ class MessageRepository(
                     messageId = message.id,
                     newText = message.text,
                     isComplete = message.status == MessageStatus.COMPLETED.value,
-                    isFailed = message.status == MessageStatus.FAILED.value
+                    isFailed = message.status == MessageStatus.FAILED.value,
+                    failReason = message.failReason,
                 ).also {
                 }
             }
@@ -76,7 +77,8 @@ class MessageRepository(
         val messageId: String,
         val newText: String,
         val isComplete: Boolean,
-        val isFailed: Boolean
+        val isFailed: Boolean,
+        val failReason: String? = null,
     )
 
     suspend fun insertMessage(session: ClientSession, messageDbo: MessageDbo) {
@@ -284,12 +286,17 @@ class MessageRepository(
         status: String? = null,
         text: String? = null,
         nsfw: Boolean? = null,
+        failReason: String? = null,
     ) {
         collection.findOneById(messageId) ?: return
         val updates = mutableListOf<Bson>()
         imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
-        status?.let { updates.add(setValue(MessageDbo::status, it)) }
+        status?.let {
+            updates.add(setValue(MessageDbo::status, it))
+            // Причина живёт только вместе со статусом FAILED
+            updates.add(setValue(MessageDbo::failReason, if (it == MessageStatus.FAILED.value) failReason else null))
+        }
         text?.let { updates.add(setValue(MessageDbo::text, it)) }
         nsfw?.let { updates.add(setValue(MessageDbo::nsfw, it)) }
         if (updates.isEmpty()) return
@@ -311,6 +318,7 @@ class MessageRepository(
             combine(
                 setValue(MessageDbo::status, MessageStatus.FAILED.value),
                 setValue(MessageDbo::text, ""),
+                setValue(MessageDbo::failReason, com.lvsmsmch.aichat.chat.network.FailReason.ERROR),
                 setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
             )
         )

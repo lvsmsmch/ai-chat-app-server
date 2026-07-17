@@ -10,9 +10,11 @@ import org.litote.kmongo.coroutine.CoroutineCollection
 import kotlinx.coroutines.reactive.asFlow
 
 inline fun <reified T : Any> CoroutineCollection<T>.watchAsFlow(): Flow<DatabaseEvent<T>> {
+    // WHEN_AVAILABLE вместо REQUIRED: отсутствие pre-image (error 47 NoMatchingDocument)
+    // валило весь change stream навсегда — стримы сообщений замолкали до рестарта сервера
     val reactivePublisher = this.collection.watch(emptyList(), T::class.java)
         .fullDocument(FullDocument.UPDATE_LOOKUP)
-        .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED)
+        .fullDocumentBeforeChange(FullDocumentBeforeChange.WHEN_AVAILABLE)
 
     return reactivePublisher.asFlow().let { reactiveFlow ->
         flow {
@@ -29,7 +31,8 @@ inline fun <reified T : Any> CoroutineCollection<T>.watchAsFlow(): Flow<Database
 
                     OperationType.UPDATE, OperationType.REPLACE -> {
                         val newDocument = change.fullDocument
-                        val oldDocument = change.fullDocumentBeforeChange
+                        // Pre-image может отсутствовать — подписчикам важен только new
+                        val oldDocument = change.fullDocumentBeforeChange ?: newDocument
                         if (newDocument != null && oldDocument != null) {
                             DatabaseEvent.Updated(oldDocument, newDocument)
                         } else null

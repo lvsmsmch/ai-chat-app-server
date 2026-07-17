@@ -67,13 +67,14 @@ class MessageFinisher(
                                 status = MessageStatus.COMPLETED.value
                             )
                         },
-                        onError = {
-                            logger.debug("finishMessageAsync onError, upd msg (${it})")
+                        onError = { reason ->
+                            logger.debug("finishMessageAsync onError, upd msg (${reason})")
                             ensureActive()
                             messageRepository.updateMessage(
                                 messageId = messageId,
                                 text = "",
-                                status = MessageStatus.FAILED.value
+                                status = MessageStatus.FAILED.value,
+                                failReason = reason,
                             )
                         }
                     )
@@ -83,7 +84,8 @@ class MessageFinisher(
                 messageRepository.updateMessage(
                     messageId = messageId,
                     text = "",
-                    status = MessageStatus.FAILED.value
+                    status = MessageStatus.FAILED.value,
+                    failReason = com.lvsmsmch.aichat.chat.network.FailReason.ERROR,
                 )
             } catch (e: CancellationException) {
                 logger.debug("finishMessageAsync cancelled, another job took over (${e.message})")
@@ -93,7 +95,8 @@ class MessageFinisher(
                 messageRepository.updateMessage(
                     messageId = messageId,
                     text = "",
-                    status = MessageStatus.FAILED.value
+                    status = MessageStatus.FAILED.value,
+                    failReason = com.lvsmsmch.aichat.chat.network.FailReason.ERROR,
                 )
             }
         }

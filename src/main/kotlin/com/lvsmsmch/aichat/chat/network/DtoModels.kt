@@ -26,6 +26,7 @@ data class MessageDto(
     @SerialName("isRead") val isRead: Boolean,
     @SerialName("isCompleted") val isCompleted: Boolean,
     @SerialName("isFailedCompleting") val isFailedCompleting: Boolean,
+    @SerialName("failReason") val failReason: String? = null,
     @SerialName("nsfw") val nsfw: Boolean
 )
 
@@ -166,8 +167,20 @@ data class StreamMessageChunk(
     @SerialName("chunk") val chunk: String,
     @SerialName("isComplete") val isComplete: Boolean,
     @SerialName("isFailed") val isFailed: Boolean,
+    @SerialName("failReason") val failReason: String? = null,
     @SerialName("nsfw") val nsfw: Boolean,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse? = null
+)
+
+@Serializable
+data class ClearChatRequest(
+    // Задан → Restart chat: после очистки создаётся новое приветствие персонажа
+    @SerialName("initialMessageId") val initialMessageId: String? = null,
+)
+
+@Serializable
+data class IsSuccessResponse(
+    @SerialName("isSuccess") val isSuccess: Boolean
 )
 
 

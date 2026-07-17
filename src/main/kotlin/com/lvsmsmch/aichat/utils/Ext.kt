@@ -9,6 +9,7 @@ import io.ktor.server.response.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.Json
 import org.litote.kmongo.coroutine.CoroutineCollection
@@ -75,6 +76,16 @@ inline fun <reified T : Any> createDatabaseEventsFlow(
     return collection
         .watchAsFlow()
         .onEach { event -> logDatabaseEvent(event, collection.namespace.collectionName) }
+        // Change stream не должен умирать навсегда от единичной ошибки Mongo —
+        // переподключаемся с паузой (иначе SSE-стримы сообщений молчат до рестарта)
+        .retryWhen { cause, attempt ->
+            logger.error(
+                "Change stream for ${collection.namespace.collectionName} failed " +
+                    "(attempt $attempt), restarting", cause,
+            )
+            delay(minOf(1000L * (attempt + 1), 15_000L))
+            true
+        }
         .shareIn(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
             started = SharingStarted.Eagerly,

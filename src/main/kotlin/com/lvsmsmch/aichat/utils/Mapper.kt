@@ -197,6 +197,7 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         isRead = isRead,
         isCompleted = status == MessageStatus.COMPLETED.value,
         isFailedCompleting = status == MessageStatus.FAILED.value,
+        failReason = failReason,
         nsfw = nsfw
     )
 }

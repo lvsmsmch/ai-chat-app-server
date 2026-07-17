@@ -19,7 +19,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 
 fun Route.configureChatRouting(
@@ -366,26 +368,10 @@ fun Route.configureChatRouting(
                 throw ForbiddenException("Access denied to this chat")
             }
 
-            request.userMessage?.let { userMessage ->
-                val existingMessage = messageRepository.findByClientId(userMessage.id)
-                if (existingMessage != null) {
-                    val chatSyncResponse = generateChatSyncResponse(
-                        chat = chat,
-                        chatSyncRequest = request.chatSyncRequest,
-                        chatRepository = chatRepository,
-                        messageRepository = messageRepository,
-                        mapper = mapper
-                    )
-
-                    return@post call.respondSuccess(
-                        SendMessageResponse(
-                            isSuccess = true,
-                            limitsResponse = userRepository.getLimits(userId),
-                            chatSyncResponse = chatSyncResponse
-                        )
-                    )
-                }
-            }
+            // Идемпотентность: юзерское сообщение могло дойти при «неудачной» попытке
+            // (клиент ретраит после обрыва сети) — не дублируем его, но characterMessage
+            // ниже ОБЯЗАТЕЛЬНО обрабатываем, иначе ретрай оставляет клиента без ответа.
+            val existingUserMessage = request.userMessage?.let { messageRepository.findByClientId(it.id) }
 
             val limits = userRepository.getLimits(userId)
             if (limits.limitUntil != null) {
@@ -408,36 +394,45 @@ fun Route.configureChatRouting(
                 return@post
             }
 
-            request.userMessage?.let { userMessage ->
-                validateMessageText(userMessage.text)
-                MessageDbo(
-                    id = idGenerator.generateId(EntityType.MESSAGE),
-                    chatId = chat.id,
-                    clientId = userMessage.id,
-                    senderId = userId,
-                    isSentByUser = true,
-                    text = userMessage.text,
-                    status = MessageStatus.COMPLETED.value,
-                    chatClientId = chat.clientId,
-                ).also {
-                    complexQueryHelper.addMessage(it)
+            if (existingUserMessage == null) {
+                request.userMessage?.let { userMessage ->
+                    validateMessageText(userMessage.text)
+                    MessageDbo(
+                        id = idGenerator.generateId(EntityType.MESSAGE),
+                        chatId = chat.id,
+                        clientId = userMessage.id,
+                        senderId = userId,
+                        isSentByUser = true,
+                        text = userMessage.text,
+                        status = MessageStatus.COMPLETED.value,
+                        chatClientId = chat.clientId,
+                    ).also {
+                        complexQueryHelper.addMessage(it)
+                    }
                 }
             }
 
             request.characterMessage?.let { characterMessage ->
                 val characterId = characterMessage.characterId
-                MessageDbo(
-                    id = idGenerator.generateId(EntityType.MESSAGE),
-                    chatId = chat.id,
-                    clientId = characterMessage.id,
-                    senderId = characterId,
-                    isSentByUser = false,
-                    text = "",
-                    status = MessageStatus.STREAMING.value,
-                    chatClientId = chat.clientId,
-                ).also {
-                    complexQueryHelper.addMessage(it)
-                    messageFinisher.finishMessageAsync(it.id)
+                val existingCharMessage = messageRepository.findByClientId(characterMessage.id)
+                when {
+                    existingCharMessage == null -> MessageDbo(
+                        id = idGenerator.generateId(EntityType.MESSAGE),
+                        chatId = chat.id,
+                        clientId = characterMessage.id,
+                        senderId = characterId,
+                        isSentByUser = false,
+                        text = "",
+                        status = MessageStatus.STREAMING.value,
+                        chatClientId = chat.clientId,
+                    ).also {
+                        complexQueryHelper.addMessage(it)
+                        messageFinisher.finishMessageAsync(it.id)
+                    }
+                    // Ретрай: плейсхолдер уже есть, но генерация не идёт — перезапускаем
+                    existingCharMessage.status != MessageStatus.COMPLETED.value &&
+                        !messageFinisher.isFinishing(existingCharMessage.id) ->
+                        messageFinisher.finishMessageAsync(existingCharMessage.id)
                 }
             }
 
@@ -527,6 +522,48 @@ fun Route.configureChatRouting(
 
 
 
+        /**
+         * Очистка истории чата (все сообщения разом). Если передан initialMessageId —
+         * это Restart chat: после очистки персонаж заново присылает приветствие
+         * по той же логике, что и при создании чата.
+         */
+        post("/{chatId}/clear") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatClientId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val request = call.receive<ClearChatRequest>()
+
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
+
+            if (chat.userId != userId) {
+                throw ForbiddenException("Access denied to this chat")
+            }
+
+            messageRepository.deleteAllMessagesInChat(chat.id)
+
+            request.initialMessageId?.let { greetingId ->
+                if (messageRepository.findByClientId(greetingId) == null) {
+                    val characterId = chat.characterIds.first()
+                    MessageDbo(
+                        id = idGenerator.generateId(EntityType.MESSAGE),
+                        chatId = chat.id,
+                        chatClientId = chat.clientId,
+                        clientId = greetingId,
+                        senderId = characterId,
+                        isSentByUser = false,
+                        text = "",
+                        status = MessageStatus.STREAMING.value,
+                    ).also {
+                        complexQueryHelper.addMessage(it)
+                        messageFinisher.finishMessageAsync(it.id)
+                    }
+                }
+            }
+
+            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+        }
+
         post("/{chatId}/messages/{messageId}/stream") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -595,8 +632,11 @@ fun Route.configureChatRouting(
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
-                    messageRepository.streamMessageUpdates(message.id)
-                        .collect { update ->
+                    // firstOrNull завершает подписку на терминальном чанке (collect с
+                    // return@collect висел вечно); таймаут страхует от молчащей генерации —
+                    // соединение всегда закрывается, пул клиента не забивается.
+                    val terminal = withTimeoutOrNull(180_000L) {
+                        messageRepository.streamMessageUpdates(message.id).firstOrNull { update ->
                             val chunk = if (update.isComplete || update.isFailed) {
                                 val finalSyncResponse = generateChatSyncResponse(
                                     chat = chat,
@@ -610,6 +650,7 @@ fun Route.configureChatRouting(
                                     chunk = update.newText,
                                     isComplete = update.isComplete,
                                     isFailed = update.isFailed,
+                                    failReason = update.failReason,
                                     nsfw = false,
                                     chatSyncResponse = finalSyncResponse
                                 )
@@ -630,15 +671,30 @@ fun Route.configureChatRouting(
                                 }
                             }
 
-                            if (update.isComplete || update.isFailed) {
-                                return@collect
-                            }
+                            update.isComplete || update.isFailed
                         }
+                    }
+
+                    if (terminal == null) {
+                        val timeoutChunk = StreamMessageChunk(
+                            chunk = "",
+                            isComplete = false,
+                            isFailed = true,
+                            failReason = FailReason.ERROR,
+                            nsfw = false
+                        )
+                        try {
+                            write("data: ${defaultJson.encodeToString(timeoutChunk)}\n\n")
+                            flush()
+                        } catch (writeException: Exception) {
+                        }
+                    }
                 } catch (e: Exception) {
                     val errorChunk = StreamMessageChunk(
                         chunk = "",
                         isComplete = false,
                         isFailed = true,
+                        failReason = FailReason.ERROR,
                         nsfw = false
                     )
 

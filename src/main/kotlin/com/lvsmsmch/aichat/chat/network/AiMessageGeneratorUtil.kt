@@ -20,6 +20,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.*
 import kotlin.random.Random
 
+/** Генерация заблокирована фильтром контента — юзеру показывается отдельная причина. */
+class CensoredException(message: String) : Exception(message)
+
+/** Коды причин FAILED-сообщений (хранятся в MessageDbo.failReason и уходят клиенту). */
+object FailReason {
+    const val CENSORED = "censored"
+    const val ERROR = "error"
+}
+
 object AiMessageGeneratorUtil {
 
     private val groqApiUrl
@@ -144,9 +153,12 @@ object AiMessageGeneratorUtil {
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
+        } catch (e: CensoredException) {
+            logger.error("Generation blocked by content filter: ${e.message}")
+            onError(FailReason.CENSORED)
         } catch (e: Exception) {
             logger.error("Full error: ${e.message}", e)
-            onError(e.localizedMessage)
+            onError(FailReason.ERROR)
         }
     }
 
@@ -405,8 +417,21 @@ object AiMessageGeneratorUtil {
         }
 
         val jsonResponse = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+
+        // Цензура: промпт заблокирован целиком или кандидат оборван safety-фильтром
+        jsonResponse["promptFeedback"]?.jsonObject
+            ?.get("blockReason")?.jsonPrimitive?.contentOrNull?.let {
+                throw CensoredException("promptFeedback.blockReason=$it")
+            }
+
         val candidates = jsonResponse["candidates"]?.jsonArray
-        val content = candidates?.get(0)?.jsonObject
+        val firstCandidate = candidates?.firstOrNull()?.jsonObject
+        val finishReason = firstCandidate?.get("finishReason")?.jsonPrimitive?.contentOrNull
+        if (finishReason in setOf("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY")) {
+            throw CensoredException("finishReason=$finishReason")
+        }
+
+        val content = firstCandidate
             ?.get("content")?.jsonObject
             ?.get("parts")?.jsonArray
             ?.get(0)?.jsonObject
