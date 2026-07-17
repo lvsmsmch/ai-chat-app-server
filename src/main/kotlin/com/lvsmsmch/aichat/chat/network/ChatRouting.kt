@@ -482,8 +482,23 @@ fun Route.configureChatRouting(
             val messageClientIds = request.messageIds.distinct()
             val messageDbos = messageRepository.getMessagesByClientIds(messageClientIds)
 
-            if (messageDbos.size != messageClientIds.size) {
-                throw BadRequestException("Some messages not found")
+            // Неизвестные id игнорируем: клиент может удалять «фантомы» — сообщения,
+            // которые так и не дошли до сервера. Раньше это давало 400 и блокировало
+            // удаление ВСЕГО выбранного (даже локально).
+            if (messageDbos.isEmpty()) {
+                return@post call.respondSuccess(
+                    DeleteMessagesResponse(
+                        isSuccess = true,
+                        chatSyncResponse = generateChatSyncResponse(
+                            chat = chatRepository.getChatByClientId(request.chatId)
+                                ?: throw ChatNotFoundException(request.chatId),
+                            chatSyncRequest = request.chatSyncRequest,
+                            chatRepository = chatRepository,
+                            messageRepository = messageRepository,
+                            mapper = mapper
+                        )
+                    )
+                )
             }
 
             val chatIds = messageDbos.map { it.chatId }.toSet()
