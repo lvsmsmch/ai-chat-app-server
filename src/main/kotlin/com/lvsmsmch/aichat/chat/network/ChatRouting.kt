@@ -523,6 +523,68 @@ fun Route.configureChatRouting(
 
 
         /**
+         * Редактирование СВОЕГО сообщения: текст заменяется, вся история после него
+         * удаляется, и (в директе) персонаж отвечает заново — как будто разговор
+         * продолжился с этого места.
+         */
+        post("/{chatId}/messages/{messageId}/edit") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatClientId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val messageClientId = call.parameters["messageId"]
+                ?: throw BadRequestException("Message ID is required")
+            val request = call.receive<EditMessageRequest>()
+
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
+
+            if (chat.userId != userId) {
+                throw ForbiddenException("Access denied to this chat")
+            }
+
+            val message = messageRepository.findByClientId(messageClientId)
+                ?: throw BadRequestException("Message not found")
+
+            if (message.chatId != chat.id) {
+                throw BadRequestException("Message does not belong to this chat")
+            }
+
+            if (!message.isSentByUser) {
+                throw BadRequestException("Only own messages can be edited")
+            }
+
+            validateMessageText(request.newText)
+
+            messageRepository.deleteMessagesCreatedAfter(chat.id, message.createdAt)
+            messageRepository.updateMessage(
+                messageId = message.id,
+                text = request.newText,
+                status = MessageStatus.COMPLETED.value,
+            )
+
+            request.characterMessageId?.let { charMsgId ->
+                if (messageRepository.findByClientId(charMsgId) == null) {
+                    val characterId = chat.characterIds.first()
+                    MessageDbo(
+                        id = idGenerator.generateId(EntityType.MESSAGE),
+                        chatId = chat.id,
+                        chatClientId = chat.clientId,
+                        clientId = charMsgId,
+                        senderId = characterId,
+                        isSentByUser = false,
+                        text = "",
+                        status = MessageStatus.STREAMING.value,
+                    ).also {
+                        complexQueryHelper.addMessage(it)
+                        messageFinisher.finishMessageAsync(it.id)
+                    }
+                }
+            }
+
+            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+        }
+
+        /**
          * Очистка истории чата (все сообщения разом). Если передан initialMessageId —
          * это Restart chat: после очистки персонаж заново присылает приветствие
          * по той же логике, что и при создании чата.

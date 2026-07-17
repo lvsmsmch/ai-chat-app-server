@@ -173,6 +173,13 @@ data class StreamMessageChunk(
 )
 
 @Serializable
+data class EditMessageRequest(
+    @SerialName("newText") val newText: String,
+    // Директ-чат: id нового ответа персонажа (генерится клиентом, стримится как обычно)
+    @SerialName("characterMessageId") val characterMessageId: String? = null,
+)
+
+@Serializable
 data class ClearChatRequest(
     // Задан → Restart chat: после очистки создаётся новое приветствие персонажа
     @SerialName("initialMessageId") val initialMessageId: String? = null,

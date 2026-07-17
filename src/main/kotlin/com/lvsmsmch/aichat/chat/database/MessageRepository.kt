@@ -371,6 +371,21 @@ class MessageRepository(
         )
     }
 
+    /** Редактирование сообщения: вся история ПОСЛЕ него удаляется (разговор продолжается заново). */
+    suspend fun deleteMessagesCreatedAfter(chatId: String, timestamp: String) {
+        collection.updateMany(
+            and(
+                MessageDbo::chatId eq chatId,
+                MessageDbo::createdAt gt timestamp,
+            ),
+            combine(
+                setValue(MessageDbo::isDeleted, true),
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString())
+            )
+        )
+    }
+
     suspend fun deleteAllMessagesInChat(chatId: String) {
         collection.updateMany(
             MessageDbo::chatId eq chatId,
