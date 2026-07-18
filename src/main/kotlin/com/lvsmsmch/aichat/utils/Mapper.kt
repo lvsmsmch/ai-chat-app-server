@@ -109,6 +109,7 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
         picUrl = picUrl,
         picUrlThumbnail = picUrlThumbnail ?: picUrl,
         color = color,
+        topRank = topRank,
     )
 }
 

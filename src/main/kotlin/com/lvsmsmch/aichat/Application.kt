@@ -260,6 +260,12 @@ fun Application.module() {
         updateIntervalMinutes = 5
     )
 
+    val topCharactersUpdaterJob = configureTopCharactersUpdater(
+        databaseScope = databaseScope,
+        characterRepository = characterRepository,
+        updateIntervalHours = 24
+    )
+
     val defaultPersonalizedUpdaterJob = configureDefaultRecommendationsUpdater(
         databaseScope = databaseScope,
         characterRepository = characterRepository,

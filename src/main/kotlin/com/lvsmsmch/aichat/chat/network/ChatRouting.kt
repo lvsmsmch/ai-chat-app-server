@@ -143,11 +143,35 @@ fun Route.configureChatRouting(
 
             val isDirect = request.characterIds.size == 1
 
-            val isFirstChat = if (isDirect) {
-                chatRepository.findChatByUserAndCharacter(userId, request.characterIds.first()) == null
-            } else {
-                false
+            // Дубликаты direct-чатов запрещены: быстрый двойной тап создавал два чата
+            // с одним персонажем. Существующий чат просто возвращается клиенту.
+            if (isDirect) {
+                chatRepository.findChatByUserAndCharacter(userId, request.characterIds.first())?.let { existing ->
+                    val existingSync = generateChatSyncResponse(
+                        chat = existing,
+                        chatSyncRequest = ChatSyncRequest(
+                            chatId = existing.clientId,
+                            lastChatSyncTimestamp = UtcTimestamp.year1900().toString(),
+                            lastMessagesSyncTimestamp = UtcTimestamp.year1900().toString(),
+                            oldestLoadedMessageTime = null,
+                            newestLoadedMessageTime = null
+                        ),
+                        chatRepository = chatRepository,
+                        messageRepository = messageRepository,
+                        mapper = mapper
+                    )
+                    return@post call.respondSuccess(
+                        CreateChatResponse(
+                            isSuccess = true,
+                            addInitMessageSuccess = false,
+                            limitsResponse = userRepository.getLimits(userId),
+                            chatSyncResponse = existingSync
+                        )
+                    )
+                }
             }
+
+            val isFirstChat = isDirect
 
             val chatDbo = ChatDbo(
                 id = idGenerator.generateId(EntityType.CHAT),

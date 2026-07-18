@@ -21,7 +21,8 @@ data class CharacterDto(
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,
     @SerialName("averageRating") val averageRating: Float,
-    @SerialName("color") val color: String = ""
+    @SerialName("color") val color: String = "",
+    @SerialName("topRank") val topRank: Int? = null
 )
 
 @Serializable

@@ -286,6 +286,10 @@ class CharacterRepository(
         collection.updateOneById(session, characterId, setValue(CharacterDbo::averageRating, newRating))
     }
 
+    suspend fun updateTopRank(characterId: String, rank: Int?) {
+        collection.updateOneById(characterId, setValue(CharacterDbo::topRank, rank))
+    }
+
     suspend fun updateTrendingScore(characterId: String, trendingScore: Float) {
         collection.updateOneById(characterId, setValue(CharacterDbo::trendingScore, trendingScore))
         collection.updateOneById(

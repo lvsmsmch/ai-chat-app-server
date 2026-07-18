@@ -31,5 +31,7 @@ data class CharacterDbo(
     val recommendationsScoreMultiplier: Float? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
     val coOccurrenceScoreUpdatedAt: String? = null,
-    val color: String = AvatarColors.random()
+    val color: String = AvatarColors.random(),
+    // Место в топе своей категории за всё время (1..3); пересчитывается раз в день
+    val topRank: Int? = null
 )

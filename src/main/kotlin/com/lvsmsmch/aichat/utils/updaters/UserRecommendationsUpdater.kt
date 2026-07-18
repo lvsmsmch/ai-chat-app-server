@@ -125,22 +125,25 @@ private fun calculatePersonalizedScore(
     character: CharacterDbo,
     userCharacters: List<CharacterDbo>
 ): Float {
-    var score = character.recommendationScore * 0.3f
+    // Персональная часть нормируется на число персонажей юзера, а глобальное
+    // качество кандидата — нет: раньше recommendationScore тоже делился и у
+    // активных юзеров (30+ персонажей) популярность фактически обнулялась.
+    var personal = 0f
 
     userCharacters.forEach { userChar ->
-        if (userChar.category == character.category) score += 0.2f
+        if (userChar.category == character.category) personal += 0.2f
         val commonTags = userChar.tags.intersect(character.tags.toSet()).size
-        score += commonTags * 0.1f
+        personal += commonTags * 0.1f
     }
 
     val userCharacterIds = userCharacters.map { it.id }.toSet()
     character.coOccurrenceScore.forEach { (charId, coScore) ->
         if (charId in userCharacterIds) {
-            score += coScore * 0.4f
+            personal += coScore * 0.4f
         }
     }
 
-    return score / maxOf(userCharacters.size, 1)
+    return character.recommendationScore * 0.3f + personal / maxOf(userCharacters.size, 1)
 }
 
 private fun determineTTL(lastActiveAt: UtcTimestamp, now: UtcTimestamp): Long {
