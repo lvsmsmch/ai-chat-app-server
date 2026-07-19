@@ -130,6 +130,27 @@ fun Route.configureCommentRouting(
             )
         }
 
+        patch("/{id}") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val commentId = call.parameters["id"]
+                ?: throw BadRequestException("Missing id parameter")
+            val request = call.receive<UpdateCommentRequest>()
+
+            val commentDbo = commentRepository.getCommentById(commentId)
+                ?: throw CommentNotFoundException(id = commentId)
+
+            if (commentDbo.authorId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "You are not allowed to edit this comment")
+            }
+            validateCommentText(request.text)
+
+            commentRepository.updateText(commentId, request.text.trim())
+
+            call.respondSuccess(
+                data = toDtos(listOf(commentDbo.copy(text = request.text.trim())), sessionDbo.userId).first()
+            )
+        }
+
         delete("/{id}") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val commentId = call.parameters["id"]

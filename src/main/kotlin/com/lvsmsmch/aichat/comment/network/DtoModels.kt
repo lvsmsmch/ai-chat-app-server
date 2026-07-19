@@ -35,6 +35,11 @@ data class CreateCommentRequest(
 )
 
 @Serializable
+data class UpdateCommentRequest(
+    @SerialName("text") val text: String
+)
+
+@Serializable
 data class ReportCommentRequest(
     @SerialName("reason") val reason: String,
     @SerialName("text") val text: String = ""

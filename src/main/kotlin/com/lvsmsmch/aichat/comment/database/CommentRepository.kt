@@ -66,6 +66,10 @@ class CommentRepository(
         return collection.find(session, CommentDbo::parentId eq parentId).toList().map { it.id }
     }
 
+    suspend fun updateText(commentId: String, text: String) {
+        collection.updateOneById(commentId, org.litote.kmongo.setValue(CommentDbo::text, text))
+    }
+
     suspend fun incrementLikesCount(session: ClientSession, commentId: String, increment: Int) {
         collection.updateOneById(session, commentId, inc(CommentDbo::likesCount, increment))
     }
