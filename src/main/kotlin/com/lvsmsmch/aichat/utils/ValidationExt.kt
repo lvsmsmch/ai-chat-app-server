@@ -14,7 +14,7 @@ fun validateDeviceId(deviceId: String) {
     }
 }
 
-private val USERNAME_REGEX = Regex("^[\\p{L}\\p{N}._-]{3,20}$")
+private val USERNAME_REGEX = Regex("^[\\p{L}\\p{N}_-]{3,20}$")
 
 fun validateUserUsername(username: String) {
     if (username.length < 3 || username.length > 20) {
@@ -24,7 +24,7 @@ fun validateUserUsername(username: String) {
     // Отсекает пробелы, переносы строк, эмодзи и управляющие символы —
     // ничего, что могло бы сломать UI или экзотически повести себя в БД.
     if (!USERNAME_REGEX.matches(username)) {
-        throw ValidationException("Username can contain only letters, digits, dot, underscore and dash")
+        throw ValidationException("Username can contain only letters, digits, \"_\" and \"-\"")
     }
 }
 
