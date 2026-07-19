@@ -247,5 +247,6 @@ data class LimitsResponse(
     @SerialName("dailyUsed") val dailyUsed: Int,
     @SerialName("dailyLimit") val dailyLimit: Int,
     @SerialName("extraLeft") val extraLeft: Int,
-    @SerialName("extraAmountForReward") val extraAmountForReward: Int
+    @SerialName("extraAmountForReward") val extraAmountForReward: Int,
+    @SerialName("trialUsed") val trialUsed: Boolean = false
 )

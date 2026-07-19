@@ -31,5 +31,7 @@ data class UserDbo(
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
     val extraFreeMessagesCount: Int = 0,
-    val color: String = AvatarColors.random()
+    val color: String = AvatarColors.random(),
+    // Бесплатный триал одноразовый: выставляется при первой подписке
+    val trialUsed: Boolean = false
 )

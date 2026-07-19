@@ -98,7 +98,8 @@ class UserRepository(
             dailyUsed = user.dailyMessageCount,
             dailyLimit = dailyLimit,
             extraLeft = user.extraFreeMessagesCount,
-            extraAmountForReward = EXTRA_AMOUNT_FOR_REWARD
+            extraAmountForReward = EXTRA_AMOUNT_FOR_REWARD,
+            trialUsed = user.trialUsed
         )
 
         return limitsResponse
@@ -155,6 +156,8 @@ class UserRepository(
         collection.updateOneById(
             userId, combine(
                 Updates.set(UserDbo::hasSubscription.name, hasSubscription),
+                // Первая подписка сжигает бесплатный триал навсегда
+                *(if (hasSubscription) arrayOf(Updates.set(UserDbo::trialUsed.name, true)) else emptyArray()),
             )
         )
     }
@@ -276,6 +279,6 @@ class UserRepository(
         const val HOURLY_LIMIT_MESSAGES_REGULAR = 50
         const val DAILY_LIMIT_MESSAGES_PREMIUM = 1000
         const val HOURLY_LIMIT_MESSAGES_PREMIUM = 500
-        const val EXTRA_AMOUNT_FOR_REWARD = 25
+        const val EXTRA_AMOUNT_FOR_REWARD = 10
     }
 }
