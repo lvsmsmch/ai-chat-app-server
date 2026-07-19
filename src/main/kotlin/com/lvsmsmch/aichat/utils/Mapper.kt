@@ -105,6 +105,7 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
         totalChats = totalChats,
         totalMessages = totalMessages,
         totalReviews = totalReviews,
+        totalComments = totalComments,
         averageRating = averageRating,
         picUrl = picUrl,
         picUrlThumbnail = picUrlThumbnail ?: picUrl,

@@ -100,6 +100,15 @@ class ChatNotFoundException(
     errorMessage = errorMessage
 )
 
+class CommentNotFoundException(
+    id: String? = null,
+    errorMessage: String = if (id != null) "Comment with id $id not found" else "Comment not found"
+) : ApiException(
+    httpStatus = HttpStatusCode.NotFound,
+    errorCode = "comment_not_found",
+    errorMessage = errorMessage
+)
+
 class ReviewNotFoundException(
     id: String? = null,
     errorMessage: String = if (id != null) "Review with id $id not found" else "Review not found"

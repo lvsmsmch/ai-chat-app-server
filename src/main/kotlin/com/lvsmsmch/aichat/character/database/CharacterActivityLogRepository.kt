@@ -24,6 +24,7 @@ enum class ActivityType(val code: Int) {
     CHAT_CREATED(0),
     MESSAGE_SENT(1),
     REVIEW_ADDED(2),
+    COMMENT_ADDED(3),
 }
 
 class CharacterActivityLogRepository(

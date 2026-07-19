@@ -56,6 +56,15 @@ fun validateReviewRating(rating: Int) {
     }
 }
 
+fun validateCommentText(text: String) {
+    if (text.isBlank()) {
+        throw ValidationException("Comment text must not be blank")
+    }
+    if (text.length > 1000) {
+        throw ValidationException("Text should not exceed 1000 characters")
+    }
+}
+
 fun validateReviewText(text: String) {
     if (text.length > 1000) {
         throw ValidationException("Text should not exceed 1000 characters")

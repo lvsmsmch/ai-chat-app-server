@@ -322,6 +322,10 @@ class CharacterRepository(
         collection.updateOneById(session, characterId, inc(CharacterDbo::totalReviews, increment))
     }
 
+    suspend fun incrementCommentsCount(session: ClientSession, characterId: String, increment: Int) {
+        collection.updateOneById(session, characterId, inc(CharacterDbo::totalComments, increment))
+    }
+
     suspend fun incrementChatsCount(session: ClientSession, characterId: String, increment: Int) {
         collection.updateOneById(session, characterId, inc(CharacterDbo::totalChats, increment))
     }

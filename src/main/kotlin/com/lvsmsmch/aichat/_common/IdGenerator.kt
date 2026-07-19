@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat._common
 
 import com.lvsmsmch.aichat._common.database.DeletedIdsStatsRepository
 import com.lvsmsmch.aichat._common.database.EntityType
+import com.lvsmsmch.aichat.comment.database.CommentRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
@@ -14,7 +15,8 @@ class IdGenerator(
     private val characterRepository: CharacterRepository,
     private val chatRepository: ChatRepository,
     private val messageRepository: MessageRepository,
-    private val reviewRepository: ReviewRepository
+    private val reviewRepository: ReviewRepository,
+    private val commentRepository: CommentRepository
 ) {
 
     private val secureRandom = java.security.SecureRandom()
@@ -64,6 +66,7 @@ class IdGenerator(
             EntityType.CHAT -> chatRepository.getChatById(id) == null
             EntityType.MESSAGE -> messageRepository.getMessageById(id) == null
             EntityType.REVIEW -> reviewRepository.getReviewById(id) == null
+            EntityType.COMMENT -> commentRepository.getCommentById(id) == null
         }
     }
 

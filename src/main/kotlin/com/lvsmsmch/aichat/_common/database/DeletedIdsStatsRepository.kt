@@ -11,7 +11,8 @@ enum class EntityType(val code: String, val recommendedIdLength: Int) {
     CHARACTER("character", 6),
     CHAT("chat", 10),
     MESSAGE("message", 10),
-    REVIEW("review", 6);
+    REVIEW("review", 6),
+    COMMENT("comment", 6);
 
     companion object {
         fun fromCode(code: String) = entries.first { it.code == code }

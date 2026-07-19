@@ -44,9 +44,14 @@ fun configureCharacterTrendingScoreUpdater(
                         activityType = ActivityType.MESSAGE_SENT,
                         since = cutoffDate
                     )
+                    // Отзывы заменены комментами — активность считаем по обоим типам
                     val uniqueUsersThatLeftReview = characterActivityLogRepository.getUniqueUsersForActivity(
                         characterId = character.id,
                         activityType = ActivityType.REVIEW_ADDED,
+                        since = cutoffDate
+                    ) + characterActivityLogRepository.getUniqueUsersForActivity(
+                        characterId = character.id,
+                        activityType = ActivityType.COMMENT_ADDED,
                         since = cutoffDate
                     )
 

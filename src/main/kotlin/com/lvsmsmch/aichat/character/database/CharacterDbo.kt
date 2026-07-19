@@ -23,6 +23,7 @@ data class CharacterDbo(
     val totalChats: Int = 0,
     val totalMessages: Int = 0,
     val totalReviews: Int = 0,
+    val totalComments: Int = 0,
     val averageRating: Float = 0f,
     val trendingScore: Float = 0f,
     val trendingScoreUpdatedAt: String? = null,

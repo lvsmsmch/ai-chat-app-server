@@ -18,7 +18,9 @@ import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
 import com.lvsmsmch.aichat.feedback.network.configureFeedbackRouting
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
-import com.lvsmsmch.aichat.review.network.configureReviewRouting
+import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
+import com.lvsmsmch.aichat.comment.database.CommentRepository
+import com.lvsmsmch.aichat.comment.network.configureCommentRouting
 import com.lvsmsmch.aichat.user.database.FollowRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
 import com.lvsmsmch.aichat.user.network.configureUserRouting
@@ -40,6 +42,8 @@ fun Application.configureRouting(
     followRepository: FollowRepository,
     reportRepository: ReportRepository,
     reviewLikeRepository: ReviewLikeRepository,
+    commentRepository: CommentRepository,
+    commentLikeRepository: CommentLikeRepository,
     searchSuggestionsRepository: SearchSuggestionsRepository,
     feedbackRepository: FeedbackRepository,
     idGenerator: IdGenerator,
@@ -92,10 +96,10 @@ fun Application.configureRouting(
                 complexQueryHelper = complexQueryHelper
             )
 
-            configureReviewRouting(
+            configureCommentRouting(
                 sessionRepository = sessionRepository,
-                reviewRepository = reviewRepository,
-                reviewLikeRepository = reviewLikeRepository,
+                commentRepository = commentRepository,
+                commentLikeRepository = commentLikeRepository,
                 characterRepository = characterRepository,
                 reportRepository = reportRepository,
                 userRepository = userRepository,

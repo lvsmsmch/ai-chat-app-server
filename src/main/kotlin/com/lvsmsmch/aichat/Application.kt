@@ -18,6 +18,10 @@ import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.feedback.database.FeedbackDbo
 import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
+import com.lvsmsmch.aichat.comment.database.CommentDbo
+import com.lvsmsmch.aichat.comment.database.CommentLikeDbo
+import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
+import com.lvsmsmch.aichat.comment.database.CommentRepository
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
@@ -145,6 +149,12 @@ fun Application.module() {
     val reviewRepository = ReviewRepository(
         database.getCollection<ReviewDbo>("reviews")
     )
+    val commentRepository = CommentRepository(
+        database.getCollection<CommentDbo>("comments")
+    )
+    val commentLikeRepository = CommentLikeRepository(
+        database.getCollection<CommentLikeDbo>("comment_likes")
+    )
     val characterActivityLogRepository = CharacterActivityLogRepository(
         database.getCollection<CharacterActivityLogDbo>("character_activity_logs")
     )
@@ -167,6 +177,8 @@ fun Application.module() {
             messageRepository.ensureIndexes()
             reviewRepository.ensureIndexes()
             reviewLikeRepository.ensureIndexes()
+            commentRepository.ensureIndexes()
+            commentLikeRepository.ensureIndexes()
             feedbackRepository.ensureIndexes()
             logger.info("Database indexes ensured")
         } catch (e: Exception) {
@@ -195,6 +207,7 @@ fun Application.module() {
         chatRepository = chatRepository,
         messageRepository = messageRepository,
         reviewRepository = reviewRepository,
+        commentRepository = commentRepository,
     )
 
     val usernameGenerator = UsernameGenerator(userRepository)
@@ -219,6 +232,8 @@ fun Application.module() {
         followRepository = followRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         reviewLikeRepository = reviewLikeRepository,
+        commentRepository = commentRepository,
+        commentLikeRepository = commentLikeRepository,
         deletedIdsStatsRepository = deletedIdsStatsRepository,
         characterActivityLogRepository = characterActivityLogRepository
     )
@@ -312,6 +327,8 @@ fun Application.module() {
         followRepository = followRepository,
         reportRepository = reportRepository,
         reviewLikeRepository = reviewLikeRepository,
+        commentRepository = commentRepository,
+        commentLikeRepository = commentLikeRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         feedbackRepository = feedbackRepository,
         idGenerator = idGenerator,

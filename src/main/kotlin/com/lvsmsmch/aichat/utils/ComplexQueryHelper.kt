@@ -7,6 +7,9 @@ import com.lvsmsmch.aichat.chat.database.ChatDbo
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.chat.database.MessageRepository
+import com.lvsmsmch.aichat.comment.database.CommentDbo
+import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
+import com.lvsmsmch.aichat.comment.database.CommentRepository
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
@@ -24,6 +27,8 @@ class ComplexQueryHelper(
     private val followRepository: FollowRepository,
     private val searchSuggestionsRepository: SearchSuggestionsRepository,
     private val reviewLikeRepository: ReviewLikeRepository,
+    private val commentRepository: CommentRepository,
+    private val commentLikeRepository: CommentLikeRepository,
     private val deletedIdsStatsRepository: DeletedIdsStatsRepository,
     private val characterActivityLogRepository: CharacterActivityLogRepository,
 ) {
@@ -102,6 +107,53 @@ class ComplexQueryHelper(
         transactionHelper.withTransaction { session ->
             reviewLikeRepository.unlikeReview(session, userId, reviewId)
             reviewRepository.incrementLikesCount(session, reviewId, -1)
+        }
+    }
+
+
+
+
+    suspend fun addComment(commentDbo: CommentDbo) {
+        transactionHelper.withTransaction { session ->
+            commentRepository.addComment(session, commentDbo)
+            characterRepository.incrementCommentsCount(session, commentDbo.characterId, 1)
+            commentDbo.parentId?.let { commentRepository.incrementRepliesCount(session, it, 1) }
+            characterActivityLogRepository.logActivity(
+                session = session,
+                activityType = ActivityType.COMMENT_ADDED,
+                characterId = commentDbo.characterId,
+                userId = commentDbo.authorId
+            )
+        }
+    }
+
+    /** Удаление коммента: корневой уносит с собой всю ветку ответов. */
+    suspend fun deleteComment(comment: CommentDbo) {
+        transactionHelper.withTransaction { session ->
+            val ids = mutableListOf(comment.id)
+            if (comment.parentId == null) {
+                ids += commentRepository.getReplyIds(session, comment.id)
+            } else {
+                commentRepository.incrementRepliesCount(session, comment.parentId, -1)
+            }
+            commentRepository.deleteCommentsByIds(session, ids)
+            deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.COMMENT, ids)
+            commentLikeRepository.removeAllLikesForComments(session, ids)
+            characterRepository.incrementCommentsCount(session, comment.characterId, -ids.size)
+        }
+    }
+
+    suspend fun likeComment(commentId: String, userId: String) {
+        transactionHelper.withTransaction { session ->
+            commentLikeRepository.likeComment(session, userId, commentId)
+            commentRepository.incrementLikesCount(session, commentId, 1)
+        }
+    }
+
+    suspend fun unlikeComment(commentId: String, userId: String) {
+        transactionHelper.withTransaction { session ->
+            commentLikeRepository.unlikeComment(session, userId, commentId)
+            commentRepository.incrementLikesCount(session, commentId, -1)
         }
     }
 
@@ -191,6 +243,11 @@ class ComplexQueryHelper(
             reviewRepository.deleteReviewsByIds(session, reviewIds)
             deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.REVIEW, reviewIds)
             reviewLikeRepository.removeAllLikesForReviews(session, reviewIds)
+
+            val commentIds = commentRepository.getCommentIdsByCharacterIds(session, listOf(characterId))
+            commentRepository.deleteCommentsByIds(session, commentIds)
+            deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.COMMENT, commentIds)
+            commentLikeRepository.removeAllLikesForComments(session, commentIds)
         }
     }
 
@@ -266,6 +323,32 @@ class ComplexQueryHelper(
                 reviewRepository.deleteReviewsByIds(session, allReviewIds)
                 deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.REVIEW, allReviewIds)
                 reviewLikeRepository.removeAllLikesForReviews(session, allReviewIds)
+            }
+
+            // Комменты: к персонажам юзера — целиком; его собственные — вместе с
+            // ветками под его корневыми; счётчики выживших чужих веток/персонажей чиним
+            val commentsForCharacters = commentRepository.getCommentIdsByCharacterIds(session, characterIds)
+            val ownComments = commentRepository.getCommentsByUserId(session, userId)
+            val ownRootIds = ownComments.filter { it.parentId == null }.map { it.id }
+            val underOwnRoots = commentRepository.getRepliesByParentIds(session, ownRootIds)
+            val allCommentIds = (commentsForCharacters + ownComments.map { it.id } + underOwnRoots.map { it.id }).distinct()
+            if (allCommentIds.isNotEmpty()) {
+                commentRepository.deleteCommentsByIds(session, allCommentIds)
+                deletedIdsStatsRepository.entitiesWereDeleted(session, EntityType.COMMENT, allCommentIds)
+                commentLikeRepository.removeAllLikesForComments(session, allCommentIds)
+                // Ответы юзера под ЧУЖИМИ корнями — минус в repliesCount этих корней
+                ownComments.filter { it.parentId != null && it.parentId !in ownRootIds }
+                    .groupBy { it.parentId!! }
+                    .forEach { (parentId, list) ->
+                        commentRepository.incrementRepliesCount(session, parentId, -list.size)
+                    }
+                // totalComments у чужих персонажей
+                (ownComments + underOwnRoots).distinctBy { it.id }
+                    .filter { it.characterId !in characterIds }
+                    .groupBy { it.characterId }
+                    .forEach { (charId, list) ->
+                        characterRepository.incrementCommentsCount(session, charId, -list.size)
+                    }
             }
 
             userRepository.deleteUser(session, userId = userId)
