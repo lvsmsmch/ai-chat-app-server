@@ -254,7 +254,8 @@ object AiMessageGeneratorUtil {
                     }
                 }
             }
-            put("max_completion_tokens", 1000)
+            // Потолок-страховка от «полотен»: краткость требует промпт, а это кап
+            put("max_completion_tokens", 180)
             put("temperature", temperature)
             put("stream", stream)
         }
@@ -421,7 +422,7 @@ object AiMessageGeneratorUtil {
             }
             putJsonObject("generationConfig") {
                 put("temperature", temperature)
-                put("maxOutputTokens", 1000)
+                put("maxOutputTokens", 180)
             }
         }
     }
