@@ -19,6 +19,8 @@ data class UserDbo(
     val googleOauthId: String? = null,
     val accountType: AccountType = AccountType.GUEST,
     val hasSubscription: Boolean = false,
+    /** Язык персонажей (каталог, промпты, ответы в чате). */
+    val characterLanguage: String = "en",
     val deviceId: String? = null,
     val facebookOauthId: String? = null,
     val hashedPassword: String? = null,

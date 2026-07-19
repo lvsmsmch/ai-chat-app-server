@@ -165,7 +165,7 @@ fun Route.configureCharacterRouting(
                 cursorPosition = cursor
             )
 
-            call.respondSuccess(data = result.toDto(mapper))
+            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId)))
         }
 
         get("/search/suggestions") {
@@ -232,7 +232,7 @@ fun Route.configureCharacterRouting(
                 )
             }
 
-            call.respondSuccess(data = result.toDto(mapper))
+            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId)))
         }
 
         get("/{id}") {
@@ -248,7 +248,7 @@ fun Route.configureCharacterRouting(
                 throw CharacterNotFoundException(id = characterId)
             }
 
-            call.respondSuccess(data = characterDbo.toCharacterDto(mapper))
+            call.respondSuccess(data = characterDbo.toCharacterDto(mapper, mapper.languageOf(currentUserId)))
         }
 
         get("/{id}/details") {
@@ -280,7 +280,7 @@ fun Route.configureCharacterRouting(
                 throw ForbiddenException("You are not allowed to access this characters private info")
             }
 
-            call.respondSuccess(data = characterDbo.toCharacterPrivateInfoDto(mapper))
+            call.respondSuccess(data = characterDbo.toCharacterPrivateInfoDto(mapper, mapper.languageOf(currentUserId)))
         }
 
         get("/{characterId}/similar") {
@@ -303,7 +303,7 @@ fun Route.configureCharacterRouting(
 
             val similarCharacterDtos = similarCharacterIds.mapNotNull {
                 characterRepository.getCharacter(it.first)
-            }.map { it.toCharacterDto(mapper) }
+            }.map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
 
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))
         }

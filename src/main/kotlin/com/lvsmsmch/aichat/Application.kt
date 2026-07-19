@@ -197,7 +197,8 @@ fun Application.module() {
     val messageFinisher = MessageFinisher(
         messageRepository = messageRepository,
         characterRepository = characterRepository,
-        chatRepository = chatRepository
+        chatRepository = chatRepository,
+        userRepository = userRepository
     )
 
     val idGenerator = IdGenerator(

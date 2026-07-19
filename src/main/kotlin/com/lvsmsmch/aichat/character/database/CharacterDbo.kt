@@ -34,5 +34,33 @@ data class CharacterDbo(
     val coOccurrenceScoreUpdatedAt: String? = null,
     val color: String = AvatarColors.random(),
     // Место в топе своей категории за всё время (1..3); пересчитывается раз в день
-    val topRank: Int? = null
+    val topRank: Int? = null,
+    /** Локализации по языкам ("ru" → перевод); отсутствие языка = оригинал (en). */
+    val translations: Map<String, CharacterTranslationDbo> = emptyMap()
 )
+
+@kotlinx.serialization.Serializable
+data class CharacterTranslationDbo(
+    val name: String,
+    val description: String,
+    val prompt: String,
+    val initialMessage: String,
+)
+
+/** Поддерживаемые языки локализации персонажей (кроме en-оригинала). */
+val SUPPORTED_CHARACTER_LANGUAGES = listOf("ru")
+
+/**
+ * Локализованная копия: имя/описание/промпт/приветствие подменяются переводом.
+ * en, неизвестный язык или отсутствие перевода — оригинал.
+ */
+fun CharacterDbo.localized(lang: String?): CharacterDbo {
+    if (lang == null || lang == "en") return this
+    val t = translations[lang] ?: return this
+    return copy(
+        name = t.name.ifBlank { name },
+        description = t.description.ifBlank { description },
+        prompt = t.prompt.ifBlank { prompt },
+        initialMessage = t.initialMessage.ifBlank { initialMessage },
+    )
+}

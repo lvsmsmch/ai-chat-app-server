@@ -268,6 +268,10 @@ class UserRepository(
     }
 
 
+    suspend fun setCharacterLanguage(userId: String, lang: String) {
+        collection.updateOneById(userId, org.litote.kmongo.setValue(UserDbo::characterLanguage, lang))
+    }
+
     suspend fun deleteUser(session: ClientSession, userId: String): Boolean {
         val deleteResult = collection.deleteOneById(session, userId)
         return deleteResult.deletedCount > 0

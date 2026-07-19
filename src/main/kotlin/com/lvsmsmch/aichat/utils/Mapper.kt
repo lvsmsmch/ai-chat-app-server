@@ -31,7 +31,18 @@ class Mapper(
     val reviewRepository: ReviewRepository,
     val reviewLikeRepository: ReviewLikeRepository,
     val followRepository: FollowRepository,
-)
+) {
+    /** Кэш языка персонажей по юзеру (инвалидируется при смене языка). */
+    val userLanguageCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    suspend fun languageOf(userId: String?): String? {
+        if (userId == null) return null
+        userLanguageCache[userId]?.let { return it }
+        val lang = userRepository.getUserById(userId)?.characterLanguage ?: "en"
+        userLanguageCache[userId] = lang
+        return lang
+    }
+}
 
 suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
     return UserDto(
@@ -92,14 +103,15 @@ suspend fun UserDbo.toUserLoginInfoDto(
     )
 }
 
-suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
+suspend fun CharacterDbo.toCharacterDto(mapper: Mapper, lang: String? = null): CharacterDto {
+    val c = this.localized(lang)
     return CharacterDto(
         id = id,
         createdAt = createdAt.toString(),
         author = mapper.userRepository.getUserById(authorId)!!.toUserDto(mapper),
         visibility = visibility,
-        name = name,
-        description = description,
+        name = c.name,
+        description = c.description,
         category = category,
         tags = tags,
         totalChats = totalChats,
@@ -114,10 +126,10 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper): CharacterDto {
     )
 }
 
-suspend fun CachedCharactersResult.toDto(mapper: Mapper): CachedCharactersResultDto {
+suspend fun CachedCharactersResult.toDto(mapper: Mapper, lang: String? = null): CachedCharactersResultDto {
     return CachedCharactersResultDto(
         refreshed = refreshed,
-        items = items.map { it.toCharacterDto(mapper) },
+        items = items.map { it.toCharacterDto(mapper, lang) },
         nextCursor = nextCursor?.toString(),
     )
 }
@@ -133,19 +145,21 @@ suspend fun CharacterDbo.toCharacterDetailsDto(
     )
 }
 
-suspend fun CharacterDbo.toCharacterPrivateInfoDto(mapper: Mapper): CharacterPrivateInfoDto {
+suspend fun CharacterDbo.toCharacterPrivateInfoDto(mapper: Mapper, lang: String? = null): CharacterPrivateInfoDto {
+    val c = this.localized(lang)
     return CharacterPrivateInfoDto(
         id = id,
-        prompt = prompt,
-        initialMessage = initialMessage
+        prompt = c.prompt,
+        initialMessage = c.initialMessage
     )
 }
 
 suspend fun CharacterDbo.toCharacterFullInfoDto(mapper: Mapper, demanderId: String): CharacterFullInfoDto {
+    val lang = mapper.languageOf(demanderId)
     return CharacterFullInfoDto(
-        character = toCharacterDto(mapper),
+        character = toCharacterDto(mapper, lang),
         characterDetails = toCharacterDetailsDto(mapper, demanderId),
-        characterPrivateInfo = toCharacterPrivateInfoDto(mapper)
+        characterPrivateInfo = toCharacterPrivateInfoDto(mapper, lang)
     )
 }
 
@@ -174,8 +188,10 @@ suspend fun ReviewDbo.toReviewDto(mapper: Mapper, currentUserId: String? = null)
 suspend fun ChatDbo.toChatDto(
     mapper: Mapper
 ): ChatDto {
+    // Язык владельца чата: имена/авы участников локализованы и в списке чатов
+    val lang = mapper.languageOf(userId)
     val characters = characterIds.mapNotNull { charId ->
-        mapper.characterRepository.getCharacter(charId)?.toCharacterDto(mapper)
+        mapper.characterRepository.getCharacter(charId)?.toCharacterDto(mapper, lang)
     }
 
     return ChatDto(
@@ -209,7 +225,7 @@ suspend fun RecommendationsDbo.toNotificationDto(mapper: Mapper): NotificationDt
         type = NotificationType.Recommendations.code,
         notification = RecommendationsDto(
             characters = characterIds.mapNotNull {
-                mapper.characterRepository.getCharacter(it)?.toCharacterDto(mapper)
+                mapper.characterRepository.getCharacter(it)?.toCharacterDto(mapper, mapper.languageOf(userId))
             }
         )
     )

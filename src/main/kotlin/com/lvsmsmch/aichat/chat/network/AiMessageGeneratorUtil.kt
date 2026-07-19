@@ -77,6 +77,7 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
+        responseLanguage: String? = null,
         onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit,
         onError: suspend (String) -> Unit
@@ -89,7 +90,7 @@ object AiMessageGeneratorUtil {
                 val key = if (useGroq) groqApiKey else openAiApiKey
                 val model = if (useGroq) groqModel else openAiModel
 
-                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
+                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage)
                 val requestBody = buildRequestBody(messages, model = model, stream = false)
 
                 logger.debug("Messages count: ${messages.size}")
@@ -137,7 +138,7 @@ object AiMessageGeneratorUtil {
                 }
             } else if (useGemini) {
                 val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
-                val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo)
+                val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo, responseLanguage)
 
                 logger.debug("Sending request to Gemini API")
 
@@ -167,11 +168,12 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
+        responseLanguage: String? = null,
         maxCharacters: Int = 1000
     ): List<Map<String, String>> {
         val systemMessage = mapOf(
             "role" to "system",
-            "content" to buildSystemPrompt(chatDbo, characterDbo)
+            "content" to buildSystemPrompt(chatDbo, characterDbo, responseLanguage)
         )
 
         val selectedMessages = mutableListOf<MessageDbo>()
@@ -216,12 +218,25 @@ object AiMessageGeneratorUtil {
         return listOf(systemMessage) + historyMessages
     }
 
-    private fun buildSystemPrompt(chatDbo: ChatDbo, characterDbo: CharacterDbo): String {
+    private fun buildSystemPrompt(
+        chatDbo: ChatDbo,
+        characterDbo: CharacterDbo,
+        responseLanguage: String? = null,
+    ): String {
         val template = aiPrompt + if (chatDbo.characterIds.size > 1) aiGroupChatPrompt else ""
+
+        // Жёсткая языковая инструкция: даже с локализованным промптом модель
+        // иногда сползает в английский без явного требования
+        val languageInstruction = when (responseLanguage) {
+            "ru" -> "\n\nIMPORTANT: Always respond ONLY in Russian (по-русски). " +
+                "Every message you write must be in Russian, including actions in asterisks."
+            else -> ""
+        }
 
         return template
             .replace("{CHARACTER_NAME}", characterDbo.name)
-            .replace("{USER_PROMPT}", characterDbo.prompt.takeIf { it.isNotBlank() } ?: "")
+            .replace("{USER_PROMPT}", characterDbo.prompt.takeIf { it.isNotBlank() } ?: "") +
+            languageInstruction
     }
 
     private fun buildRequestBody(
@@ -265,7 +280,8 @@ object AiMessageGeneratorUtil {
     private suspend fun processStreamingResponse(
         response: HttpResponse,
         onMsgTextUpdate: suspend (String) -> Unit,
-        onFinished: suspend (String) -> Unit
+        onFinished: suspend (String) -> Unit,
+        responseLanguage: String? = null
     ) {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
@@ -376,9 +392,10 @@ object AiMessageGeneratorUtil {
     private fun buildGeminiRequestBody(
         messages: List<Map<String, Any>>,
         chatDbo: ChatDbo,
-        characterDbo: CharacterDbo
+        characterDbo: CharacterDbo,
+        responseLanguage: String? = null
     ): JsonObject {
-        val systemPrompt = buildSystemPrompt(chatDbo, characterDbo)
+        val systemPrompt = buildSystemPrompt(chatDbo, characterDbo, responseLanguage)
 
         return buildJsonObject {
             putJsonObject("systemInstruction") {

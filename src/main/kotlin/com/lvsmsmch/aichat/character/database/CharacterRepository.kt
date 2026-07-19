@@ -91,6 +91,14 @@ class CharacterRepository(
                     CharacterDbo::category.regex(".*$searchQuery.*", "i"),
                     regex(CharacterDbo::tags.name, ".*$searchQuery.*", "i"),
                     CharacterDbo::description.regex(".*$searchQuery.*", "i"),
+                    // Поиск работает на всех языках: локализованные имя/описание
+                    // матчатся независимо от языка приложения юзера
+                    *SUPPORTED_CHARACTER_LANGUAGES.flatMap { lang ->
+                        listOf(
+                            regex("translations.$lang.name", ".*$searchQuery.*", "i"),
+                            regex("translations.$lang.description", ".*$searchQuery.*", "i"),
+                        )
+                    }.toTypedArray(),
                 )
             } else EMPTY_BSON,
             if (authorId != null) {

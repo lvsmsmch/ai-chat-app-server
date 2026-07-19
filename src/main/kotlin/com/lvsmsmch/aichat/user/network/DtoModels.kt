@@ -91,3 +91,7 @@ data class ReportUserRequest(
     @SerialName("reason") val reason: String,
     @SerialName("text") val text: String = ""
 )
+@kotlinx.serialization.Serializable
+data class SetCharacterLanguageRequest(
+    @kotlinx.serialization.SerialName("language") val language: String
+)

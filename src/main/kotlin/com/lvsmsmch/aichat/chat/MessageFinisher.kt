@@ -1,6 +1,7 @@
 package com.lvsmsmch.aichat.chat
 
 import com.lvsmsmch.aichat.character.database.CharacterRepository
+import com.lvsmsmch.aichat.character.database.localized
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.database.MessageStatus
@@ -16,6 +17,7 @@ class MessageFinisher(
     private val characterRepository: CharacterRepository,
     private val chatRepository: ChatRepository,
     private val messageRepository: MessageRepository,
+    private val userRepository: com.lvsmsmch.aichat.user.database.UserRepository
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -36,7 +38,11 @@ class MessageFinisher(
                     chatId = chatDbo.id,
                     timestamp = UtcTimestamp.parse(messageDbo.createdAt)
                 ).takeLast(200)
-                val participants = chatDbo.characterIds.mapNotNull { characterRepository.getCharacter(it) }
+                // Язык владельца чата: промпт/приветствие и ответы — на нём
+                val lang = userRepository.getUserById(chatDbo.userId)?.characterLanguage ?: "en"
+                val participants = chatDbo.characterIds
+                    .mapNotNull { characterRepository.getCharacter(it) }
+                    .map { it.localized(lang) }
 
                 messageRepository.updateMessage(
                     messageId = messageId,
@@ -47,9 +53,10 @@ class MessageFinisher(
                 withTimeout(timeoutSeconds.seconds) {
                     AiMessageGeneratorUtil.generateAiMessageWithStreaming(
                         chatDbo = chatDbo,
-                        characterDbo = characterDbo,
+                        characterDbo = characterDbo.localized(lang),
                         participants = participants,
                         messagesHistory = messageHistory,
+                        responseLanguage = lang,
                         onMsgTextUpdate = {
                             ensureActive()
                             messageRepository.updateMessage(

@@ -79,7 +79,7 @@ fun Route.configureUserRouting(
                 size = request.size
             )
 
-            val charactersDto = result.items.map { it.toCharacterDto(mapper) }
+            val charactersDto = result.items.map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
             val response = UserCharactersResponse(
                 characters = charactersDto,
                 nextCursor = result.nextCursor
@@ -245,6 +245,24 @@ fun Route.configureUserRouting(
                 ?: throw UserNotFoundException(id = userId)
 
             call.respondSuccess(data = updatedUser.toUserFullInfoDto(mapper, demanderId = sessionDbo.userId))
+        }
+
+        /** Смена языка персонажей: каталог/промпты/ответы приходят на этом языке. */
+        post("/{userId}/character-language") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "You can only change your own language")
+            }
+            val request = call.receive<SetCharacterLanguageRequest>()
+            val lang = request.language
+            if (lang != "en" && lang !in com.lvsmsmch.aichat.character.database.SUPPORTED_CHARACTER_LANGUAGES) {
+                throw ValidationException("Unsupported language: $lang")
+            }
+            userRepository.setCharacterLanguage(userId, lang)
+            mapper.userLanguageCache.remove(userId)
+            call.respondSuccess()
         }
 
         post("/{userId}/follow") {
