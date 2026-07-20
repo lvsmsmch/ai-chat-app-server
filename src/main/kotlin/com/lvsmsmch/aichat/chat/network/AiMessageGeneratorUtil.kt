@@ -117,21 +117,22 @@ object AiMessageGeneratorUtil {
             // назначает длину каждого ответа; распределение зависит от режима.
             val wordy = lastUserLen > 100 || avgUserLen > 80
             val lengthRoll = kotlin.random.Random.nextDouble()
-            val lengthNudge = when {
+            // maxSentences — жёсткий потолок для пост-обрезки (модель любит перебарщивать)
+            val (lengthNudge, maxSentences) = when {
                 userRoleplays || wordy -> when {
-                    lengthRoll < 0.10 -> " Reply VERY briefly this time: a few words or a short interjection."
-                    lengthRoll < 0.35 -> " Reply briefly this time: one sentence."
-                    lengthRoll < 0.75 -> " Reply with two or three sentences this time."
-                    else -> " This time you may reply at length: a fuller, expressive answer " +
-                        "(up to ~100 words) that moves the conversation forward."
+                    lengthRoll < 0.10 -> " Reply VERY briefly this time: a few words or a short interjection." to 1
+                    lengthRoll < 0.35 -> " Reply briefly this time: one sentence." to 2
+                    lengthRoll < 0.75 -> " Reply with two or three sentences this time." to 4
+                    else -> (" This time you may reply at length: a fuller, expressive answer " +
+                        "(up to ~100 words) that moves the conversation forward.") to null
                 }
                 else -> when {
-                    lengthRoll < 0.20 -> " Reply VERY briefly this time: a few words, or even a single word " +
-                        "or interjection if it fits your mood."
-                    lengthRoll < 0.65 -> " Reply briefly this time: one short sentence."
-                    lengthRoll < 0.90 -> " Reply with two or three sentences this time."
-                    else -> " This time you may reply at length: several sentences (up to ~80 words) " +
-                        "if you have something worth saying."
+                    lengthRoll < 0.20 -> (" Reply VERY briefly this time: a few words, or even a single word " +
+                        "or interjection if it fits your mood.") to 1
+                    lengthRoll < 0.65 -> " Reply briefly this time: one short sentence." to 2
+                    lengthRoll < 0.90 -> " Reply with two or three sentences this time." to 3
+                    else -> (" This time you may reply at length: several sentences (up to ~80 words) " +
+                        "if you have something worth saying.") to null
                 }
             }
 
@@ -149,7 +150,11 @@ object AiMessageGeneratorUtil {
                 val key = if (useGroq) groqApiKey else openAiApiKey
                 val model = if (useGroq) groqModel else openAiModel
 
-                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage, styleNudge)
+                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage, styleNudge) +
+                    listOf(mapOf(
+                        "role" to "user",
+                        "content" to "[Instruction for your next reply - do not mention it:" + styleNudge + "]"
+                    ))
                 val requestBody = buildRequestBody(messages, model = model, stream = false)
 
                 logger.debug("Messages count: ${messages.size}")
@@ -176,7 +181,7 @@ object AiMessageGeneratorUtil {
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
-                        simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
+                        simulateStreaming(enforceLength(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), maxSentences), onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
                     } catch (e: Exception) {
@@ -196,7 +201,14 @@ object AiMessageGeneratorUtil {
                     }
                 }
             } else if (useGemini) {
-                val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
+                // Инструкция стиля — ПОСЛЕДНИМ сообщением: у истории чата больший
+                // вес, чем у системного промпта, и модель слушает то, что ближе к концу
+                val styleMessage = mapOf(
+                    "role" to "user",
+                    "parts" to listOf(mapOf("text" to
+                        "[Instruction for your next reply - do not mention it:" + styleNudge + "]"))
+                )
+                val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory) + styleMessage
                 val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo, responseLanguage, styleNudge)
 
                 logger.debug("Sending request to Gemini API")
@@ -209,7 +221,7 @@ object AiMessageGeneratorUtil {
                 logger.debug("Response status: ${response.status}")
 
                 val fullMessage = processGeminiResponse(response, characterDbo)
-                simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
+                simulateStreaming(enforceLength(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), maxSentences), onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
@@ -564,6 +576,37 @@ object AiMessageGeneratorUtil {
      * Запретили действия - вырезаем *...*; просили действие в конце, а оно
      * в начале - переставляем. Сообщение из одного действия не трогаем.
      */
+    /**
+     * Жёсткий потолок длины: ролл выбрал короткий ответ, а модель выдала
+     * полотно - отрезаем по границе N-го предложения. Действия в *звёздочках*
+     * - атомы: не режутся посередине, прилегающее к месту среза действие сохраняется.
+     */
+    private fun enforceLength(text: String, maxSentences: Int?): String {
+        if (maxSentences == null) return text
+        val tokens = Regex("\\*[^*]*\\*|[^*]+").findAll(text.trim()).map { it.value }.toList()
+        val out = StringBuilder()
+        var sentences = 0
+        for (t in tokens) {
+            if (t.startsWith("*")) {
+                out.append(t)
+                if (sentences >= maxSentences) break
+                continue
+            }
+            val parts = Regex("[^.!?\u2026]+[.!?\u2026]*\\s*").findAll(t).map { it.value }.toList()
+            var done = false
+            for (partText in parts) {
+                out.append(partText)
+                if (Regex("[.!?\u2026]\\s*$").containsMatchIn(partText)) {
+                    sentences++
+                    if (sentences >= maxSentences) { done = true; break }
+                }
+            }
+            if (done) break
+        }
+        val result = out.toString().trim()
+        return if (result.isBlank()) text else result
+    }
+
     private fun enforceActionStyle(text: String, forbidActions: Boolean, wantActionAtEnd: Boolean): String {
         val t = text.trim()
         if (forbidActions) {
