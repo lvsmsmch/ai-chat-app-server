@@ -29,21 +29,35 @@ class CommentRepository(
 
     suspend fun getCommentById(id: String): CommentDbo? = collection.findOneById(id)
 
-    /** Корневые комменты персонажа, новые сверху; курсор — createdAt последнего. */
+    /**
+     * Корневые комменты персонажа. Сортировки: 0 — новые сверху (курсор createdAt <),
+     * 1 — старые сверху (createdAt >), 2 — топ по лайкам (пагинация смещением
+     * не нужна на наших объёмах: курсор — позиция).
+     */
     suspend fun getRootComments(
         characterId: String,
-        beforeTime: UtcTimestamp?,
+        sortCriteria: Int,
+        cursor: String?,
         size: Int
     ): List<CommentDbo> {
-        return collection.find(
-            and(
-                CommentDbo::characterId eq characterId,
-                CommentDbo::parentId eq null,
-                if (beforeTime != null) CommentDbo::createdAt lt beforeTime.toString() else EMPTY_BSON
-            )
-        ).sort(descending(CommentDbo::createdAt))
-            .limit(size)
-            .toList()
+        val base = and(
+            CommentDbo::characterId eq characterId,
+            CommentDbo::parentId eq null,
+        )
+        return when (sortCriteria) {
+            1 -> collection.find(
+                and(base, if (cursor != null) CommentDbo::createdAt gt cursor else EMPTY_BSON)
+            ).sort(ascending(CommentDbo::createdAt)).limit(size).toList()
+            2 -> {
+                val skip = cursor?.toIntOrNull() ?: 0
+                collection.find(base)
+                    .sort(org.litote.kmongo.orderBy(mapOf(CommentDbo::likesCount to false, CommentDbo::createdAt to false)))
+                    .skip(skip).limit(size).toList()
+            }
+            else -> collection.find(
+                and(base, if (cursor != null) CommentDbo::createdAt lt cursor else EMPTY_BSON)
+            ).sort(descending(CommentDbo::createdAt)).limit(size).toList()
+        }
     }
 
     /** Ответы ветки, старые сверху (как на YouTube); курсор — createdAt последнего. */
@@ -67,7 +81,13 @@ class CommentRepository(
     }
 
     suspend fun updateText(commentId: String, text: String) {
-        collection.updateOneById(commentId, org.litote.kmongo.setValue(CommentDbo::text, text))
+        collection.updateOneById(
+            commentId,
+            org.litote.kmongo.combine(
+                org.litote.kmongo.setValue(CommentDbo::text, text),
+                org.litote.kmongo.setValue(CommentDbo::editedAt, UtcTimestamp.now().toString()),
+            )
+        )
     }
 
     suspend fun incrementLikesCount(session: ClientSession, commentId: String, increment: Int) {

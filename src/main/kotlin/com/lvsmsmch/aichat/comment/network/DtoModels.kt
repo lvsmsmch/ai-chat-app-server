@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 data class CommentDto(
     @SerialName("id") val id: String,
     @SerialName("createdAt") val createdAt: String,
+    @SerialName("editedAt") val editedAt: String? = null,
     @SerialName("characterId") val characterId: String,
     @SerialName("author") val author: UserDto,
     @SerialName("parentId") val parentId: String? = null,

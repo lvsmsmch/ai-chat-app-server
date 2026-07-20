@@ -22,4 +22,6 @@ data class CommentDbo(
     val likesCount: Int = 0,
     /** Только у корневых: сколько ответов в ветке. */
     val repliesCount: Int = 0,
+    /** Время последней правки текста (null — не редактировался). */
+    val editedAt: String? = null,
 )

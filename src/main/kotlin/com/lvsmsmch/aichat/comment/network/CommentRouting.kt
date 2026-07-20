@@ -35,6 +35,7 @@ fun Route.configureCommentRouting(
             CommentDto(
                 id = c.id,
                 createdAt = c.createdAt,
+                editedAt = c.editedAt,
                 characterId = c.characterId,
                 author = author.toUserDto(mapper),
                 parentId = c.parentId,
@@ -87,21 +88,29 @@ fun Route.configureCommentRouting(
             val characterId = call.request.queryParameters["characterId"]
                 ?: throw BadRequestException("Missing characterId parameter")
             val cursor = call.request.queryParameters["cursor"]
+            val sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0
             val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
             require(size in 1..100) { "Size must be between 1 and 100" }
+            require(sortCriteria in 0..2) { "Unknown sortCriteria" }
 
             val dbos = commentRepository.getRootComments(
                 characterId = characterId,
-                beforeTime = cursor?.let { UtcTimestamp.parse(it) },
+                sortCriteria = sortCriteria,
+                cursor = cursor,
                 size = size + 1
             )
             val hasMore = dbos.size > size
             val page = if (hasMore) dbos.dropLast(1) else dbos
+            val nextCursor = when {
+                !hasMore -> null
+                sortCriteria == 2 -> ((cursor?.toIntOrNull() ?: 0) + page.size).toString()
+                else -> page.lastOrNull()?.createdAt
+            }
 
             call.respondSuccess(
                 data = CommentsResponse(
                     comments = toDtos(page, sessionDbo.userId),
-                    nextCursor = if (hasMore) page.lastOrNull()?.createdAt else null
+                    nextCursor = nextCursor
                 )
             )
         }
@@ -147,7 +156,7 @@ fun Route.configureCommentRouting(
             commentRepository.updateText(commentId, request.text.trim())
 
             call.respondSuccess(
-                data = toDtos(listOf(commentDbo.copy(text = request.text.trim())), sessionDbo.userId).first()
+                data = toDtos(listOf(commentDbo.copy(text = request.text.trim(), editedAt = UtcTimestamp.now().toString())), sessionDbo.userId).first()
             )
         }
 
