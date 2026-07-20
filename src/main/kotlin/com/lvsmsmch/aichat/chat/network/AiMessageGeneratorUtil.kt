@@ -83,14 +83,37 @@ object AiMessageGeneratorUtil {
         onError: suspend (String) -> Unit
     ) {
         try {
+            // Анти-шаблон: модель копирует форму своих прошлых сообщений из истории
+            // (все начинаются с *действия*). Ломаем детерминированно: смотрим на
+            // последние свои ответы и прямо запрещаем повторять форму.
+            val ownRecent = messagesHistory
+                .filter { !it.isSentByUser && it.senderId == characterDbo.id }
+                .takeLast(3)
+                .map { it.text.trim() }
+            val styleNudge = buildString {
+                val startsWithAction = ownRecent.count { it.startsWith("*") }
+                val containAction = ownRecent.count { it.contains("*") }
+                if (ownRecent.size >= 2 && startsWithAction >= 2) {
+                    append(
+                        " IMPORTANT: your recent replies all began with an *action*. " +
+                        "Do NOT begin this reply with an asterisk action - start with plain speech; " +
+                        "a brief action at the end is allowed, or none at all."
+                    )
+                }
+                if (ownRecent.size >= 3 && containAction >= 3) {
+                    append(" Write this reply with NO asterisks at all.")
+                }
+            }
+
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
             } else if (useGroq || useOpenAi) {
+
                 val url = if (useGroq) groqApiUrl else openAiApiUrl
                 val key = if (useGroq) groqApiKey else openAiApiKey
                 val model = if (useGroq) groqModel else openAiModel
 
-                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage)
+                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage, styleNudge)
                 val requestBody = buildRequestBody(messages, model = model, stream = false)
 
                 logger.debug("Messages count: ${messages.size}")
@@ -117,7 +140,7 @@ object AiMessageGeneratorUtil {
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
-                        simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
+                        simulateStreaming(breakActionPattern(fullMessage, styleNudge), onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
                     } catch (e: Exception) {
@@ -138,7 +161,7 @@ object AiMessageGeneratorUtil {
                 }
             } else if (useGemini) {
                 val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory)
-                val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo, responseLanguage)
+                val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo, responseLanguage, styleNudge)
 
                 logger.debug("Sending request to Gemini API")
 
@@ -150,7 +173,7 @@ object AiMessageGeneratorUtil {
                 logger.debug("Response status: ${response.status}")
 
                 val fullMessage = processGeminiResponse(response, characterDbo)
-                simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
+                simulateStreaming(breakActionPattern(fullMessage, styleNudge), onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
@@ -169,11 +192,12 @@ object AiMessageGeneratorUtil {
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
         responseLanguage: String? = null,
+        styleNudge: String = "",
         maxCharacters: Int = 1000
     ): List<Map<String, String>> {
         val systemMessage = mapOf(
             "role" to "system",
-            "content" to buildSystemPrompt(chatDbo, characterDbo, responseLanguage)
+            "content" to (buildSystemPrompt(chatDbo, characterDbo, responseLanguage) + styleNudge)
         )
 
         val selectedMessages = mutableListOf<MessageDbo>()
@@ -394,9 +418,10 @@ object AiMessageGeneratorUtil {
         messages: List<Map<String, Any>>,
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
-        responseLanguage: String? = null
+        responseLanguage: String? = null,
+        styleNudge: String = ""
     ): JsonObject {
-        val systemPrompt = buildSystemPrompt(chatDbo, characterDbo, responseLanguage)
+        val systemPrompt = buildSystemPrompt(chatDbo, characterDbo, responseLanguage) + styleNudge
 
         return buildJsonObject {
             putJsonObject("systemInstruction") {
@@ -496,6 +521,22 @@ object AiMessageGeneratorUtil {
         if (remaining.isNotEmpty()) {
             emit(remaining)
         }
+    }
+
+    /**
+     * Модель попросили не начинать с *действия*, но она ослушалась (flash-lite
+     * слабо следует стилевым инструкциям): детерминированно переставляем
+     * стартовое действие в конец. Сообщение из одного действия не трогаем -
+     * это законная короткая форма.
+     */
+    private fun breakActionPattern(text: String, styleNudge: String): String {
+        if (styleNudge.isBlank()) return text
+        val t = text.trim()
+        val m = Regex("^\\*([^*]+)\\*\\s*(.+)", RegexOption.DOT_MATCHES_ALL).find(t) ?: return text
+        val action = m.groupValues[1].trim()
+        val speech = m.groupValues[2].trim()
+        if (speech.isBlank() || speech.contains("*")) return text
+        return speech + " *" + action + "*"
     }
 
     private suspend fun simulateStreaming(
