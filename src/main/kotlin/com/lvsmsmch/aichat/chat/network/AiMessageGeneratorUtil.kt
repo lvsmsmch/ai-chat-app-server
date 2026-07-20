@@ -102,15 +102,44 @@ object AiMessageGeneratorUtil {
             val actionPosition = if (positionRoll < 0.4) "end" else if (positionRoll < 0.75) "middle" else "start"
             val forbidActions = !userRoleplays && !allowAction
             val wantActionAtEnd = !userRoleplays && allowAction && actionPosition == "end"
-            val styleNudge = when {
+            val actionNudge = when {
                 userRoleplays ->
                     " The user is roleplaying with *actions* in asterisks: match their style - use actions freely, " +
-                    "several are fine, anywhere in the message, and you may write a bit longer to keep the scene going."
+                    "several are fine, anywhere in the message."
                 allowAction ->
                     " In this reply you may include ONE brief action in *asterisks*, placed at the " +
                     actionPosition + " of the message."
                 else -> " Write this reply as plain speech with NO asterisks at all."
             }
+
+            // Рулетка ДЛИНЫ: модель копирует длину своих прошлых сообщений из
+            // истории и застревает в шаблоне «всегда 3 предложения». Сервер сам
+            // назначает длину каждого ответа; распределение зависит от режима.
+            val wordy = lastUserLen > 100 || avgUserLen > 80
+            val lengthRoll = kotlin.random.Random.nextDouble()
+            val lengthNudge = when {
+                userRoleplays || wordy -> when {
+                    lengthRoll < 0.10 -> " Reply VERY briefly this time: a few words or a short interjection."
+                    lengthRoll < 0.35 -> " Reply briefly this time: one sentence."
+                    lengthRoll < 0.75 -> " Reply with two or three sentences this time."
+                    else -> " This time you may reply at length: a fuller, expressive answer " +
+                        "(up to ~100 words) that moves the conversation forward."
+                }
+                else -> when {
+                    lengthRoll < 0.20 -> " Reply VERY briefly this time: a few words, or even a single word " +
+                        "or interjection if it fits your mood."
+                    lengthRoll < 0.65 -> " Reply briefly this time: one short sentence."
+                    lengthRoll < 0.90 -> " Reply with two or three sentences this time."
+                    else -> " This time you may reply at length: several sentences (up to ~80 words) " +
+                        "if you have something worth saying."
+                }
+            }
+
+            // Анти-эхо: прямой запрет копировать форму собственных прошлых сообщений
+            val antiEcho = " The message history shows your previous replies: do NOT imitate their " +
+                "length, structure or opening pattern. Follow the instructions above for THIS reply."
+
+            val styleNudge = actionNudge + lengthNudge + antiEcho
 
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
@@ -286,7 +315,7 @@ object AiMessageGeneratorUtil {
                 }
             }
             // Потолок-страховка от «полотен»: краткость требует промпт, а это кап
-            put("max_completion_tokens", 180)
+            put("max_completion_tokens", 400)
             put("temperature", temperature)
             put("stream", stream)
         }
@@ -454,7 +483,7 @@ object AiMessageGeneratorUtil {
             }
             putJsonObject("generationConfig") {
                 put("temperature", temperature)
-                put("maxOutputTokens", 180)
+                put("maxOutputTokens", 400)
             }
         }
     }
