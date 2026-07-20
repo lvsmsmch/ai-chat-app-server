@@ -83,26 +83,33 @@ object AiMessageGeneratorUtil {
         onError: suspend (String) -> Unit
     ) {
         try {
-            // Анти-шаблон: модель копирует форму своих прошлых сообщений из истории
-            // (все начинаются с *действия*). Ломаем детерминированно: смотрим на
-            // последние свои ответы и прямо запрещаем повторять форму.
-            val ownRecent = messagesHistory
-                .filter { !it.isSentByUser && it.senderId == characterDbo.id }
-                .takeLast(3)
-                .map { it.text.trim() }
-            val styleNudge = buildString {
-                val startsWithAction = ownRecent.count { it.startsWith("*") }
-                val containAction = ownRecent.count { it.contains("*") }
-                if (ownRecent.size >= 2 && startsWithAction >= 2) {
-                    append(
-                        " IMPORTANT: your recent replies all began with an *action*. " +
-                        "Do NOT begin this reply with an asterisk action - start with plain speech; " +
-                        "a brief action at the end is allowed, or none at all."
-                    )
-                }
-                if (ownRecent.size >= 3 && containAction >= 3) {
-                    append(" Write this reply with NO asterisks at all.")
-                }
+            // Сервер сам решает, будут ли в ЭТОМ ответе *действия* — по режиму диалога:
+            // обычная переписка короткими репликами — ~20% сообщений с действием;
+            // юзер пишет развёрнуто — ~50%; юзер сам ролеплеит со звёздочками —
+            // действия свободно, сколько угодно и где угодно.
+            val recentUser = messagesHistory.filter { it.isSentByUser }.takeLast(3).map { it.text }
+            val userRoleplays = recentUser.any { it.contains("*") }
+            val lastUserLen = recentUser.lastOrNull()?.length ?: 0
+            val avgUserLen = if (recentUser.isEmpty()) 0 else recentUser.sumOf { it.length } / recentUser.size
+            val actionChance = when {
+                userRoleplays -> 1.0
+                lastUserLen > 100 || avgUserLen > 80 -> 0.5
+                else -> 0.2
+            }
+            val allowAction = kotlin.random.Random.nextDouble() < actionChance
+            // Позиция действия тоже рандомизируется — иначе модель лепит всё в начало
+            val positionRoll = kotlin.random.Random.nextDouble()
+            val actionPosition = if (positionRoll < 0.4) "end" else if (positionRoll < 0.75) "middle" else "start"
+            val forbidActions = !userRoleplays && !allowAction
+            val wantActionAtEnd = !userRoleplays && allowAction && actionPosition == "end"
+            val styleNudge = when {
+                userRoleplays ->
+                    " The user is roleplaying with *actions* in asterisks: match their style - use actions freely, " +
+                    "several are fine, anywhere in the message, and you may write a bit longer to keep the scene going."
+                allowAction ->
+                    " In this reply you may include ONE brief action in *asterisks*, placed at the " +
+                    actionPosition + " of the message."
+                else -> " Write this reply as plain speech with NO asterisks at all."
             }
 
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
@@ -140,7 +147,7 @@ object AiMessageGeneratorUtil {
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
-                        simulateStreaming(breakActionPattern(fullMessage, styleNudge), onMsgTextUpdate, onFinished)
+                        simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
                     } catch (e: Exception) {
@@ -173,7 +180,7 @@ object AiMessageGeneratorUtil {
                 logger.debug("Response status: ${response.status}")
 
                 val fullMessage = processGeminiResponse(response, characterDbo)
-                simulateStreaming(breakActionPattern(fullMessage, styleNudge), onMsgTextUpdate, onFinished)
+                simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
@@ -524,19 +531,25 @@ object AiMessageGeneratorUtil {
     }
 
     /**
-     * Модель попросили не начинать с *действия*, но она ослушалась (flash-lite
-     * слабо следует стилевым инструкциям): детерминированно переставляем
-     * стартовое действие в конец. Сообщение из одного действия не трогаем -
-     * это законная короткая форма.
+     * Страховка стиля: модель не всегда слушается инструкций (flash-lite).
+     * Запретили действия - вырезаем *...*; просили действие в конце, а оно
+     * в начале - переставляем. Сообщение из одного действия не трогаем.
      */
-    private fun breakActionPattern(text: String, styleNudge: String): String {
-        if (styleNudge.isBlank()) return text
+    private fun enforceActionStyle(text: String, forbidActions: Boolean, wantActionAtEnd: Boolean): String {
         val t = text.trim()
-        val m = Regex("^\\*([^*]+)\\*\\s*(.+)", RegexOption.DOT_MATCHES_ALL).find(t) ?: return text
-        val action = m.groupValues[1].trim()
-        val speech = m.groupValues[2].trim()
-        if (speech.isBlank() || speech.contains("*")) return text
-        return speech + " *" + action + "*"
+        if (forbidActions) {
+            val stripped = t.replace(Regex("\\*[^*]*\\*"), " ")
+                .replace(Regex("\\s+"), " ").trim()
+            return if (stripped.isBlank()) t else stripped
+        }
+        if (wantActionAtEnd) {
+            val m = Regex("^\\*([^*]+)\\*\\s*(.+)", RegexOption.DOT_MATCHES_ALL).find(t) ?: return t
+            val action = m.groupValues[1].trim()
+            val speech = m.groupValues[2].trim()
+            if (speech.isBlank() || speech.contains("*")) return t
+            return speech + " *" + action + "*"
+        }
+        return t
     }
 
     private suspend fun simulateStreaming(
