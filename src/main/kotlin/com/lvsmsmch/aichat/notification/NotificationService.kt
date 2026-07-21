@@ -55,6 +55,7 @@ class NotificationService(
                     token = token,
                     title = "New follower! 🎉",
                     body = "@${actor.username} started following you",
+                    route = "notifications",
                 )
             }
         }
@@ -82,6 +83,7 @@ class NotificationService(
                     token = token,
                     title = "New comment on ${character.name} 💬",
                     body = "@${actor.username}: ${comment.text.take(80)}",
+                    route = "notifications",
                 )
             }
         }
@@ -146,6 +148,7 @@ class NotificationService(
                     token = token,
                     title = "Milestone! 🎉",
                     body = "${character.name} reached ${formatMilestone(total)} messages",
+                    route = "notifications",
                 )
             }
         }
