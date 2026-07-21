@@ -100,7 +100,10 @@ class UserRepository(
             dailyLimit = dailyLimit,
             extraLeft = user.extraFreeMessagesCount,
             extraAmountForReward = EXTRA_AMOUNT_FOR_REWARD,
-            trialUsed = user.trialUsed
+            trialUsed = user.trialUsed,
+            imagesUsed = user.dailyImageCount,
+            imagesLimit = if (user.hasSubscription) DAILY_IMAGES_PREMIUM else 0,
+            hasSubscription = user.hasSubscription
         )
 
         return limitsResponse
@@ -224,6 +227,21 @@ class UserRepository(
             update = combine(
                 setValue(UserDbo::dailyMessageCount, 0),
                 setValue(UserDbo::dailyImageCount, 0),
+            )
+        )
+    }
+
+    /** [DEBUG] Полный сброс лимитов юзера (дебаг-кнопка в настройках приложения). */
+    suspend fun debugResetLimits(userId: String) {
+        collection.updateOneById(
+            userId,
+            combine(
+                setValue(UserDbo::hourlyMessageCount, 0),
+                setValue(UserDbo::dailyMessageCount, 0),
+                setValue(UserDbo::dailyImageCount, 0),
+                setValue(UserDbo::monthlyMessageCount, 0),
+                setValue(UserDbo::monthlyTopModelCount, 0),
+                setValue(UserDbo::monthlyTopImageCount, 0),
             )
         )
     }

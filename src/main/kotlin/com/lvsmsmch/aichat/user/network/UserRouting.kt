@@ -247,6 +247,25 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = updatedUser.toUserFullInfoDto(mapper, demanderId = sessionDbo.userId))
         }
 
+        /**
+         * [DEBUG] Сброс своих лимитов — для дебаг-кнопки в настройках.
+         * Включается env DEBUG_ENDPOINTS=true; в проде обязан быть выключен,
+         * иначе любой юзер сбрасывает себе лимиты прямым запросом.
+         */
+        post("/{userId}/debug-reset-limits") {
+            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+                throw ForbiddenException(errorMessage = "debug endpoints disabled")
+            }
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "You can only reset your own limits")
+            }
+            userRepository.debugResetLimits(userId)
+            call.respondSuccess()
+        }
+
         /** FCM-токен девайса — для пушей (лимиты, винбэк-подарки). */
         post("/{userId}/fcm-token") {
             val sessionDbo = sessionRepository.verifyToken(call)
