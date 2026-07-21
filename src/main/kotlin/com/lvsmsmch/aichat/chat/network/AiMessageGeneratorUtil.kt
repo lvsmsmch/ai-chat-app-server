@@ -112,13 +112,16 @@ object AiMessageGeneratorUtil {
                 else -> " Write this reply as plain speech with NO asterisks at all."
             }
 
-            // Длину модель выбирает САМА - по настроению и контексту. Единственный
-            // запрет: ориентироваться на длину собственных прошлых сообщений
-            // (иначе застревает в шаблоне «всегда 3 предложения»).
-            val lengthNudge = " Choose the length of this reply yourself, by feel: a single word, " +
-                "a short phrase, a sentence or two, or - when you genuinely have a lot to say - " +
-                "a longer answer. Judge only by the mood and what the user just wrote, " +
-                "NEVER by the length or structure of your own previous replies."
+            // Длина ответа привязана к длине СООБЩЕНИЯ ЮЗЕРА (короткое - короткий
+            // ответ, максимум х2), с исключениями: вопрос - чуть длиннее, просьба
+            // рассказать - можно развёрнуто, активный ролеплей - можно длиннее.
+            // Копировать длину СВОИХ прошлых ответов запрещено (шаблонная ловушка).
+            val lengthNudge = " Match the length of your reply to the user's LAST message: " +
+                "roughly the same amount of text, at most twice as long. A short message gets " +
+                "a short reply - even a single word or phrase. Exceptions: if they ask a question " +
+                "you may go a bit longer; if they ask you to tell or explain something, a long " +
+                "answer is fine; during active roleplay longer replies are fine. " +
+                "NEVER base the length on your own previous replies."
 
             val styleNudge = actionNudge + lengthNudge
 
