@@ -381,7 +381,8 @@ class ComplexQueryHelper(
     suspend fun addMessage(messageDbo: MessageDbo) {
         transactionHelper.withTransaction { session ->
             messageRepository.insertMessage(session, messageDbo)
-            if (!messageDbo.isSentByUser) {
+            // Изображения НЕ тратят лимит сообщений — у них свой дневной счётчик
+            if (!messageDbo.isSentByUser && !messageDbo.isImage) {
                 val chat = chatRepository.getChatById(session, messageDbo.chatId)!!
                 userRepository.notifyCharacterMessageWasSent(session, chat.userId)
                 characterRepository.incrementMessagesCount(session, messageDbo.senderId, 1)

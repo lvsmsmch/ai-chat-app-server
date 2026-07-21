@@ -27,7 +27,9 @@ data class MessageDto(
     @SerialName("isCompleted") val isCompleted: Boolean,
     @SerialName("isFailedCompleting") val isFailedCompleting: Boolean,
     @SerialName("failReason") val failReason: String? = null,
-    @SerialName("nsfw") val nsfw: Boolean
+    @SerialName("nsfw") val nsfw: Boolean,
+    @SerialName("imageUrl") val imageUrl: String? = null,
+    @SerialName("isImage") val isImage: Boolean = false
 )
 
 
@@ -169,7 +171,13 @@ data class StreamMessageChunk(
     @SerialName("isFailed") val isFailed: Boolean,
     @SerialName("failReason") val failReason: String? = null,
     @SerialName("nsfw") val nsfw: Boolean,
+    @SerialName("imageUrl") val imageUrl: String? = null,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse? = null
+)
+
+@Serializable
+data class GenerateImageRequest(
+    @SerialName("messageId") val messageId: String,
 )
 
 @Serializable

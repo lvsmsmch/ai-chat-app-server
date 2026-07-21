@@ -665,6 +665,59 @@ fun Route.configureChatRouting(
             call.respondSuccess(IsSuccessResponse(isSuccess = true))
         }
 
+        /**
+         * Генерация изображения персонажем: создаётся message-плейсхолдер
+         * (isImage=true), результат клиент забирает обычным /stream.
+         * Идемпотентно: повторный вызов с тем же messageId перезапускает
+         * упавшую генерацию (ретрай после сетевой ошибки).
+         */
+        post("/{chatId}/generate-image") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val request = call.receive<GenerateImageRequest>()
+            val chat = chatRepository.getChatByClientId(chatId)
+                ?: throw ChatNotFoundException(chatId)
+            if (chat.userId != userId) {
+                throw ForbiddenException("Access denied to this chat")
+            }
+            val user = userRepository.getUserById(userId)
+                ?: throw com.lvsmsmch.aichat.utils.UserNotFoundException()
+            if (UserRepository.imageLimitsEnforced) {
+                if (!user.hasSubscription) {
+                    throw ForbiddenException(errorMessage = "image_generation_premium_only")
+                }
+                if (user.dailyImageCount >= UserRepository.DAILY_IMAGES_PREMIUM) {
+                    throw ForbiddenException(errorMessage = "image_limit_reached")
+                }
+            }
+            val characterId = chat.characterIds.firstOrNull()
+                ?: throw BadRequestException("Chat has no characters")
+
+            val existing = messageRepository.findByClientId(request.messageId)
+            when {
+                existing == null -> MessageDbo(
+                    id = idGenerator.generateId(EntityType.MESSAGE),
+                    chatId = chat.id,
+                    clientId = request.messageId,
+                    senderId = characterId,
+                    isSentByUser = false,
+                    text = "",
+                    isImage = true,
+                    status = MessageStatus.STREAMING.value,
+                    chatClientId = chat.clientId,
+                ).also {
+                    complexQueryHelper.addMessage(it)
+                    messageFinisher.finishMessageAsync(it.id)
+                }
+                existing.status != MessageStatus.COMPLETED.value &&
+                    !messageFinisher.isFinishing(existing.id) ->
+                    messageFinisher.finishMessageAsync(existing.id)
+            }
+
+            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+        }
+
         post("/{chatId}/messages/{messageId}/stream") {
             val userId = sessionRepository.verifyToken(call).userId
             val chatId = call.parameters["chatId"]
@@ -717,6 +770,7 @@ fun Route.configureChatRouting(
                             isComplete = true,
                             isFailed = false,
                             nsfw = false,
+                            imageUrl = currentMessage.imageUrl,
                             chatSyncResponse = finalSyncResponse
                         )
 
@@ -753,6 +807,7 @@ fun Route.configureChatRouting(
                                     isFailed = update.isFailed,
                                     failReason = update.failReason,
                                     nsfw = false,
+                                    imageUrl = update.imageUrl,
                                     chatSyncResponse = finalSyncResponse
                                 )
                             } else {

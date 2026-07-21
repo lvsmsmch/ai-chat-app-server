@@ -51,6 +51,37 @@ class MessageFinisher(
                     status = MessageStatus.STREAMING.value
                 )
 
+                // Сообщение-изображение: отдельный генератор, свой таймаут (90с)
+                if (messageDbo.isImage) {
+                    withTimeout(90.seconds) {
+                        try {
+                            val url = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(
+                                characterDbo = characterDbo.localized(lang),
+                                messagesHistory = messageHistory,
+                            )
+                            messageRepository.updateMessage(
+                                messageId = messageId,
+                                imageUrl = url,
+                                text = "",
+                                status = MessageStatus.COMPLETED.value,
+                            )
+                            // Успех тратит дневной лимит изображений
+                            userRepository.incrementImageCount(chatDbo.userId)
+                        } catch (e: com.lvsmsmch.aichat.chat.network.CensoredException) {
+                            logger.error("Image generation censored: ${e.message}")
+                            messageRepository.updateMessage(
+                                messageId = messageId,
+                                text = "",
+                                status = MessageStatus.FAILED.value,
+                                failReason = com.lvsmsmch.aichat.chat.network.FailReason.CENSORED,
+                            )
+                            // Цензура тоже тратит лимит: ретраить запрещёнку бесплатно нельзя
+                            userRepository.incrementImageCount(chatDbo.userId)
+                        }
+                    }
+                    return@launch
+                }
+
                 withTimeout(timeoutSeconds.seconds) {
                     AiMessageGeneratorUtil.generateAiMessageWithStreaming(
                         chatDbo = chatDbo,

@@ -34,6 +34,8 @@ data class UserDbo(
     // все сообщения за месяц и сообщения, сгенерированные топ-моделью
     val monthlyMessageCount: Int = 0,
     val monthlyTopModelCount: Int = 0,
+    // Сгенерированных изображений сегодня (сброс в полночь вместе с дневным)
+    val dailyImageCount: Int = 0,
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
     val extraFreeMessagesCount: Int = 0,

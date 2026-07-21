@@ -67,6 +67,7 @@ class MessageRepository(
                     isComplete = message.status == MessageStatus.COMPLETED.value,
                     isFailed = message.status == MessageStatus.FAILED.value,
                     failReason = message.failReason,
+                    imageUrl = message.imageUrl,
                 ).also {
                 }
             }
@@ -79,6 +80,7 @@ class MessageRepository(
         val isComplete: Boolean,
         val isFailed: Boolean,
         val failReason: String? = null,
+        val imageUrl: String? = null,
     )
 
     suspend fun insertMessage(session: ClientSession, messageDbo: MessageDbo) {

@@ -220,9 +220,17 @@ class UserRepository(
 
     suspend fun resetDailyCountersForAllUsers() {
         collection.updateMany(
-            filter = UserDbo::dailyMessageCount gt 0,
-            update = setValue(UserDbo::dailyMessageCount, 0)
+            filter = or(UserDbo::dailyMessageCount gt 0, UserDbo::dailyImageCount gt 0),
+            update = combine(
+                setValue(UserDbo::dailyMessageCount, 0),
+                setValue(UserDbo::dailyImageCount, 0),
+            )
         )
+    }
+
+    /** Изображение сгенерировано (или зацензурено — тоже трата лимита). */
+    suspend fun incrementImageCount(userId: String) {
+        collection.updateOneById(userId, inc(UserDbo::dailyImageCount, 1))
     }
 
     // ---- Пуши ----
@@ -371,5 +379,10 @@ class UserRepository(
         const val DAILY_LIMIT_MESSAGES_PREMIUM = 1_000_000
         const val HOURLY_LIMIT_MESSAGES_PREMIUM = 1_000_000
         const val EXTRA_AMOUNT_FOR_REWARD = 5
+        // Генерация изображений: фри — нельзя, премиум — 10/день.
+        // Пока лимиты ВЫКЛЮЧЕНЫ для тестов: включаются env IMAGE_LIMITS_ENFORCED=true
+        const val DAILY_IMAGES_PREMIUM = 10
+        val imageLimitsEnforced: Boolean
+            get() = System.getenv("IMAGE_LIMITS_ENFORCED")?.toBoolean() ?: false
     }
 }

@@ -18,6 +18,8 @@ data class MessageDbo(
     val isSentByUser: Boolean = false,
     val text: String,
     val imageUrl: String? = null,
+    // Сообщение-изображение: генерится картинка, а не текст
+    val isImage: Boolean = false,
     val isRead: Boolean = false,
     val status: String,
     // Причина FAILED: "censored" (фильтр контента) или "error" (сбой генерации/сервера)
