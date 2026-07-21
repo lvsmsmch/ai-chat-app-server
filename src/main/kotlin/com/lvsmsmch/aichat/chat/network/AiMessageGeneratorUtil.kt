@@ -572,7 +572,11 @@ object AiMessageGeneratorUtil {
 
         return content
             .removeBracketContent()
+            // Модель иногда выплёвывает огрызки HTML из обучающих данных
+            // (</blockquote>, <b> и т.п.) — юзеру такое видеть незачем
+            .replace(Regex("</?[a-zA-Z][a-zA-Z0-9]*[^>]*>"), "")
             .replace("\n", "")
+            .trim()
     }
 
     private suspend fun ByteReadChannel.readUTF8LineSequence(): Flow<String> = flow {
