@@ -66,6 +66,10 @@ object AiMessageGeneratorUtil {
 
     private val temperature
         get() = (System.getenv("AI_TEMPERATURE") ?: throw Exception("Missing AI_TEMPERATURE key")).toFloat()
+    // Для reasoning-моделей на OpenAI-совместимых API (gpt-oss, grok):
+    // low/minimal, иначе токены уходят на размышления. Не задан — не отправляется.
+    private val textReasoningEffort
+        get() = System.getenv("TEXT_REASONING_EFFORT")?.takeIf { it.isNotBlank() }
     private val aiPrompt
         get() = System.getenv("AI_PROMPT") ?: throw Exception("Missing AI_PROMPT key")
     private val aiGroupChatPrompt
@@ -184,6 +188,7 @@ object AiMessageGeneratorUtil {
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
+                            .cleanupReply()
                         simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
@@ -368,6 +373,7 @@ object AiMessageGeneratorUtil {
             put("max_completion_tokens", 400)
             put("temperature", temperature)
             put("stream", stream)
+            textReasoningEffort?.let { put("reasoning_effort", it) }
         }
     }
 
@@ -588,14 +594,19 @@ object AiMessageGeneratorUtil {
             throw Exception("Empty or null content in Gemini response")
         }
 
-        return content
-            .removeBracketContent()
-            // Модель иногда выплёвывает огрызки HTML из обучающих данных
-            // (</blockquote>, <b> и т.п.) — юзеру такое видеть незачем
-            .replace(Regex("</?[a-zA-Z][a-zA-Z0-9]*[^>]*>"), "")
-            .replace("\n", "")
-            .trim()
+        return content.cleanupReply()
     }
+
+    /**
+     * Общая зачистка ответа любой текстовой модели: [служебные скобки],
+     * огрызки HTML из обучающих данных, переводы строк → одна строка.
+     */
+    private fun String.cleanupReply(): String = this
+        .removeBracketContent()
+        .replace(Regex("</?[a-zA-Z][a-zA-Z0-9]*[^>]*>"), "")
+        .replace("\n", " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
 
     private suspend fun ByteReadChannel.readUTF8LineSequence(): Flow<String> = flow {
         val buffer = ByteArray(8192)
