@@ -309,6 +309,11 @@ fun Application.module() {
         userRepository = userRepository
     )
 
+    val winbackPushUpdaterJob = configureWinbackPushUpdater(
+        databaseScope = databaseScope,
+        userRepository = userRepository
+    )
+
     val fillDefaultSuggestionsJob = fillDefaultSuggestions(
         databaseScope = databaseScope,
         searchSuggestionsRepository = searchSuggestionsRepository

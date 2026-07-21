@@ -225,6 +225,64 @@ class UserRepository(
         )
     }
 
+    // ---- Пуши ----
+
+    suspend fun saveFcmToken(userId: String, token: String) {
+        collection.updateOneById(userId, setValue(UserDbo::fcmToken, token))
+    }
+
+    /**
+     * Кандидаты на пуш «лимиты возобновились»: фри-юзеры с токеном, выжегшие
+     * дневной лимит (вызывать ДО полуночного сброса счётчиков).
+     */
+    suspend fun findLimitResetPushCandidates(): List<UserDbo> =
+        collection.find(
+            and(
+                UserDbo::hasSubscription eq false,
+                UserDbo::dailyMessageCount gte DAILY_LIMIT_MESSAGES_REGULAR,
+                UserDbo::fcmToken ne null,
+            )
+        ).toList()
+
+    suspend fun markLimitPushSent(userId: String, newStage: Int) {
+        collection.updateOneById(
+            userId,
+            combine(
+                setValue(UserDbo::limitPushStage, newStage),
+                setValue(UserDbo::lastLimitPushAt, UtcTimestamp.now().toString()),
+            )
+        )
+    }
+
+    /**
+     * Кандидаты на винбэк: писали хотя бы [minMessages] сообщений, не заходили
+     * с [inactiveSinceIso], пуш не отправлялся с [lastPushBeforeIso] (или вообще).
+     */
+    suspend fun findWinbackCandidates(inactiveSinceIso: String, lastPushBeforeIso: String, minMessages: Int): List<UserDbo> =
+        collection.find(
+            and(
+                UserDbo::hasSubscription eq false,
+                UserDbo::totalMessagesCount gt minMessages,
+                UserDbo::fcmToken ne null,
+                UserDbo::lastActiveAt lt inactiveSinceIso,
+                or(
+                    UserDbo::lastWinbackPushAt eq null,
+                    UserDbo::lastWinbackPushAt lt lastPushBeforeIso,
+                ),
+            )
+        ).toList()
+
+    /** Винбэк-подарок: +[extra] сообщений и отметка отправки пуша. */
+    suspend fun grantWinbackGift(userId: String, extra: Int) {
+        collection.updateOneById(
+            userId,
+            combine(
+                inc(UserDbo::extraFreeMessagesCount, extra),
+                setValue(UserDbo::lastWinbackPushAt, UtcTimestamp.now().toString()),
+            )
+        )
+    }
+
     /** 1-го числа: месячные счётчики умного даунгрейда модели обнуляются. */
     suspend fun resetMonthlyCountersForAllUsers() {
         collection.updateMany(
@@ -238,7 +296,13 @@ class UserRepository(
 
     suspend fun notifyCharacterMessageWasSent(session: ClientSession, userId: String) {
         val userDbo = getUserById(session, userId) ?: return
-        val messagesUpdateBson = if (userDbo.extraFreeMessagesCount > 0) {
+        // Сначала тратится обычный дневной лимит, экстра-подарок — только после него
+        val dailyLimit = if (userDbo.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
+        val messagesUpdateBson = if (
+            !userDbo.hasSubscription &&
+            userDbo.dailyMessageCount >= dailyLimit &&
+            userDbo.extraFreeMessagesCount > 0
+        ) {
             inc(UserDbo::extraFreeMessagesCount, -1)
         } else {
             combine(

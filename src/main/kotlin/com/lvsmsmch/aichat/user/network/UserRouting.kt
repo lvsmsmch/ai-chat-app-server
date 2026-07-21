@@ -247,6 +247,22 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = updatedUser.toUserFullInfoDto(mapper, demanderId = sessionDbo.userId))
         }
 
+        /** FCM-токен девайса — для пушей (лимиты, винбэк-подарки). */
+        post("/{userId}/fcm-token") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "You can only update your own token")
+            }
+            val request = call.receive<SetFcmTokenRequest>()
+            if (request.token.isBlank() || request.token.length > 4096) {
+                throw ValidationException("Invalid FCM token")
+            }
+            userRepository.saveFcmToken(userId, request.token)
+            call.respondSuccess()
+        }
+
         /** Смена языка персонажей: каталог/промпты/ответы приходят на этом языке. */
         post("/{userId}/character-language") {
             val sessionDbo = sessionRepository.verifyToken(call)

@@ -95,3 +95,8 @@ data class ReportUserRequest(
 data class SetCharacterLanguageRequest(
     @kotlinx.serialization.SerialName("language") val language: String
 )
+
+@kotlinx.serialization.Serializable
+data class SetFcmTokenRequest(
+    @kotlinx.serialization.SerialName("token") val token: String
+)

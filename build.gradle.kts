@@ -38,6 +38,9 @@ dependencies {
     implementation("software.amazon.awssdk:s3:2.20.45")
     implementation("software.amazon.awssdk:aws-core:2.20.45")
 
+    // FCM-пуши (лимиты возобновились, винбэк-подарок)
+    implementation("com.google.firebase:firebase-admin:9.3.0")
+
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     implementation("ch.qos.logback:logback-classic:1.4.12")
     implementation("org.mindrot:jbcrypt:0.4")

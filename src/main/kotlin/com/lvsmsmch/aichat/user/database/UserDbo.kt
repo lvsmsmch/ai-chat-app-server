@@ -37,6 +37,13 @@ data class UserDbo(
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
     val extraFreeMessagesCount: Int = 0,
+    // FCM-токен девайса для пушей (null — пуши недоступны)
+    val fcmToken: String? = null,
+    // Каскад пушей «лимиты возобновились»: 0 → сразу, 1 → через 3 дня, дальше — раз в неделю
+    val limitPushStage: Int = 0,
+    val lastLimitPushAt: String? = null,
+    // Винбэк-подарок (+100 сообщений неактивным) — не чаще раза в 30 дней
+    val lastWinbackPushAt: String? = null,
     val color: String = AvatarColors.random(),
     // Бесплатный триал одноразовый: выставляется при первой подписке
     val trialUsed: Boolean = false
