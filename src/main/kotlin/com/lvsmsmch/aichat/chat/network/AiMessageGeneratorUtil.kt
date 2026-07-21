@@ -73,40 +73,14 @@ object AiMessageGeneratorUtil {
     }
 
     /**
-     * Анти-спам цензуры: серия подряд зацензуренных генераций юзера включает
-     * растущий кулдаун. Пока кулдаун активен, новые попытки отбиваются СРАЗУ,
-     * без единого запроса к API — намеренно сжигать токены ретраями не выйдет.
-     * Ложные «волны» фильтра не страдают: первый же успех сбрасывает серию.
+     * Защита от сжигания токенов ретраями: сообщение, чья генерация уже словила
+     * цензуру во ВСЕХ попытках, повторно в API не отправляется — короткая пауза
+     * для видимости и сразу censored. Изменённое сообщение = новый ключ = новый шанс.
      */
-    private val censorStreaks = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
+    private val censoredMessages = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    private fun censorCooldownMs(streak: Int): Long = when {
-        streak <= 1 -> 0
-        streak == 2 -> 10_000L
-        streak == 3 -> 30_000L
-        streak == 4 -> 60_000L
-        else -> 300_000L
-    }
-
-    private fun checkCensorGuard(userId: String) {
-        val (streak, lastAt) = censorStreaks[userId] ?: return
-        val waitLeft = censorCooldownMs(streak) - (System.currentTimeMillis() - lastAt)
-        if (waitLeft > 0) {
-            throw CensoredException("censor cooldown active: streak=$streak, ${waitLeft}ms left")
-        }
-    }
-
-    /** Серия активна (даже без кулдауна) — ретраи к API сокращаем до одного. */
-    private fun censorStreakActive(userId: String): Boolean = censorStreaks.containsKey(userId)
-
-    private fun recordCensor(userId: String) {
-        val streak = (censorStreaks[userId]?.first ?: 0) + 1
-        censorStreaks[userId] = streak to System.currentTimeMillis()
-    }
-
-    private fun clearCensorStreak(userId: String) {
-        censorStreaks.remove(userId)
-    }
+    private fun censorKey(chatDbo: ChatDbo, messagesHistory: List<MessageDbo>): String =
+        chatDbo.id + ":" + (messagesHistory.lastOrNull { it.isSentByUser }?.text?.hashCode() ?: 0)
 
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
@@ -136,27 +110,30 @@ object AiMessageGeneratorUtil {
             // Позиция действия тоже рандомизируется — иначе модель лепит всё в начало
             val positionRoll = kotlin.random.Random.nextDouble()
             val actionPosition = if (positionRoll < 0.4) "end" else if (positionRoll < 0.75) "middle" else "start"
-            val forbidActions = !userRoleplays && !allowAction
-            val wantActionAtEnd = !userRoleplays && allowAction && actionPosition == "end"
+            // Формулировки МЯГКИЕ (prefer/feel free, не запреты): умная модель
+            // следует им слишком буквально, а живость требует свободы — персонаж,
+            // который физически что-то делает, должен мочь показать это действием
             val actionNudge = when {
                 userRoleplays ->
                     " The user is roleplaying with *actions* in asterisks: match their style - use actions freely, " +
                     "several are fine, anywhere in the message."
                 allowAction ->
-                    " In this reply you may include ONE brief action in *asterisks*, placed at the " +
-                    actionPosition + " of the message."
-                else -> " Write this reply as plain speech with NO asterisks at all."
+                    " Feel free to include a brief action in *asterisks* (say, at the " + actionPosition +
+                    " of the message) if it fits the moment."
+                else ->
+                    " Prefer plain speech without asterisks this time - but if your character is physically " +
+                    "doing something or reacting strongly, you may show it with a brief *action*."
             }
 
-            // Длина ответа привязана к длине СООБЩЕНИЯ ЮЗЕРА (короткое - короткий
-            // ответ, максимум х2), с исключениями: вопрос - чуть длиннее, просьба
-            // рассказать - можно развёрнуто, активный ролеплей - можно длиннее.
+            // Длина: базово равняемся на сообщение юзера (короткое - коротко),
+            // но с явным разрешением развернуться, когда сцена живая - иначе
+            // послушная модель отвечает парой слов даже посреди активной игры.
             // Копировать длину СВОИХ прошлых ответов запрещено (шаблонная ловушка).
-            val lengthNudge = " Match the length of your reply to the user's LAST message: " +
-                "roughly the same amount of text, at most twice as long. A short message gets " +
-                "a short reply - even a single word or phrase. Exceptions: if they ask a question " +
-                "you may go a bit longer; if they ask you to tell or explain something, a long " +
-                "answer is fine; during active roleplay longer replies are fine. " +
+            val lengthNudge = " As a baseline, match the length of your reply to the user's LAST message: " +
+                "roughly the same amount of text, up to twice as long; a short message usually gets " +
+                "a short reply. But trust the moment: if they ask a question or ask you to tell " +
+                "something, or the scene is lively (a game, physical activity, strong emotion), " +
+                "a longer, more expressive reply is welcome. " +
                 "NEVER base the length on your own previous replies."
 
             val styleNudge = actionNudge + lengthNudge
@@ -164,7 +141,6 @@ object AiMessageGeneratorUtil {
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
             } else if (useGroq || useOpenAi) {
-                checkCensorGuard(chatDbo.userId)
 
                 val url = if (useGroq) groqApiUrl else openAiApiUrl
                 val key = if (useGroq) groqApiKey else openAiApiKey
@@ -201,7 +177,7 @@ object AiMessageGeneratorUtil {
 
                         val fullMessage = processNonStreamingResponse(response)
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
-                        simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
+                        simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
                     } catch (e: Exception) {
@@ -233,18 +209,20 @@ object AiMessageGeneratorUtil {
 
                 logger.debug("Sending request to Gemini API")
 
-                // Кулдаун цензуры: активен — отбой сразу, ноль запросов к API
-                checkCensorGuard(chatDbo.userId)
+                // Это сообщение уже цензурилось всеми попытками — в API не ходим
+                val censorKey = censorKey(chatDbo, messagesHistory)
+                if (censorKey in censoredMessages) {
+                    delay(1500)
+                    throw CensoredException("message already censored before, skipping API call")
+                }
 
                 // Ретраи и на сетевые ошибки, и на цензуру: входной фильтр Gemini
                 // вероятностный и даёт ложные блоки невинных диалогов волнами —
                 // повтор почти всегда проходит. Реальный запрещённый контент
                 // блокируется во всех попытках и честно уходит юзеру как censored.
-                // При активной серии цензуры ретраи урезаны до одного запроса.
-                val maxAttempts = if (censorStreakActive(chatDbo.userId)) 1 else 3
                 var fullMessage: String? = null
                 var lastError: Exception? = null
-                for (attempt in 1..maxAttempts) {
+                for (attempt in 1..3) {
                     try {
                         val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
                             contentType(ContentType.Application.Json)
@@ -256,18 +234,19 @@ object AiMessageGeneratorUtil {
                     } catch (e: Exception) {
                         lastError = e
                         logger.error("Gemini attempt $attempt failed: ${e.message}")
-                        if (attempt < maxAttempts) delay(400)
+                        if (attempt < 3) delay(400)
                     }
                 }
-                if (fullMessage == null) throw lastError ?: Exception("Gemini generation failed")
-                clearCensorStreak(chatDbo.userId)
-                simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
+                if (fullMessage == null) {
+                    // Все попытки в цензуру — чёрный список до изменения сообщения
+                    if (lastError is CensoredException) censoredMessages.add(censorKey)
+                    throw lastError ?: Exception("Gemini generation failed")
+                }
+                simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
         } catch (e: CensoredException) {
-            // Считаем и отказ по кулдауну: спам во время кулдауна продлевает его
-            recordCensor(chatDbo.userId)
             logger.error("Generation blocked by content filter: ${e.message}")
             onError(FailReason.CENSORED)
         } catch (e: Exception) {
@@ -628,28 +607,6 @@ object AiMessageGeneratorUtil {
         if (remaining.isNotEmpty()) {
             emit(remaining)
         }
-    }
-
-    /**
-     * Страховка стиля: модель не всегда слушается инструкций (flash-lite).
-     * Запретили действия - вырезаем *...*; просили действие в конце, а оно
-     * в начале - переставляем. Сообщение из одного действия не трогаем.
-     */
-    private fun enforceActionStyle(text: String, forbidActions: Boolean, wantActionAtEnd: Boolean): String {
-        val t = text.trim()
-        if (forbidActions) {
-            val stripped = t.replace(Regex("\\*[^*]*\\*"), " ")
-                .replace(Regex("\\s+"), " ").trim()
-            return if (stripped.isBlank()) t else stripped
-        }
-        if (wantActionAtEnd) {
-            val m = Regex("^\\*([^*]+)\\*\\s*(.+)", RegexOption.DOT_MATCHES_ALL).find(t) ?: return t
-            val action = m.groupValues[1].trim()
-            val speech = m.groupValues[2].trim()
-            if (speech.isBlank() || speech.contains("*")) return t
-            return speech + " *" + action + "*"
-        }
-        return t
     }
 
     private suspend fun simulateStreaming(
