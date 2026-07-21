@@ -43,7 +43,7 @@ fun configureWinbackPushUpdater(
                     val ok = FcmSender.send(
                         token = token,
                         title = "A gift is waiting for you! 🎁",
-                        body = "+$WINBACK_GIFT_MESSAGES free messages just for you. Your characters missed you!",
+                        body = "+$WINBACK_GIFT_MESSAGES free messages. Tap to claim your gift!",
                     )
                     if (ok) {
                         userRepository.grantWinbackGift(user.id, WINBACK_GIFT_MESSAGES)
