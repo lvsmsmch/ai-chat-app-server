@@ -106,8 +106,11 @@ object AiImageGeneratorUtil {
             }
             when {
                 lastGenFile != null -> append(
-                    "\nThe attached image is the previous scene of this chat: keep the SAME " +
-                        "character design and art style, continue the visual continuity."
+                    "\nThe attached image is the previous scene of this chat. Keep the SAME " +
+                        "character design and art style, but compose a COMPLETELY NEW shot: " +
+                        "change the camera angle, distance, framing, pose and background to match " +
+                        "the current moment of the conversation. Do NOT copy the previous " +
+                        "composition - it is a style reference, not a template."
                 )
                 avatarFile != null -> append(
                     "\nThe attached image shows this character's appearance: use it as the " +
