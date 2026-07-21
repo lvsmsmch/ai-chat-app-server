@@ -38,8 +38,9 @@ class MessageFinisher(
                     chatId = chatDbo.id,
                     timestamp = UtcTimestamp.parse(messageDbo.createdAt)
                 ).takeLast(200)
-                // Язык владельца чата: промпт/приветствие и ответы — на нём
-                val lang = userRepository.getUserById(chatDbo.userId)?.characterLanguage ?: "en"
+                // Владелец чата: язык ответов + тир модели (умный даунгрейд)
+                val owner = userRepository.getUserById(chatDbo.userId)
+                val lang = owner?.characterLanguage ?: "en"
                 val participants = chatDbo.characterIds
                     .mapNotNull { characterRepository.getCharacter(it) }
                     .map { it.localized(lang) }
@@ -57,6 +58,7 @@ class MessageFinisher(
                         participants = participants,
                         messagesHistory = messageHistory,
                         responseLanguage = lang,
+                        ownerDbo = owner,
                         onMsgTextUpdate = {
                             ensureActive()
                             messageRepository.updateMessage(

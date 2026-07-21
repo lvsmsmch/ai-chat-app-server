@@ -55,6 +55,12 @@ object AiMessageGeneratorUtil {
         get() = System.getenv("GEMINI_API_KEY") ?: throw Exception("Missing GEMINI_API_KEY key")
     private val geminiModel
         get() = System.getenv("GEMINI_MODEL") ?: "gemini-1.5-flash"
+    // Тиры умного даунгрейда: MID после месячного порога (фри) / 200 в день
+    // (премиум), LOW после 500 в день у премиума. Логика — ModelTierPicker.
+    private val geminiModelMid
+        get() = System.getenv("GEMINI_MODEL_MID") ?: "gemini-3.1-flash-lite"
+    private val geminiModelLow
+        get() = System.getenv("GEMINI_MODEL_LOW") ?: "gemini-2.5-flash-lite"
     private val useGemini
         get() = (System.getenv("USE_GEMINI") ?: throw Exception("Missing USE_GEMINI key")).toBoolean()
 
@@ -88,6 +94,7 @@ object AiMessageGeneratorUtil {
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
         responseLanguage: String? = null,
+        ownerDbo: com.lvsmsmch.aichat.user.database.UserDbo? = null,
         onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit,
         onError: suspend (String) -> Unit
@@ -220,11 +227,22 @@ object AiMessageGeneratorUtil {
                 // вероятностный и даёт ложные блоки невинных диалогов волнами —
                 // повтор почти всегда проходит. Реальный запрещённый контент
                 // блокируется во всех попытках и честно уходит юзеру как censored.
+                // Модель по тиру юзера: фри после месячного порога и премиум
+                // после дневных порогов едут на модели дешевле
+                val tier = ownerDbo?.let { com.lvsmsmch.aichat.user.database.ModelTierPicker.pick(it) }
+                    ?: com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.TOP
+                val tierModel = when (tier) {
+                    com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.TOP -> geminiModel
+                    com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.MID -> geminiModelMid
+                    com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.LOW -> geminiModelLow
+                }
+                logger.debug("Gemini model tier: $tier ($tierModel)")
+
                 var fullMessage: String? = null
                 var lastError: Exception? = null
                 for (attempt in 1..3) {
                     try {
-                        val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
+                        val response = httpClient.post("$geminiApiUrl/$tierModel:generateContent?key=$geminiApiKey") {
                             contentType(ContentType.Application.Json)
                             setBody(requestBody)
                         }

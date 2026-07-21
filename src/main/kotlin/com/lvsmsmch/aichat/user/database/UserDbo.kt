@@ -30,6 +30,10 @@ data class UserDbo(
     val followingCount: Int = 0,
     val hourlyMessageCount: Int = 0,
     val dailyMessageCount: Int = 0,
+    // Месячные счётчики для умного даунгрейда модели (сброс 1-го числа):
+    // все сообщения за месяц и сообщения, сгенерированные топ-моделью
+    val monthlyMessageCount: Int = 0,
+    val monthlyTopModelCount: Int = 0,
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
     val extraFreeMessagesCount: Int = 0,

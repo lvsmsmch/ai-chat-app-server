@@ -79,7 +79,8 @@ class UserRepository(
 
         val now = java.time.LocalDateTime.now()
 
-        val limitUntil = if (user.extraFreeMessagesCount > 0) {
+        // Премиум без лимитов вообще — вместо них после порогов даунгрейдится модель
+        val limitUntil = if (user.hasSubscription || user.extraFreeMessagesCount > 0) {
             null
         } else if (user.dailyMessageCount >= dailyLimit) {
             val nextDay = now.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
@@ -224,6 +225,17 @@ class UserRepository(
         )
     }
 
+    /** 1-го числа: месячные счётчики умного даунгрейда модели обнуляются. */
+    suspend fun resetMonthlyCountersForAllUsers() {
+        collection.updateMany(
+            filter = UserDbo::monthlyMessageCount gt 0,
+            update = combine(
+                setValue(UserDbo::monthlyMessageCount, 0),
+                setValue(UserDbo::monthlyTopModelCount, 0),
+            )
+        )
+    }
+
     suspend fun notifyCharacterMessageWasSent(session: ClientSession, userId: String) {
         val userDbo = getUserById(session, userId) ?: return
         val messagesUpdateBson = if (userDbo.extraFreeMessagesCount > 0) {
@@ -235,11 +247,19 @@ class UserRepository(
             )
         }
 
+        // Месячные счётчики умного даунгрейда: топовый инкрементим, только если
+        // ЭТО сообщение реально уйдёт топ-модели (тир считается до инкремента)
+        val monthlyUpdates = mutableListOf(inc(UserDbo::monthlyMessageCount, 1))
+        if (ModelTierPicker.pick(userDbo) == ModelTierPicker.Tier.TOP) {
+            monthlyUpdates.add(inc(UserDbo::monthlyTopModelCount, 1))
+        }
+
         collection.updateOneById(
             session,
             userId,
             combine(
                 messagesUpdateBson,
+                combine(monthlyUpdates),
                 inc(UserDbo::totalMessagesCount, 1),
                 setValue(UserDbo::lastActiveAt, UtcTimestamp.now().toString())
             )
@@ -280,10 +300,12 @@ class UserRepository(
 
     companion object {
         const val DAILY_LIMIT_MESSAGES_REGULAR = 50
-        const val HOURLY_LIMIT_MESSAGES_REGULAR = 25
-        const val DAILY_LIMIT_MESSAGES_PREMIUM = 500
-        // Часовой лимит у премиума отсутствует: равен дневному и не срабатывает раньше него
-        const val HOURLY_LIMIT_MESSAGES_PREMIUM = 500
+        // Часовой лимит у фри отсутствует: равен дневному и не срабатывает раньше него
+        const val HOURLY_LIMIT_MESSAGES_REGULAR = 50
+        // Премиум безлимитен (getLimits для подписки всегда отдаёт limitUntil=null);
+        // значения нужны только для полей LimitsResponse
+        const val DAILY_LIMIT_MESSAGES_PREMIUM = 1_000_000
+        const val HOURLY_LIMIT_MESSAGES_PREMIUM = 1_000_000
         const val EXTRA_AMOUNT_FOR_REWARD = 5
     }
 }

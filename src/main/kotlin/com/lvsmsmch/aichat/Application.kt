@@ -304,6 +304,11 @@ fun Application.module() {
         userRepository = userRepository
     )
 
+    val monthlyCounterUpdaterJob = configureMonthlyCountersUpdater(
+        databaseScope = databaseScope,
+        userRepository = userRepository
+    )
+
     val fillDefaultSuggestionsJob = fillDefaultSuggestions(
         databaseScope = databaseScope,
         searchSuggestionsRepository = searchSuggestionsRepository
