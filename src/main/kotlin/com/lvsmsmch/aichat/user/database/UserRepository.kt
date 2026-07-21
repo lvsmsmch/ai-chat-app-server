@@ -229,8 +229,10 @@ class UserRepository(
     }
 
     /** Изображение сгенерировано (или зацензурено — тоже трата лимита). */
-    suspend fun incrementImageCount(userId: String) {
-        collection.updateOneById(userId, inc(UserDbo::dailyImageCount, 1))
+    suspend fun incrementImageCount(userId: String, onTopModel: Boolean) {
+        val updates = mutableListOf(inc(UserDbo::dailyImageCount, 1))
+        if (onTopModel) updates.add(inc(UserDbo::monthlyTopImageCount, 1))
+        collection.updateOneById(userId, combine(updates))
     }
 
     // ---- Пуши ----
@@ -294,10 +296,11 @@ class UserRepository(
     /** 1-го числа: месячные счётчики умного даунгрейда модели обнуляются. */
     suspend fun resetMonthlyCountersForAllUsers() {
         collection.updateMany(
-            filter = UserDbo::monthlyMessageCount gt 0,
+            filter = or(UserDbo::monthlyMessageCount gt 0, UserDbo::monthlyTopImageCount gt 0),
             update = combine(
                 setValue(UserDbo::monthlyMessageCount, 0),
                 setValue(UserDbo::monthlyTopModelCount, 0),
+                setValue(UserDbo::monthlyTopImageCount, 0),
             )
         )
     }
@@ -382,6 +385,8 @@ class UserRepository(
         // Генерация изображений: фри — нельзя, премиум — 10/день.
         // Пока лимиты ВЫКЛЮЧЕНЫ для тестов: включаются env IMAGE_LIMITS_ENFORCED=true
         const val DAILY_IMAGES_PREMIUM = 10
+        // Больше этого на топ-модели за месяц — картинки едут на mid-модель
+        const val MONTHLY_TOP_IMAGES_LIMIT = 50
         val imageLimitsEnforced: Boolean
             get() = System.getenv("IMAGE_LIMITS_ENFORCED")?.toBoolean() ?: false
     }

@@ -27,8 +27,11 @@ object AiImageGeneratorUtil {
         get() = System.getenv("GEMINI_API_URL") ?: "https://generativelanguage.googleapis.com/v1beta/models"
     private val geminiApiKey
         get() = System.getenv("GEMINI_API_KEY") ?: throw Exception("Missing GEMINI_API_KEY key")
-    private val imageModel
-        get() = System.getenv("GEMINI_IMAGE_MODEL") ?: "gemini-3.1-flash-lite-image"
+    // Топ-модель для картинок; после месячного порога юзер едет на mid
+    private val imageModelTop
+        get() = System.getenv("GEMINI_IMAGE_MODEL") ?: "gemini-3.1-flash-image"
+    private val imageModelMid
+        get() = System.getenv("GEMINI_IMAGE_MODEL_MID") ?: "gemini-3.1-flash-lite-image"
 
     data class ImageGenResult(val url: String, val debugInfo: String)
 
@@ -57,7 +60,9 @@ object AiImageGeneratorUtil {
     suspend fun generateImage(
         characterDbo: CharacterDbo,
         messagesHistory: List<MessageDbo>,
+        useTopModel: Boolean = true,
     ): ImageGenResult {
+        val imageModel = if (useTopModel) imageModelTop else imageModelMid
         val recent = messagesHistory
             .filter { it.text.isNotBlank() }
             .takeLast(8)

@@ -36,6 +36,8 @@ data class UserDbo(
     val monthlyTopModelCount: Int = 0,
     // Сгенерированных изображений сегодня (сброс в полночь вместе с дневным)
     val dailyImageCount: Int = 0,
+    // Изображений на ТОП-модели за месяц (сброс 1-го): после порога — даунгрейд
+    val monthlyTopImageCount: Int = 0,
     val totalMessagesCount: Int = 0,
     val totalChatsCount: Int = 0,
     val extraFreeMessagesCount: Int = 0,
