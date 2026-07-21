@@ -196,14 +196,28 @@ object AiMessageGeneratorUtil {
 
                 logger.debug("Sending request to Gemini API")
 
-                val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody)
+                // Ретраи и на сетевые ошибки, и на цензуру: входной фильтр Gemini
+                // вероятностный и даёт ложные блоки невинных диалогов волнами —
+                // повтор почти всегда проходит. Реальный запрещённый контент
+                // блокируется во всех попытках и честно уходит юзеру как censored.
+                var fullMessage: String? = null
+                var lastError: Exception? = null
+                for (attempt in 1..3) {
+                    try {
+                        val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
+                            contentType(ContentType.Application.Json)
+                            setBody(requestBody)
+                        }
+                        logger.debug("Response status: ${response.status} (attempt $attempt)")
+                        fullMessage = processGeminiResponse(response, characterDbo)
+                        break
+                    } catch (e: Exception) {
+                        lastError = e
+                        logger.error("Gemini attempt $attempt failed: ${e.message}")
+                        if (attempt < 3) delay(400)
+                    }
                 }
-
-                logger.debug("Response status: ${response.status}")
-
-                val fullMessage = processGeminiResponse(response, characterDbo)
+                if (fullMessage == null) throw lastError ?: Exception("Gemini generation failed")
                 simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
@@ -480,6 +494,22 @@ object AiMessageGeneratorUtil {
                 // Thinking-модели (gemini-3.5-flash) без этого тратят весь лимит
                 // токенов на размышления и возвращают пустой ответ
                 putJsonObject("thinkingConfig") { put("thinkingBudget", 0) }
+            }
+            // Мягкие категории фильтра — выкл: дефолтные пороги ложно блокируют
+            // безобидный ролеплей. Жёсткий фильтр (PROHIBITED_CONTENT) настройке
+            // не поддаётся и продолжает работать.
+            putJsonArray("safetySettings") {
+                listOf(
+                    "HARM_CATEGORY_HARASSMENT",
+                    "HARM_CATEGORY_HATE_SPEECH",
+                    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "HARM_CATEGORY_DANGEROUS_CONTENT",
+                ).forEach { category ->
+                    addJsonObject {
+                        put("category", category)
+                        put("threshold", "BLOCK_NONE")
+                    }
+                }
             }
         }
     }
