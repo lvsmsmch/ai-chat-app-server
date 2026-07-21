@@ -53,9 +53,12 @@ class MessageFinisher(
 
                 // Сообщение-изображение: отдельный генератор, свой таймаут (90с)
                 if (messageDbo.isImage) {
-                    // Топ-модель до месячного порога, дальше — mid до конца месяца
+                    // Топ-модель до месячного порога, дальше — mid до конца месяца.
+                    // Для xAI тиров нет — счётчик топ-модели не двигаем
                     val useTop = (owner?.monthlyTopImageCount ?: 0) <
                         com.lvsmsmch.aichat.user.database.UserRepository.MONTHLY_TOP_IMAGES_LIMIT
+                    val countsTop = useTop &&
+                        !com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.providerIsXai
                     withTimeout(90.seconds) {
                         try {
                             val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(
@@ -71,7 +74,7 @@ class MessageFinisher(
                                 status = MessageStatus.COMPLETED.value,
                             )
                             // Успех тратит дневной лимит изображений
-                            userRepository.incrementImageCount(chatDbo.userId, onTopModel = useTop)
+                            userRepository.incrementImageCount(chatDbo.userId, onTopModel = countsTop)
                         } catch (e: com.lvsmsmch.aichat.chat.network.CensoredException) {
                             logger.error("Image generation censored: ${e.message}")
                             messageRepository.updateMessage(
@@ -81,7 +84,7 @@ class MessageFinisher(
                                 failReason = com.lvsmsmch.aichat.chat.network.FailReason.CENSORED,
                             )
                             // Цензура тоже тратит лимит: ретраить запрещёнку бесплатно нельзя
-                            userRepository.incrementImageCount(chatDbo.userId, onTopModel = useTop)
+                            userRepository.incrementImageCount(chatDbo.userId, onTopModel = countsTop)
                         }
                     }
                     return@launch

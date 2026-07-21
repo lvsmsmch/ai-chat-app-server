@@ -33,6 +33,17 @@ object AiImageGeneratorUtil {
     private val imageModelMid
         get() = System.getenv("GEMINI_IMAGE_MODEL_MID") ?: "gemini-3.1-flash-lite-image"
 
+    // Провайдер генерации: "gemini" (дефолт) или "xai" (Grok Imagine, ~$0.02/картинка)
+    private val provider
+        get() = System.getenv("IMAGE_PROVIDER") ?: "gemini"
+    private val xaiApiKey
+        get() = System.getenv("XAI_API_KEY") ?: throw Exception("Missing XAI_API_KEY")
+    private val xaiImageModel
+        get() = System.getenv("XAI_IMAGE_MODEL") ?: "grok-imagine-image"
+
+    /** xAI — одна модель без тиров: месячный топ-даунгрейд Gemini к нему не применяется. */
+    val providerIsXai: Boolean get() = provider == "xai"
+
     data class ImageGenResult(val url: String, val debugInfo: String)
 
     /** Прайс для ориентировочной цены в дебаг-инфо: $/1M input-токенов и ~$/картинка. */
@@ -105,6 +116,8 @@ object AiImageGeneratorUtil {
             }
             append("\nStyle: high quality digital art, expressive, no text or captions in the image.")
         }
+
+        if (providerIsXai) return generateViaXai(prompt, refFile)
 
         val requestBody = buildJsonObject {
             putJsonArray("contents") {
@@ -192,6 +205,65 @@ object AiImageGeneratorUtil {
         val debugInfo = "$dims · $imageModel · in $inTok tok · out $outTok tok$costStr"
 
         val tempFile = File.createTempFile("gen_image_", ".png")
+        return try {
+            tempFile.writeBytes(bytes)
+            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    /**
+     * Grok Imagine (xAI): без референса — /images/generations, с референсом
+     * (аватарка или прошлая сцена) — /images/edits с data-URL картинкой.
+     */
+    private suspend fun generateViaXai(prompt: String, refFile: File?): ImageGenResult {
+        val endpoint = if (refFile != null) {
+            "https://api.x.ai/v1/images/edits"
+        } else {
+            "https://api.x.ai/v1/images/generations"
+        }
+        val body = buildJsonObject {
+            put("model", xaiImageModel)
+            put("prompt", prompt)
+            put("response_format", "b64_json")
+            if (refFile != null) {
+                putJsonObject("image") {
+                    put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFile.readBytes()))
+                    put("type", "image_url")
+                }
+            }
+        }
+
+        val response = httpClient.post(endpoint) {
+            header(HttpHeaders.Authorization, "Bearer $xaiApiKey")
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+        val text = response.bodyAsText()
+        if (response.status != HttpStatusCode.OK) {
+            logger.error("xAI image API error: ${response.status}, body: ${text.take(400)}")
+            if (Regex("(?i)content|policy|moderat|safety|prohibited").containsMatchIn(text)) {
+                throw CensoredException("xAI image blocked: ${text.take(200)}")
+            }
+            throw Exception("xAI image API error: ${response.status}")
+        }
+
+        val json = Json.parseToJsonElement(text).jsonObject
+        val b64 = json["data"]?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("b64_json")?.jsonPrimitive?.contentOrNull
+            ?: throw Exception("No image data in xAI response")
+        val bytes = Base64.getDecoder().decode(b64)
+
+        val ticks = json["usage"]?.jsonObject?.get("cost_in_usd_ticks")?.jsonPrimitive?.longOrNull
+        val cost = ticks?.let { it / 10_000_000_000.0 }
+        val dims = runCatching {
+            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
+        }.getOrNull() ?: "?x?"
+        val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
+        val debugInfo = "$dims · $xaiImageModel$costStr"
+
+        val tempFile = File.createTempFile("gen_image_", ".jpg")
         return try {
             tempFile.writeBytes(bytes)
             ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
