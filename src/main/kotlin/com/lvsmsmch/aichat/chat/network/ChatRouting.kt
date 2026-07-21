@@ -771,6 +771,7 @@ fun Route.configureChatRouting(
                             isFailed = false,
                             nsfw = false,
                             imageUrl = currentMessage.imageUrl,
+                            imageDebugInfo = currentMessage.imageDebugInfo,
                             chatSyncResponse = finalSyncResponse
                         )
 
@@ -808,6 +809,7 @@ fun Route.configureChatRouting(
                                     failReason = update.failReason,
                                     nsfw = false,
                                     imageUrl = update.imageUrl,
+                                    imageDebugInfo = update.imageDebugInfo,
                                     chatSyncResponse = finalSyncResponse
                                 )
                             } else {

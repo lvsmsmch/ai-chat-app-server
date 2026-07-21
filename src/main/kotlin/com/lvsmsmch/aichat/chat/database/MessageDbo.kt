@@ -20,6 +20,8 @@ data class MessageDbo(
     val imageUrl: String? = null,
     // Сообщение-изображение: генерится картинка, а не текст
     val isImage: Boolean = false,
+    // Дебаг-инфо генерации (разрешение/модель/токены/цена) — клиент показывает в debug-сборке
+    val imageDebugInfo: String? = null,
     val isRead: Boolean = false,
     val status: String,
     // Причина FAILED: "censored" (фильтр контента) или "error" (сбой генерации/сервера)

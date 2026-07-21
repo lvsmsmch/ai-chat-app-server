@@ -29,7 +29,8 @@ data class MessageDto(
     @SerialName("failReason") val failReason: String? = null,
     @SerialName("nsfw") val nsfw: Boolean,
     @SerialName("imageUrl") val imageUrl: String? = null,
-    @SerialName("isImage") val isImage: Boolean = false
+    @SerialName("isImage") val isImage: Boolean = false,
+    @SerialName("imageDebugInfo") val imageDebugInfo: String? = null
 )
 
 
@@ -172,6 +173,7 @@ data class StreamMessageChunk(
     @SerialName("failReason") val failReason: String? = null,
     @SerialName("nsfw") val nsfw: Boolean,
     @SerialName("imageUrl") val imageUrl: String? = null,
+    @SerialName("imageDebugInfo") val imageDebugInfo: String? = null,
     @SerialName("chatSyncResponse") val chatSyncResponse: ChatSyncResponse? = null
 )
 

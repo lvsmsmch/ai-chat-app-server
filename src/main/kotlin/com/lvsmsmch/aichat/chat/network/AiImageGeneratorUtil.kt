@@ -30,6 +30,16 @@ object AiImageGeneratorUtil {
     private val imageModel
         get() = System.getenv("GEMINI_IMAGE_MODEL") ?: "gemini-3.1-flash-lite-image"
 
+    data class ImageGenResult(val url: String, val debugInfo: String)
+
+    /** Прайс для ориентировочной цены в дебаг-инфо: $/1M input-токенов и ~$/картинка. */
+    private data class ImagePricing(val inputPerMTok: Double, val perImageOut: Double)
+    private val pricing = mapOf(
+        "gemini-3.1-flash-image" to ImagePricing(0.50, 0.067),
+        "gemini-3.1-flash-lite-image" to ImagePricing(0.25, 0.0336),
+        "gemini-2.5-flash-image" to ImagePricing(0.30, 0.039),
+    )
+
     private val httpClient = HttpClient {
         install(ContentNegotiation) { json(defaultJson) }
         install(HttpTimeout) {
@@ -47,7 +57,7 @@ object AiImageGeneratorUtil {
     suspend fun generateImage(
         characterDbo: CharacterDbo,
         messagesHistory: List<MessageDbo>,
-    ): String {
+    ): ImageGenResult {
         val recent = messagesHistory
             .filter { it.text.isNotBlank() }
             .takeLast(8)
@@ -113,10 +123,24 @@ object AiImageGeneratorUtil {
             ?: throw Exception("No image data in Gemini response (finishReason=$finishReason)")
 
         val bytes = Base64.getDecoder().decode(base64Data)
+
+        // Дебаг-инфо: разрешение, модель, токены и ориентировочная цена
+        val usage = jsonResponse["usageMetadata"]?.jsonObject
+        val inTok = usage?.get("promptTokenCount")?.jsonPrimitive?.intOrNull ?: 0
+        val outTok = usage?.get("candidatesTokenCount")?.jsonPrimitive?.intOrNull
+            ?: usage?.get("totalTokenCount")?.jsonPrimitive?.intOrNull?.minus(inTok) ?: 0
+        val dims = runCatching {
+            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
+        }.getOrNull() ?: "?x?"
+        val price = pricing[imageModel]
+        val cost = if (price != null) inTok / 1_000_000.0 * price.inputPerMTok + price.perImageOut else null
+        val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
+        val debugInfo = "$dims · $imageModel · in $inTok tok · out $outTok tok$costStr"
+
         val tempFile = File.createTempFile("gen_image_", ".png")
         return try {
             tempFile.writeBytes(bytes)
-            ImageServer.uploadImageOnServer(tempFile).originalUrl
+            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
         } finally {
             tempFile.delete()
         }

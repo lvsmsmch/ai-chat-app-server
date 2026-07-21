@@ -68,6 +68,7 @@ class MessageRepository(
                     isFailed = message.status == MessageStatus.FAILED.value,
                     failReason = message.failReason,
                     imageUrl = message.imageUrl,
+                    imageDebugInfo = message.imageDebugInfo,
                 ).also {
                 }
             }
@@ -81,6 +82,7 @@ class MessageRepository(
         val isFailed: Boolean,
         val failReason: String? = null,
         val imageUrl: String? = null,
+        val imageDebugInfo: String? = null,
     )
 
     suspend fun insertMessage(session: ClientSession, messageDbo: MessageDbo) {
@@ -289,10 +291,12 @@ class MessageRepository(
         text: String? = null,
         nsfw: Boolean? = null,
         failReason: String? = null,
+        imageDebugInfo: String? = null,
     ) {
         collection.findOneById(messageId) ?: return
         val updates = mutableListOf<Bson>()
         imageUrl?.let { updates.add(setValue(MessageDbo::imageUrl, it)) }
+        imageDebugInfo?.let { updates.add(setValue(MessageDbo::imageDebugInfo, it)) }
         isRead?.let { updates.add(setValue(MessageDbo::isRead, it)) }
         status?.let {
             updates.add(setValue(MessageDbo::status, it))

@@ -55,13 +55,14 @@ class MessageFinisher(
                 if (messageDbo.isImage) {
                     withTimeout(90.seconds) {
                         try {
-                            val url = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(
+                            val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(
                                 characterDbo = characterDbo.localized(lang),
                                 messagesHistory = messageHistory,
                             )
                             messageRepository.updateMessage(
                                 messageId = messageId,
-                                imageUrl = url,
+                                imageUrl = result.url,
+                                imageDebugInfo = result.debugInfo,
                                 text = "",
                                 status = MessageStatus.COMPLETED.value,
                             )

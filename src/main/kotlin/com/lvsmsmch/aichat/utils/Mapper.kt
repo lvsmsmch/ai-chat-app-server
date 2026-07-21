@@ -218,7 +218,8 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         failReason = failReason,
         nsfw = nsfw,
         imageUrl = imageUrl,
-        isImage = isImage
+        isImage = isImage,
+        imageDebugInfo = imageDebugInfo
     )
 }
 
