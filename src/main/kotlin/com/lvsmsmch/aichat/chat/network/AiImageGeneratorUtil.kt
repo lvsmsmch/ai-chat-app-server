@@ -114,13 +114,26 @@ object AiImageGeneratorUtil {
             throw CensoredException("image finishReason=$finishReason")
         }
 
-        val base64Data = firstCandidate
+        val parts = firstCandidate
             ?.get("content")?.jsonObject
             ?.get("parts")?.jsonArray
+        val base64Data = parts
             ?.mapNotNull { it.jsonObject["inlineData"]?.jsonObject }
             ?.firstOrNull()
             ?.get("data")?.jsonPrimitive?.contentOrNull
-            ?: throw Exception("No image data in Gemini response (finishReason=$finishReason)")
+
+        if (base64Data == null) {
+            // «Мягкий отказ»: STOP без картинки, вместо неё текст «не могу нарисовать».
+            // Это тоже цензура (фильтр вероятностный: то мягкий отказ, то IMAGE_SAFETY) —
+            // показываем её честно и тратим слот, а не даём бесплатный ретрай.
+            val refusalText = parts
+                ?.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
+                ?.joinToString(" ")?.trim().orEmpty()
+            if (finishReason == "STOP") {
+                throw CensoredException("model refused to draw: ${refusalText.take(200)}")
+            }
+            throw Exception("No image data in Gemini response (finishReason=$finishReason)")
+        }
 
         val bytes = Base64.getDecoder().decode(base64Data)
 
