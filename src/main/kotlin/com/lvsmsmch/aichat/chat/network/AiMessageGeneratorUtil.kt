@@ -72,6 +72,42 @@ object AiMessageGeneratorUtil {
         }
     }
 
+    /**
+     * Анти-спам цензуры: серия подряд зацензуренных генераций юзера включает
+     * растущий кулдаун. Пока кулдаун активен, новые попытки отбиваются СРАЗУ,
+     * без единого запроса к API — намеренно сжигать токены ретраями не выйдет.
+     * Ложные «волны» фильтра не страдают: первый же успех сбрасывает серию.
+     */
+    private val censorStreaks = java.util.concurrent.ConcurrentHashMap<String, Pair<Int, Long>>()
+
+    private fun censorCooldownMs(streak: Int): Long = when {
+        streak <= 1 -> 0
+        streak == 2 -> 10_000L
+        streak == 3 -> 30_000L
+        streak == 4 -> 60_000L
+        else -> 300_000L
+    }
+
+    private fun checkCensorGuard(userId: String) {
+        val (streak, lastAt) = censorStreaks[userId] ?: return
+        val waitLeft = censorCooldownMs(streak) - (System.currentTimeMillis() - lastAt)
+        if (waitLeft > 0) {
+            throw CensoredException("censor cooldown active: streak=$streak, ${waitLeft}ms left")
+        }
+    }
+
+    /** Серия активна (даже без кулдауна) — ретраи к API сокращаем до одного. */
+    private fun censorStreakActive(userId: String): Boolean = censorStreaks.containsKey(userId)
+
+    private fun recordCensor(userId: String) {
+        val streak = (censorStreaks[userId]?.first ?: 0) + 1
+        censorStreaks[userId] = streak to System.currentTimeMillis()
+    }
+
+    private fun clearCensorStreak(userId: String) {
+        censorStreaks.remove(userId)
+    }
+
     suspend fun generateAiMessageWithStreaming(
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
@@ -128,6 +164,7 @@ object AiMessageGeneratorUtil {
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
             } else if (useGroq || useOpenAi) {
+                checkCensorGuard(chatDbo.userId)
 
                 val url = if (useGroq) groqApiUrl else openAiApiUrl
                 val key = if (useGroq) groqApiKey else openAiApiKey
@@ -196,13 +233,18 @@ object AiMessageGeneratorUtil {
 
                 logger.debug("Sending request to Gemini API")
 
+                // Кулдаун цензуры: активен — отбой сразу, ноль запросов к API
+                checkCensorGuard(chatDbo.userId)
+
                 // Ретраи и на сетевые ошибки, и на цензуру: входной фильтр Gemini
                 // вероятностный и даёт ложные блоки невинных диалогов волнами —
                 // повтор почти всегда проходит. Реальный запрещённый контент
                 // блокируется во всех попытках и честно уходит юзеру как censored.
+                // При активной серии цензуры ретраи урезаны до одного запроса.
+                val maxAttempts = if (censorStreakActive(chatDbo.userId)) 1 else 3
                 var fullMessage: String? = null
                 var lastError: Exception? = null
-                for (attempt in 1..3) {
+                for (attempt in 1..maxAttempts) {
                     try {
                         val response = httpClient.post("$geminiApiUrl/$geminiModel:generateContent?key=$geminiApiKey") {
                             contentType(ContentType.Application.Json)
@@ -214,15 +256,18 @@ object AiMessageGeneratorUtil {
                     } catch (e: Exception) {
                         lastError = e
                         logger.error("Gemini attempt $attempt failed: ${e.message}")
-                        if (attempt < 3) delay(400)
+                        if (attempt < maxAttempts) delay(400)
                     }
                 }
                 if (fullMessage == null) throw lastError ?: Exception("Gemini generation failed")
+                clearCensorStreak(chatDbo.userId)
                 simulateStreaming(enforceActionStyle(fullMessage, forbidActions, wantActionAtEnd), onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
         } catch (e: CensoredException) {
+            // Считаем и отказ по кулдауну: спам во время кулдауна продлевает его
+            recordCensor(chatDbo.userId)
             logger.error("Generation blocked by content filter: ${e.message}")
             onError(FailReason.CENSORED)
         } catch (e: Exception) {
