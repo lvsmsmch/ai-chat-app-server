@@ -74,6 +74,16 @@ class NotificationService(
                     commentId = comment.id,
                 )
             )
+            // Пуш автору: комменты — редкое и личное событие
+            val author = userRepository.getUserById(character.authorId) ?: return@fire
+            val actor = userRepository.getUserById(comment.authorId) ?: return@fire
+            author.fcmToken?.let { token ->
+                FcmSender.send(
+                    token = token,
+                    title = "New comment on ${character.name} 💬",
+                    body = "@${actor.username}: ${comment.text.take(80)}",
+                )
+            }
         }
     }
 
@@ -129,8 +139,20 @@ class NotificationService(
                     stackKey = key,
                 )
             )
+            // Пуш автору: веха — приятный повод вернуться
+            val author = userRepository.getUserById(character.authorId) ?: return@fire
+            author.fcmToken?.let { token ->
+                FcmSender.send(
+                    token = token,
+                    title = "Milestone! 🎉",
+                    body = "${character.name} reached ${formatMilestone(total)} messages",
+                )
+            }
         }
     }
+
+    private fun formatMilestone(m: Int): String =
+        if (m >= 1_000 && m % 1_000 == 0) "${m / 1_000},000" else "$m"
 
     private companion object {
         val MILESTONES = setOf(1_000, 10_000, 100_000)
