@@ -63,10 +63,26 @@ object AiImageGeneratorUtil {
         useTopModel: Boolean = true,
     ): ImageGenResult {
         val imageModel = if (useTopModel) imageModelTop else imageModelMid
-        val recent = messagesHistory
-            .filter { it.text.isNotBlank() }
-            .takeLast(8)
-            .joinToString("\n") { (if (it.isSentByUser) "User: " else "${characterDbo.name}: ") + it.text.take(200) }
+
+        // История для промпта: ПЕРВОЕ сообщение чата (в приветствиях часто задана
+        // сцена) + «[...]» + последние 8 сообщений
+        val meaningful = messagesHistory.filter { it.text.isNotBlank() }
+        val last8 = meaningful.takeLast(8)
+        val opening = meaningful.firstOrNull()?.takeIf { it !in last8 }
+        fun line(m: MessageDbo) =
+            (if (m.isSentByUser) "User: " else "${characterDbo.name}: ") + m.text.take(200)
+        val recent = buildString {
+            opening?.let { append(line(it)); append("\n[...]\n") }
+            append(last8.joinToString("\n") { line(it) })
+        }
+
+        // Референс внешности/стиля: последняя сгенерированная картинка этого чата
+        // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа
+        val lastGenFile = ImageServer.localFileForUrl(
+            messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
+        )
+        val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
+        val refFile = lastGenFile ?: avatarFile
 
         val prompt = buildString {
             append("Create a single vivid illustration of the character ")
@@ -77,6 +93,16 @@ object AiImageGeneratorUtil {
                 append("\nDepict the character in the current scene of this conversation:\n")
                 append(recent)
             }
+            when {
+                lastGenFile != null -> append(
+                    "\nThe attached image is the previous scene of this chat: keep the SAME " +
+                        "character design and art style, continue the visual continuity."
+                )
+                avatarFile != null -> append(
+                    "\nThe attached image shows this character's appearance: use it as the " +
+                        "visual reference for how the character looks."
+                )
+            }
             append("\nStyle: high quality digital art, expressive, no text or captions in the image.")
         }
 
@@ -84,7 +110,17 @@ object AiImageGeneratorUtil {
             putJsonArray("contents") {
                 addJsonObject {
                     put("role", "user")
-                    putJsonArray("parts") { addJsonObject { put("text", prompt) } }
+                    putJsonArray("parts") {
+                        addJsonObject { put("text", prompt) }
+                        if (refFile != null) {
+                            addJsonObject {
+                                putJsonObject("inlineData") {
+                                    put("mimeType", "image/jpeg")
+                                    put("data", Base64.getEncoder().encodeToString(refFile.readBytes()))
+                                }
+                            }
+                        }
+                    }
                 }
             }
             putJsonObject("generationConfig") {

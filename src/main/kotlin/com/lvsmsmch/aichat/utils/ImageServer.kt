@@ -32,6 +32,12 @@ object ImageServer {
     private const val TARGET_BYTES = 500_000
     private const val MAX_SIDE = 1024
 
+    /** Локальный файл по публичному /images-URL (референсы для генерации картинок). */
+    fun localFileForUrl(url: String?): File? {
+        val name = url?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: return null
+        return File(imagesDir, name).takeIf { it.exists() }
+    }
+
     suspend fun uploadImageOnServer(image: File): UploadedImages {
         logger.debug("image name: ${image.name}, size: ${image.length()}")
 
