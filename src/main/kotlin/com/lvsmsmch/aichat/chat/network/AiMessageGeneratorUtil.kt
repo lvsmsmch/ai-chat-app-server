@@ -477,6 +477,9 @@ object AiMessageGeneratorUtil {
             putJsonObject("generationConfig") {
                 put("temperature", temperature)
                 put("maxOutputTokens", 400)
+                // Thinking-модели (gemini-3.5-flash) без этого тратят весь лимит
+                // токенов на размышления и возвращают пустой ответ
+                putJsonObject("thinkingConfig") { put("thinkingBudget", 0) }
             }
         }
     }
