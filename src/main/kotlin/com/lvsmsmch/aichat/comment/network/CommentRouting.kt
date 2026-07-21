@@ -25,6 +25,7 @@ fun Route.configureCommentRouting(
     userRepository: UserRepository,
     idGenerator: IdGenerator,
     complexQueryHelper: ComplexQueryHelper,
+    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     mapper: Mapper
 ) {
 
@@ -79,6 +80,8 @@ fun Route.configureCommentRouting(
             )
 
             complexQueryHelper.addComment(commentDbo)
+            // Автору персонажа — уведомление о новом комменте
+            notificationService.onCharacterComment(commentDbo)
 
             call.respondSuccess(data = toDtos(listOf(commentDbo), sessionDbo.userId).first())
         }
@@ -182,12 +185,14 @@ fun Route.configureCommentRouting(
             val commentId = call.parameters["id"]
                 ?: throw BadRequestException("Missing id parameter")
 
-            commentRepository.getCommentById(commentId)
+            val likedComment = commentRepository.getCommentById(commentId)
                 ?: throw CommentNotFoundException(id = commentId)
 
             // Идемпотентно: повторный лайк не ошибка (оптимистичный UI может дублировать)
             if (!commentLikeRepository.isCommentLikedByUser(sessionDbo.userId, commentId)) {
                 complexQueryHelper.likeComment(commentId, sessionDbo.userId)
+                // Автору коммента — стакающееся «+1 лайк»
+                notificationService.onCommentLiked(likedComment, sessionDbo.userId)
             }
             call.respondSuccess()
         }

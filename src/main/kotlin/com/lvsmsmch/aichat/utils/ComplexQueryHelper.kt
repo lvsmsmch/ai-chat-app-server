@@ -31,6 +31,7 @@ class ComplexQueryHelper(
     private val commentLikeRepository: CommentLikeRepository,
     private val deletedIdsStatsRepository: DeletedIdsStatsRepository,
     private val characterActivityLogRepository: CharacterActivityLogRepository,
+    private val notificationService: com.lvsmsmch.aichat.notification.NotificationService,
 ) {
 
 
@@ -393,6 +394,10 @@ class ComplexQueryHelper(
                     userId = chat.userId
                 )
             }
+        }
+        // Вне транзакции: веха 1к/10к/100к сообщений персонажа
+        if (!messageDbo.isSentByUser && !messageDbo.isImage) {
+            notificationService.checkCharacterMilestone(messageDbo.senderId)
         }
     }
 }

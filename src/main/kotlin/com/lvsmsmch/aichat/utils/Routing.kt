@@ -20,6 +20,7 @@ import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
 import com.lvsmsmch.aichat.review.database.ReviewRepository
 import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
 import com.lvsmsmch.aichat.comment.database.CommentRepository
+import com.lvsmsmch.aichat.notification.network.configureNotificationsRouting
 import com.lvsmsmch.aichat.comment.network.configureCommentRouting
 import com.lvsmsmch.aichat.user.database.FollowRepository
 import com.lvsmsmch.aichat.user.database.UserRepository
@@ -51,6 +52,8 @@ fun Application.configureRouting(
     cacheManager: CacheManager,
     messageFinisher: MessageFinisher,
     complexQueryHelper: ComplexQueryHelper,
+    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
+    userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
 ) {
     routing {
         get("/test") {
@@ -82,6 +85,7 @@ fun Application.configureRouting(
                 reportRepository = reportRepository,
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
+                notificationService = notificationService,
             )
 
             configureCharacterRouting(
@@ -93,7 +97,8 @@ fun Application.configureRouting(
                 idGenerator = idGenerator,
                 cacheManager = cacheManager,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper
+                complexQueryHelper = complexQueryHelper,
+                notificationService = notificationService,
             )
 
             configureCommentRouting(
@@ -106,6 +111,15 @@ fun Application.configureRouting(
                 idGenerator = idGenerator,
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
+                notificationService = notificationService,
+            )
+
+            configureNotificationsRouting(
+                sessionRepository = sessionRepository,
+                userNotificationRepository = userNotificationRepository,
+                userRepository = userRepository,
+                characterRepository = characterRepository,
+                commentRepository = commentRepository,
             )
 
             configureChatRouting(

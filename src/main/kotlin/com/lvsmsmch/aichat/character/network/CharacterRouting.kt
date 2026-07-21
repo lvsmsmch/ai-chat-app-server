@@ -24,7 +24,8 @@ fun Route.configureCharacterRouting(
     idGenerator: IdGenerator,
     cacheManager: CacheManager,
     complexQueryHelper: ComplexQueryHelper,
-    mapper: Mapper
+    mapper: Mapper,
+    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
 ) {
 
     route("/characters") {
@@ -121,6 +122,10 @@ fun Route.configureCharacterRouting(
             )
 
             complexQueryHelper.addCharacter(characterDbo)
+            // Фолловерам автора — «добавил персонажа» (только публичные)
+            if (characterDbo.visibility != CharacterVisibility.PRIVATE.code) {
+                notificationService.onFolloweeNewCharacter(characterDbo.authorId, characterDbo.id)
+            }
 
             call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }

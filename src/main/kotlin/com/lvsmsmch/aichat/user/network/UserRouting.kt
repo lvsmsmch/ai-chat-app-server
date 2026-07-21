@@ -21,7 +21,8 @@ fun Route.configureUserRouting(
     characterRepository: CharacterRepository,
     reportRepository: ReportRepository,
     complexQueryHelper: ComplexQueryHelper,
-    mapper: Mapper
+    mapper: Mapper,
+    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
 ) {
     route("/users") {
 
@@ -317,6 +318,8 @@ fun Route.configureUserRouting(
                     currentUserId = currentUserId,
                     targetUserId = targetUserId
                 )
+                // Уведомление + пуш «на вас подписались»
+                notificationService.onNewFollower(targetUserId, currentUserId)
             }
 
             call.respondSuccess()

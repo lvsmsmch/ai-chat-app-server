@@ -76,6 +76,13 @@ class FollowRepository(
             .toList()
     }
 
+    /** Без транзакции — для рассылки уведомлений подписчикам. */
+    suspend fun getAllFollowerIds(userId: String): List<String> {
+        return collection.find(FollowDbo::followeeId eq userId)
+            .toList()
+            .map { it.followerId }
+    }
+
     suspend fun getAllFollowerIds(session: ClientSession, userId: String): List<String> {
         return collection.find(
             session,

@@ -155,6 +155,9 @@ fun Application.module() {
     val commentLikeRepository = CommentLikeRepository(
         database.getCollection<CommentLikeDbo>("comment_likes")
     )
+    val userNotificationRepository = com.lvsmsmch.aichat.notification.database.UserNotificationRepository(
+        database.getCollection<com.lvsmsmch.aichat.notification.database.UserNotificationDbo>("user_notifications")
+    )
     val characterActivityLogRepository = CharacterActivityLogRepository(
         database.getCollection<CharacterActivityLogDbo>("character_activity_logs")
     )
@@ -179,6 +182,7 @@ fun Application.module() {
             reviewLikeRepository.ensureIndexes()
             commentRepository.ensureIndexes()
             commentLikeRepository.ensureIndexes()
+            userNotificationRepository.ensureIndexes()
             feedbackRepository.ensureIndexes()
             logger.info("Database indexes ensured")
         } catch (e: Exception) {
@@ -223,6 +227,13 @@ fun Application.module() {
         followRepository = followRepository,
     )
 
+    val notificationService = com.lvsmsmch.aichat.notification.NotificationService(
+        notifications = userNotificationRepository,
+        userRepository = userRepository,
+        characterRepository = characterRepository,
+        followRepository = followRepository,
+    )
+
     val complexQueryHelper = ComplexQueryHelper(
         transactionHelper = transactionHelper,
         userRepository = userRepository,
@@ -236,7 +247,8 @@ fun Application.module() {
         commentRepository = commentRepository,
         commentLikeRepository = commentLikeRepository,
         deletedIdsStatsRepository = deletedIdsStatsRepository,
-        characterActivityLogRepository = characterActivityLogRepository
+        characterActivityLogRepository = characterActivityLogRepository,
+        notificationService = notificationService,
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
@@ -346,7 +358,9 @@ fun Application.module() {
         usernameGenerator = usernameGenerator,
         cacheManager = cacheManager,
         messageFinisher = messageFinisher,
-        complexQueryHelper = complexQueryHelper
+        complexQueryHelper = complexQueryHelper,
+        notificationService = notificationService,
+        userNotificationRepository = userNotificationRepository,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {
