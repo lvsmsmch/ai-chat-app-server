@@ -55,10 +55,11 @@ class MessageFinisher(
                 if (messageDbo.isImage) {
                     // Топ-модель до месячного порога, дальше — mid до конца месяца.
                     // Для xAI тиров нет — счётчик топ-модели не двигаем
+                    // Первые N картинок месяца — Gemini-топ (считаются в топ-счётчик),
+                    // дальше — активный провайдер
                     val useTop = (owner?.monthlyTopImageCount ?: 0) <
                         com.lvsmsmch.aichat.user.database.UserRepository.MONTHLY_TOP_IMAGES_LIMIT
-                    val countsTop = useTop &&
-                        !com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.providerIsXai
+                    val countsTop = useTop
                     withTimeout(90.seconds) {
                         try {
                             val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(

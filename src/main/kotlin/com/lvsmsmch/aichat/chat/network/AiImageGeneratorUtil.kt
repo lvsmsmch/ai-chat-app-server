@@ -107,20 +107,29 @@ object AiImageGeneratorUtil {
             when {
                 lastGenFile != null -> append(
                     "\nThe attached image is the previous scene of this chat. Keep the SAME " +
-                        "character design and art style, but compose a COMPLETELY NEW shot: " +
-                        "change the camera angle, distance, framing, pose and background to match " +
-                        "the current moment of the conversation. Do NOT copy the previous " +
-                        "composition - it is a style reference, not a template."
+                        "character design and art style; staying in the same location is fine " +
+                        "if the conversation continues there, but ALWAYS render a new shot: " +
+                        "different camera angle and distance, updated poses and details for the " +
+                        "current moment. Never return a near-copy of the reference."
                 )
                 avatarFile != null -> append(
-                    "\nThe attached image shows this character's appearance: use it as the " +
-                        "visual reference for how the character looks."
+                    "\nThe attached image is ONLY a face/appearance reference for the character. " +
+                        "Do NOT reproduce, crop, zoom or restyle that exact picture and do NOT " +
+                        "reuse its framing or visual effects. Paint a completely different " +
+                        "image: a new scene from the conversation, a different camera angle " +
+                        "and distance, a full composition with a background."
                 )
             }
-            append("\nStyle: high quality digital art, expressive, no text or captions in the image.")
+            append(
+                "\nStyle: high quality digital art. Correct anatomy is critical: every person " +
+                    "has exactly two arms and two hands, no extra, missing or deformed limbs. " +
+                    "No text or captions in the image."
+            )
         }
 
-        if (providerIsXai) return generateViaXai(prompt, refFile)
+        // Гибрид: первые генерации месяца (топ-тир) — всегда Gemini-топ,
+        // дальше — активный провайдер (Grok дешевле, но проще по качеству)
+        if (providerIsXai && !useTopModel) return generateViaXai(prompt, refFile)
 
         val requestBody = buildJsonObject {
             putJsonArray("contents") {

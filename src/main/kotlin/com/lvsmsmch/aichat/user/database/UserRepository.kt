@@ -403,8 +403,8 @@ class UserRepository(
         // Генерация изображений: фри — нельзя, премиум — 10/день.
         // Пока лимиты ВЫКЛЮЧЕНЫ для тестов: включаются env IMAGE_LIMITS_ENFORCED=true
         const val DAILY_IMAGES_PREMIUM = 10
-        // Больше этого на топ-модели за месяц — картинки едут на mid-модель
-        const val MONTHLY_TOP_IMAGES_LIMIT = 50
+        // Больше этого на топ-модели (Gemini) за месяц — дальше активный провайдер
+        const val MONTHLY_TOP_IMAGES_LIMIT = 10
         val imageLimitsEnforced: Boolean
             get() = System.getenv("IMAGE_LIMITS_ENFORCED")?.toBoolean() ?: false
     }
