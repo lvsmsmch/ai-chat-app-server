@@ -101,9 +101,9 @@ object AiImageGeneratorUtil {
 
         // Референс внешности/стиля: последняя сгенерированная картинка этого чата
         // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа.
-        // Grok'у ПРОШЛЫЙ КАДР НЕ ДАЁМ ВООБЩЕ: его /edits копирует референс почти
-        // один-в-один, игнорируя просьбы сменить ракурс — только аватар, сцена текстом
-        val lastGenFile = if (goXai || goFal) null else ImageServer.localFileForUrl(
+        // fal-модели (тест FLUX/Seedream) получают ТОЛЬКО аватар: проверяем их
+        // умение строить новую сцену текстом при консистентном лице
+        val lastGenFile = if (goFal) null else ImageServer.localFileForUrl(
             messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
         )
         val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
