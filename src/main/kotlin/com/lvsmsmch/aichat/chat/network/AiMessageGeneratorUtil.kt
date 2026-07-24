@@ -76,6 +76,29 @@ object AiMessageGeneratorUtil {
         get() = System.getenv("AI_GROUP_CHAT_PROMPT") ?: throw Exception("Missing AI_GROUP_CHAT_PROMPT key")
 
 
+    // Цены $ за 1M токенов (вход/выход) — для дебаг-строки под сообщением.
+    // Неизвестная модель — цена просто не пишется
+    private val textPrices = mapOf(
+        "gemini-3.5-flash" to (1.50 to 9.00),
+        "gemini-3.1-pro-preview" to (2.00 to 12.00),
+        "gemini-3.1-flash-lite" to (0.25 to 1.50),
+        "gemini-3-flash-preview" to (0.50 to 3.00),
+        "gemini-2.5-pro" to (1.25 to 10.00),
+        "gemini-2.5-flash" to (0.30 to 2.50),
+        "gemini-2.5-flash-lite" to (0.10 to 0.40),
+    )
+
+    private fun buildTextDebugInfo(model: String, inTok: Int, outTok: Int): String {
+        val costStr = textPrices[model]?.let { (inP, outP) ->
+            val cost = inTok / 1_000_000.0 * inP + outTok / 1_000_000.0 * outP
+            " · ~$" + String.format("%.5f", cost)
+        } ?: ""
+        return "$model · in $inTok tok · out $outTok tok$costStr"
+    }
+
+    /** Текст + токены генерации (для дебаг-строки). */
+    private data class GenText(val text: String, val inTok: Int, val outTok: Int)
+
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(defaultJson)
@@ -101,7 +124,10 @@ object AiMessageGeneratorUtil {
         ownerDbo: com.lvsmsmch.aichat.user.database.UserDbo? = null,
         onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit,
-        onError: suspend (String) -> Unit
+        onError: suspend (String) -> Unit,
+        // Дебаг-инфо генерации (модель/токены/цена) — сохраняется в сообщении,
+        // клиент показывает в debug-сборке
+        onDebugInfo: suspend (String) -> Unit = {},
     ) {
         try {
             // Сервер сам решает, будут ли в ЭТОМ ответе *действия* — по режиму диалога:
@@ -151,11 +177,17 @@ object AiMessageGeneratorUtil {
 
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)
-            } else if (useGroq || useOpenAi) {
-
-                val url = if (useGroq) groqApiUrl else openAiApiUrl
-                val key = if (useGroq) groqApiKey else openAiApiKey
-                val model = if (useGroq) groqModel else openAiModel
+            } else if (run {
+                // [DEBUG] Оверрайд модели из настроек: gemini-* уводит в Gemini-ветку,
+                // прочие (grok-*, openai/gpt-oss-*) — в OpenAI-совместимую
+                val ov = com.lvsmsmch.aichat.utils.DebugOverrides.textModel
+                if (ov != null) !ov.startsWith("gemini") else (useGroq || useOpenAi)
+            }) {
+                val overrideModel = com.lvsmsmch.aichat.utils.DebugOverrides.textModel
+                val viaGroq = overrideModel?.contains("gpt-oss") ?: useGroq
+                val url = if (viaGroq) groqApiUrl else openAiApiUrl
+                val key = if (viaGroq) groqApiKey else openAiApiKey
+                val model = overrideModel ?: if (viaGroq) groqModel else openAiModel
 
                 val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage) +
                     listOf(mapOf(
@@ -186,9 +218,11 @@ object AiMessageGeneratorUtil {
 
                         logger.debug("Response status: ${response.status}")
 
-                        val fullMessage = processNonStreamingResponse(response)
+                        val gen = processNonStreamingResponse(response)
+                        val fullMessage = gen.text
                             .removePrefixIgnoringCase("${characterDbo.name}: ")
                             .cleanupReply()
+                        onDebugInfo(buildTextDebugInfo(model, gen.inTok, gen.outTok))
                         simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
@@ -236,14 +270,15 @@ object AiMessageGeneratorUtil {
                 // после дневных порогов едут на модели дешевле
                 val tier = ownerDbo?.let { com.lvsmsmch.aichat.user.database.ModelTierPicker.pick(it) }
                     ?: com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.TOP
-                val tierModel = when (tier) {
+                // [DEBUG] Оверрайд из настроек бьёт тиринг
+                val tierModel = com.lvsmsmch.aichat.utils.DebugOverrides.textModel ?: when (tier) {
                     com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.TOP -> geminiModel
                     com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.MID -> geminiModelMid
                     com.lvsmsmch.aichat.user.database.ModelTierPicker.Tier.LOW -> geminiModelLow
                 }
                 logger.debug("Gemini model tier: $tier ($tierModel)")
 
-                var fullMessage: String? = null
+                var genResult: GenText? = null
                 var lastError: Exception? = null
                 for (attempt in 1..3) {
                     try {
@@ -252,7 +287,7 @@ object AiMessageGeneratorUtil {
                             setBody(requestBody)
                         }
                         logger.debug("Response status: ${response.status} (attempt $attempt)")
-                        fullMessage = processGeminiResponse(response, characterDbo)
+                        genResult = processGeminiResponse(response, characterDbo)
                         break
                     } catch (e: Exception) {
                         lastError = e
@@ -260,12 +295,13 @@ object AiMessageGeneratorUtil {
                         if (attempt < 3) delay(400)
                     }
                 }
-                if (fullMessage == null) {
+                if (genResult == null) {
                     // Все попытки в цензуру — чёрный список до изменения сообщения
                     if (lastError is CensoredException) censoredMessages.add(censorKey)
                     throw lastError ?: Exception("Gemini generation failed")
                 }
-                simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
+                onDebugInfo(buildTextDebugInfo(tierModel, genResult.inTok, genResult.outTok))
+                simulateStreaming(genResult.text, onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
             }
@@ -377,7 +413,7 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    private suspend fun processNonStreamingResponse(response: HttpResponse): String {
+    private suspend fun processNonStreamingResponse(response: HttpResponse): GenText {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
             logger.error("API error: ${response.status}, body: $errorBody")
@@ -390,8 +426,14 @@ object AiMessageGeneratorUtil {
         val content = choices?.get(0)?.jsonObject?.get("message")?.jsonObject?.get("content")?.jsonPrimitive?.content
 
         if (content == "") throw Exception("Empty content in response")
+        if (content == null) throw Exception("Null content in response")
 
-        return content ?: throw Exception("Null content in response")
+        val usage = jsonResponse["usage"]?.jsonObject
+        return GenText(
+            text = content,
+            inTok = usage?.get("prompt_tokens")?.jsonPrimitive?.intOrNull ?: 0,
+            outTok = usage?.get("completion_tokens")?.jsonPrimitive?.intOrNull ?: 0,
+        )
     }
 
     private suspend fun processStreamingResponse(
@@ -562,7 +604,7 @@ object AiMessageGeneratorUtil {
         }
     }
 
-    private suspend fun processGeminiResponse(response: HttpResponse, characterDbo: CharacterDbo): String {
+    private suspend fun processGeminiResponse(response: HttpResponse, characterDbo: CharacterDbo): GenText {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
             logger.error("Gemini API error: ${response.status}, body: $errorBody")
@@ -594,7 +636,11 @@ object AiMessageGeneratorUtil {
             throw Exception("Empty or null content in Gemini response")
         }
 
-        return content.cleanupReply()
+        val usage = jsonResponse["usageMetadata"]?.jsonObject
+        val inTok = usage?.get("promptTokenCount")?.jsonPrimitive?.intOrNull ?: 0
+        val outTok = usage?.get("candidatesTokenCount")?.jsonPrimitive?.intOrNull
+            ?: usage?.get("totalTokenCount")?.jsonPrimitive?.intOrNull?.minus(inTok) ?: 0
+        return GenText(content.cleanupReply(), inTok, outTok)
     }
 
     /**

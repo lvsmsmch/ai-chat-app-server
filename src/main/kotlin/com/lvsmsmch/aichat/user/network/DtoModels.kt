@@ -100,3 +100,16 @@ data class SetCharacterLanguageRequest(
 data class SetFcmTokenRequest(
     @kotlinx.serialization.SerialName("token") val token: String
 )
+
+/** [DEBUG] Оверрайды моделей: null — не менять, пустая строка — сбросить на дефолт. */
+@kotlinx.serialization.Serializable
+data class DebugModelsRequest(
+    @kotlinx.serialization.SerialName("textModel") val textModel: String? = null,
+    @kotlinx.serialization.SerialName("imageModel") val imageModel: String? = null,
+)
+
+@kotlinx.serialization.Serializable
+data class DebugModelsResponse(
+    @kotlinx.serialization.SerialName("textModel") val textModel: String?,
+    @kotlinx.serialization.SerialName("imageModel") val imageModel: String?,
+)

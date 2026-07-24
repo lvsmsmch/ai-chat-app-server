@@ -73,7 +73,10 @@ object AiImageGeneratorUtil {
         messagesHistory: List<MessageDbo>,
         useTopModel: Boolean = true,
     ): ImageGenResult {
-        val imageModel = if (useTopModel) imageModelTop else imageModelMid
+        // [DEBUG] Оверрайд из настроек приложения бьёт и гибрид, и тиры
+        val debugModel = com.lvsmsmch.aichat.utils.DebugOverrides.imageModel
+        val imageModel = debugModel?.takeIf { !it.startsWith("grok") }
+            ?: if (useTopModel) imageModelTop else imageModelMid
 
         // История для промпта: ПЕРВОЕ сообщение чата (в приветствиях часто задана
         // сцена) + «[...]» + последние 8 сообщений
@@ -128,8 +131,13 @@ object AiImageGeneratorUtil {
         }
 
         // Гибрид: первые генерации месяца (топ-тир) — всегда Gemini-топ,
-        // дальше — активный провайдер (Grok дешевле, но проще по качеству)
-        if (providerIsXai && !useTopModel) return generateViaXai(prompt, refFile)
+        // дальше — активный провайдер (Grok дешевле, но проще по качеству).
+        // [DEBUG] Оверрайд решает сам: grok-* — всегда xAI, gemini-* — всегда Gemini
+        if (debugModel != null) {
+            if (debugModel.startsWith("grok")) return generateViaXai(prompt, refFile)
+        } else if (providerIsXai && !useTopModel) {
+            return generateViaXai(prompt, refFile)
+        }
 
         val requestBody = buildJsonObject {
             putJsonArray("contents") {

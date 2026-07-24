@@ -267,6 +267,49 @@ fun Route.configureUserRouting(
             call.respondSuccess()
         }
 
+        /** [DEBUG] Текущие оверрайды моделей (текст/картинки). */
+        get("/{userId}/debug-models") {
+            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+                throw ForbiddenException(errorMessage = "debug endpoints disabled")
+            }
+            sessionRepository.verifyToken(call)
+            call.respondSuccess(
+                data = DebugModelsResponse(
+                    textModel = com.lvsmsmch.aichat.utils.DebugOverrides.textModel,
+                    imageModel = com.lvsmsmch.aichat.utils.DebugOverrides.imageModel,
+                )
+            )
+        }
+
+        /**
+         * [DEBUG] Смена активных моделей на лету. Оверрайд ГЛОБАЛЬНЫЙ (на весь
+         * сервер) и живёт в памяти до рестарта. null — поле не трогаем,
+         * пустая строка — сброс на обычную логику (тиринг/гибрид).
+         */
+        post("/{userId}/debug-models") {
+            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+                throw ForbiddenException(errorMessage = "debug endpoints disabled")
+            }
+            sessionRepository.verifyToken(call)
+            val request = call.receive<DebugModelsRequest>()
+            request.textModel?.let {
+                com.lvsmsmch.aichat.utils.DebugOverrides.textModel = it.trim().ifBlank { null }
+            }
+            request.imageModel?.let {
+                com.lvsmsmch.aichat.utils.DebugOverrides.imageModel = it.trim().ifBlank { null }
+            }
+            logger.info(
+                "[DEBUG] model overrides set: text=${com.lvsmsmch.aichat.utils.DebugOverrides.textModel} " +
+                    "image=${com.lvsmsmch.aichat.utils.DebugOverrides.imageModel}"
+            )
+            call.respondSuccess(
+                data = DebugModelsResponse(
+                    textModel = com.lvsmsmch.aichat.utils.DebugOverrides.textModel,
+                    imageModel = com.lvsmsmch.aichat.utils.DebugOverrides.imageModel,
+                )
+            )
+        }
+
         /** FCM-токен девайса — для пушей (лимиты, винбэк-подарки). */
         post("/{userId}/fcm-token") {
             val sessionDbo = sessionRepository.verifyToken(call)

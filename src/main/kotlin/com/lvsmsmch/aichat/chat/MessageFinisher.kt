@@ -92,6 +92,9 @@ class MessageFinisher(
                 }
 
                 withTimeout(timeoutSeconds.seconds) {
+                    // Дебаг-инфо генерации (модель/токены) — поле переиспользуется
+                    // и текстовыми сообщениями (клиент рисует его под пузырём)
+                    var textDebugInfo: String? = null
                     AiMessageGeneratorUtil.generateAiMessageWithStreaming(
                         chatDbo = chatDbo,
                         characterDbo = characterDbo.localized(lang),
@@ -99,6 +102,7 @@ class MessageFinisher(
                         messagesHistory = messageHistory,
                         responseLanguage = lang,
                         ownerDbo = owner,
+                        onDebugInfo = { textDebugInfo = it },
                         onMsgTextUpdate = {
                             ensureActive()
                             messageRepository.updateMessage(
@@ -113,7 +117,8 @@ class MessageFinisher(
                             messageRepository.updateMessage(
                                 messageId = messageId,
                                 text = it,
-                                status = MessageStatus.COMPLETED.value
+                                status = MessageStatus.COMPLETED.value,
+                                imageDebugInfo = textDebugInfo,
                             )
                         },
                         onError = { reason ->
