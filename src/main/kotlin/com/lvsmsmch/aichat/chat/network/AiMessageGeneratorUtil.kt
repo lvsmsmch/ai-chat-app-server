@@ -175,7 +175,17 @@ object AiMessageGeneratorUtil {
                 "a longer, more expressive reply is welcome. " +
                 "NEVER base the length on your own previous replies."
 
-            val styleNudge = actionNudge + lengthNudge
+            // Группа: базовый нудж равняется на длину сообщения ЮЗЕРА, но в группе
+            // последним чаще пишет другой персонаж — модель копировала его «полотно»,
+            // и длина лавинообразно росла. Явно прижимаем групповые реплики
+            val groupNudge = if (chatDbo.characterIds.size > 1) {
+                " This is a fast-paced group chat: keep your reply SHORT - one to three sentences, " +
+                    "like a quick text message. Never match the length of other characters' messages; " +
+                    "long monologues kill the group vibe. Only go longer if the user directly asks " +
+                    "you to explain or tell something."
+            } else ""
+
+            val styleNudge = actionNudge + lengthNudge + groupNudge
 
             if (messagesHistory.isEmpty() && characterDbo.initialMessage.isNotBlank()) {
                 simulateStreaming(characterDbo.initialMessage, onMsgTextUpdate, onFinished)

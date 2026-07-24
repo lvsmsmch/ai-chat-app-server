@@ -159,11 +159,24 @@ object AiImageGeneratorUtil {
         val tempFile = File.createTempFile("gen_image_", ".png")
         return try {
             tempFile.writeBytes(bytes)
-            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+            val uploadedUrl = ImageServer.uploadImageOnServer(tempFile).originalUrl
+            ImageGenResult(uploadedUrl, finalDims(uploadedUrl) + debugInfo)
         } finally {
             tempFile.delete()
         }
     }
+
+    /**
+     * Разрешение ФИНАЛЬНОГО файла (после даунскейла ImageServer до 1024):
+     * модели генерят 2048+, а храним мы сжатую версию — дебаг-подпись в чате
+     * должна совпадать с тем, что реально открывается на фул-скрине.
+     */
+    private fun finalDims(uploadedUrl: String): String =
+        runCatching {
+            ImageServer.localFileForUrl(uploadedUrl)?.let { f ->
+                javax.imageio.ImageIO.read(f)?.let { "${it.width}x${it.height} · " }
+            }
+        }.getOrNull() ?: ""
 
     /** Один заход в Gemini: картинка (байты) + дебаг-строка. */
     private suspend fun generateViaGeminiOnce(
@@ -248,13 +261,10 @@ object AiImageGeneratorUtil {
         val inTok = usage?.get("promptTokenCount")?.jsonPrimitive?.intOrNull ?: 0
         val outTok = usage?.get("candidatesTokenCount")?.jsonPrimitive?.intOrNull
             ?: usage?.get("totalTokenCount")?.jsonPrimitive?.intOrNull?.minus(inTok) ?: 0
-        val dims = runCatching {
-            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
-        }.getOrNull() ?: "?x?"
         val price = pricing[imageModel]
         val cost = if (price != null) inTok / 1_000_000.0 * price.inputPerMTok + price.perImageOut else null
         val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
-        val debugInfo = "$dims · $imageModel · in $inTok tok · out $outTok tok$costStr"
+        val debugInfo = "$imageModel · in $inTok tok · out $outTok tok$costStr"
 
         return bytes to debugInfo
     }
@@ -357,16 +367,14 @@ object AiImageGeneratorUtil {
 
         val ticks = json["usage"]?.jsonObject?.get("cost_in_usd_ticks")?.jsonPrimitive?.longOrNull
         val cost = ticks?.let { it / 10_000_000_000.0 }
-        val dims = runCatching {
-            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
-        }.getOrNull() ?: "?x?"
         val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
-        val debugInfo = "$dims · $xaiImageModel$costStr"
+        val debugInfo = "$xaiImageModel$costStr"
 
         val tempFile = File.createTempFile("gen_image_", ".jpg")
         return try {
             tempFile.writeBytes(bytes)
-            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+            val uploadedUrl = ImageServer.uploadImageOnServer(tempFile).originalUrl
+            ImageGenResult(uploadedUrl, finalDims(uploadedUrl) + debugInfo)
         } finally {
             tempFile.delete()
         }
@@ -425,17 +433,15 @@ object AiImageGeneratorUtil {
         // Картинка приходит ссылкой на CDN fal — забираем байты к себе
         val bytes: ByteArray = httpClient.get(imageUrl).body()
 
-        val dims = runCatching {
-            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
-        }.getOrNull() ?: "?x?"
         // Ориентировочные цены fal: flux-2-pro ~$0.03/MP, seedream 4.5 ~$0.04/img
         val cost = if (isFlux) 0.03 else 0.04
-        val debugInfo = "$dims · $model (fal) · ~$" + ((cost * 10000).toInt() / 10000.0)
+        val debugInfo = "$model (fal) · ~$" + ((cost * 10000).toInt() / 10000.0)
 
         val tempFile = File.createTempFile("gen_image_", ".jpg")
         return try {
             tempFile.writeBytes(bytes)
-            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+            val uploadedUrl = ImageServer.uploadImageOnServer(tempFile).originalUrl
+            ImageGenResult(uploadedUrl, finalDims(uploadedUrl) + debugInfo)
         } finally {
             tempFile.delete()
         }

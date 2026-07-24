@@ -62,7 +62,8 @@ class SearchSuggestionsRepository(
         if (existing == null) {
             val suggestion = SearchSuggestionDbo(
                 term = normalizedTerm,
-                displayText = normalizedTerm,
+                // Показываем имя в оригинальном регистре, а не lowercase
+                displayText = originalText.trim(),
                 searchCount = 1,
                 isCharacterName = true,
                 lastSearchedAt = UtcTimestamp.now().toString()
@@ -102,15 +103,37 @@ class SearchSuggestionsRepository(
         }
     }
     
+    /**
+     * Подсказки: имена персонажей + кураторские дефолты + популярные юзерские
+     * запросы (от 5 поисков — защита от мусора и чужих случайных строк).
+     * Матчинг: сначала префикс всего термина, потом начало любого слова
+     * («shino» находит «Kaguya Shinomiya»).
+     */
     suspend fun getSuggestions(query: String, limit: Int): List<String> {
         val normalizedQuery = query.trim().lowercase()
-        
-        return collection.find(
-            SearchSuggestionDbo::term.regex("^${Regex.escape(normalizedQuery)}.*", "i")
+        val visible = org.litote.kmongo.or(
+            SearchSuggestionDbo::isCharacterName eq true,
+            SearchSuggestionDbo::isAllowedToShow eq true,
+            SearchSuggestionDbo::searchCount gte 5,
+        )
+        val prefix = collection.find(
+            and(visible, SearchSuggestionDbo::term.regex("^${Regex.escape(normalizedQuery)}", "i"))
         ).sort(descending(SearchSuggestionDbo::searchCount))
-         .limit(limit)
-         .toList()
-         .map { it.displayText }
+            .limit(limit)
+            .toList()
+        if (prefix.size >= limit || normalizedQuery.isBlank()) {
+            return prefix.take(limit).map { it.displayText }
+        }
+        // Добираем совпадениями по началу слова внутри термина
+        val wordStart = collection.find(
+            and(visible, SearchSuggestionDbo::term.regex("\\s${Regex.escape(normalizedQuery)}", "i"))
+        ).sort(descending(SearchSuggestionDbo::searchCount))
+            .limit(limit)
+            .toList()
+        val known = prefix.map { it.term }.toSet()
+        return (prefix + wordStart.filterNot { it.term in known })
+            .take(limit)
+            .map { it.displayText }
     }
     
     suspend fun recordSearch(query: String) {
