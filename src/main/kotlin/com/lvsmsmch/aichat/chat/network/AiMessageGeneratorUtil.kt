@@ -122,6 +122,8 @@ object AiMessageGeneratorUtil {
         messagesHistory: List<MessageDbo>,
         responseLanguage: String? = null,
         ownerDbo: com.lvsmsmch.aichat.user.database.UserDbo? = null,
+        // Ретрай ранее зацензуренного сообщения: Gemini не трогаем, сразу Grok
+        grokOnlyRetry: Boolean = false,
         onMsgTextUpdate: suspend (String) -> Unit,
         onFinished: suspend (String) -> Unit,
         onError: suspend (String) -> Unit,
@@ -226,6 +228,9 @@ object AiMessageGeneratorUtil {
                         simulateStreaming(fullMessage, onMsgTextUpdate, onFinished)
 
                         isSuccessfulGeneration = true
+                    } catch (e: CensoredException) {
+                        // Фильтр контента: ретраи бессмысленны и жгут запросы
+                        throw e
                     } catch (e: Exception) {
                         lastException = e
                         logger.error("Attempt ${attempt} failed: ${e.message}")
@@ -279,28 +284,48 @@ object AiMessageGeneratorUtil {
                 logger.debug("Gemini model tier: $tier ($tierModel)")
 
                 var genResult: GenText? = null
-                var lastError: Exception? = null
-                for (attempt in 1..3) {
-                    try {
-                        val response = httpClient.post("$geminiApiUrl/$tierModel:generateContent?key=$geminiApiKey") {
-                            contentType(ContentType.Application.Json)
-                            setBody(requestBody)
+                var usedModel = tierModel
+                var geminiCensored = grokOnlyRetry
+                if (!grokOnlyRetry) {
+                    var lastError: Exception? = null
+                    for (attempt in 1..3) {
+                        try {
+                            val response = httpClient.post("$geminiApiUrl/$tierModel:generateContent?key=$geminiApiKey") {
+                                contentType(ContentType.Application.Json)
+                                setBody(requestBody)
+                            }
+                            logger.debug("Response status: ${response.status} (attempt $attempt)")
+                            genResult = processGeminiResponse(response, characterDbo)
+                            break
+                        } catch (e: CensoredException) {
+                            // Цензура Gemini: одного раза хватает, ретраи не помогут —
+                            // сразу уходим на фолбэк Grok (его фильтр заметно мягче)
+                            logger.info("Gemini censored, falling back to Grok: ${e.message}")
+                            geminiCensored = true
+                            break
+                        } catch (e: Exception) {
+                            lastError = e
+                            logger.error("Gemini attempt $attempt failed: ${e.message}")
+                            if (attempt < 3) delay(400)
                         }
-                        logger.debug("Response status: ${response.status} (attempt $attempt)")
-                        genResult = processGeminiResponse(response, characterDbo)
-                        break
-                    } catch (e: Exception) {
-                        lastError = e
-                        logger.error("Gemini attempt $attempt failed: ${e.message}")
-                        if (attempt < 3) delay(400)
+                    }
+                    if (genResult == null && !geminiCensored) {
+                        throw lastError ?: Exception("Gemini generation failed")
                     }
                 }
                 if (genResult == null) {
-                    // Все попытки в цензуру — чёрный список до изменения сообщения
-                    if (lastError is CensoredException) censoredMessages.add(censorKey)
-                    throw lastError ?: Exception("Gemini generation failed")
+                    // Фолбэк/ретрай через Grok (xAI): OpenAI-совместимый вызов
+                    try {
+                        genResult = generateViaGrokFallback(chatDbo, characterDbo, participants, messagesHistory, responseLanguage, styleNudge)
+                        usedModel = openAiModel
+                    } catch (e: CensoredException) {
+                        // Оба фильтра сказали нет — чёрный список: повторные ретраи
+                        // изображают работу (пауза) и не жгут API, пока чат не изменится
+                        censoredMessages.add(censorKey)
+                        throw e
+                    }
                 }
-                onDebugInfo(buildTextDebugInfo(tierModel, genResult.inTok, genResult.outTok))
+                onDebugInfo(buildTextDebugInfo(usedModel, genResult.inTok, genResult.outTok))
                 simulateStreaming(genResult.text, onMsgTextUpdate, onFinished)
             } else {
                 simulateStreaming(possibleFakeResponses.random(), onMsgTextUpdate, onFinished)
@@ -413,10 +438,47 @@ object AiMessageGeneratorUtil {
         }
     }
 
+    /** Фолбэк-генерация через Grok (xAI): один вызов OpenAI-совместимого API. */
+    private suspend fun generateViaGrokFallback(
+        chatDbo: ChatDbo,
+        characterDbo: CharacterDbo,
+        participants: List<CharacterDbo>,
+        messagesHistory: List<MessageDbo>,
+        responseLanguage: String?,
+        styleNudge: String,
+    ): GenText {
+        val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage) +
+            listOf(mapOf(
+                "role" to "user",
+                "content" to "[Instruction for your next reply - do not mention it:" + styleNudge + "]"
+            ))
+        val requestBody = buildRequestBody(messages, model = openAiModel, stream = false)
+        val response = httpClient.post(openAiApiUrl) {
+            header(HttpHeaders.Authorization, "Bearer $openAiApiKey")
+            contentType(ContentType.Application.Json)
+            setBody(requestBody)
+        }
+        val gen = processNonStreamingResponse(response)
+        return gen.copy(
+            text = gen.text
+                .removePrefixIgnoringCase("${characterDbo.name}: ")
+                .cleanupReply()
+        )
+    }
+
     private suspend fun processNonStreamingResponse(response: HttpResponse): GenText {
         if (response.status != HttpStatusCode.OK) {
             val errorBody = response.bodyAsText()
             logger.error("API error: ${response.status}, body: $errorBody")
+            // xAI на цензуру отвечает 403 permission-denied с SAFETY_CHECK_*
+            // («Content violates usage guidelines») — это блок фильтра, не сбой сети
+            if (errorBody.contains("SAFETY_CHECK", ignoreCase = true) ||
+                errorBody.contains("usage guidelines", ignoreCase = true) ||
+                errorBody.contains("content_policy", ignoreCase = true) ||
+                errorBody.contains("content policy", ignoreCase = true)
+            ) {
+                throw CensoredException("provider moderation: ${errorBody.take(200)}")
+            }
             throw Exception("API error: ${response.status} - $errorBody")
         }
 

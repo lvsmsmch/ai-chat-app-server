@@ -102,6 +102,9 @@ class MessageFinisher(
                         messagesHistory = messageHistory,
                         responseLanguage = lang,
                         ownerDbo = owner,
+                        // Сообщение уже цензурилось: после правок чата перегенерация
+                        // идёт только через Grok, Gemini больше не дёргаем
+                        grokOnlyRetry = messageDbo.failReason == com.lvsmsmch.aichat.chat.network.FailReason.CENSORED,
                         onDebugInfo = { textDebugInfo = it },
                         onMsgTextUpdate = {
                             ensureActive()
