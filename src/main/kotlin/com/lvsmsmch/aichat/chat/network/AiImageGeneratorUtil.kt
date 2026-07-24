@@ -90,9 +90,16 @@ object AiImageGeneratorUtil {
             append(last8.joinToString("\n") { line(it) })
         }
 
+        // Куда пойдёт запрос: [DEBUG] оверрайд решает сам, иначе гибрид
+        // (первые генерации месяца — Gemini-топ, дальше активный провайдер)
+        val goXai = if (debugModel != null) debugModel.startsWith("grok")
+        else providerIsXai && !useTopModel
+
         // Референс внешности/стиля: последняя сгенерированная картинка этого чата
-        // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа
-        val lastGenFile = ImageServer.localFileForUrl(
+        // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа.
+        // Grok'у ПРОШЛЫЙ КАДР НЕ ДАЁМ ВООБЩЕ: его /edits копирует референс почти
+        // один-в-один, игнорируя просьбы сменить ракурс — только аватар, сцена текстом
+        val lastGenFile = if (goXai) null else ImageServer.localFileForUrl(
             messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
         )
         val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
@@ -130,15 +137,35 @@ object AiImageGeneratorUtil {
             )
         }
 
-        // Гибрид: первые генерации месяца (топ-тир) — всегда Gemini-топ,
-        // дальше — активный провайдер (Grok дешевле, но проще по качеству).
-        // [DEBUG] Оверрайд решает сам: grok-* — всегда xAI, gemini-* — всегда Gemini
-        if (debugModel != null) {
-            if (debugModel.startsWith("grok")) return generateViaXai(prompt, refFile)
-        } else if (providerIsXai && !useTopModel) {
-            return generateViaXai(prompt, refFile)
-        }
+        if (goXai) return generateViaXai(prompt, refFile)
 
+        // Gemini: генерация + QA-проверка анатомии дешёвой vision-моделью.
+        // Каша с конечностями — главный провал модели; ловим и перегенерируем один раз
+        var attempt = generateViaGeminiOnce(prompt, refFile, imageModel)
+        if (runCatching { hasAnatomyDefects(attempt.first) }.getOrDefault(false)) {
+            logger.info("Image QA: anatomy defects detected, regenerating once")
+            // Вторая попытка тоже может уйти в цензуру/ошибку — тогда оставляем первую
+            runCatching { generateViaGeminiOnce(prompt, refFile, imageModel) }.getOrNull()?.let {
+                attempt = it.copy(second = it.second + " · QA retry")
+            }
+        }
+        val (bytes, debugInfo) = attempt
+
+        val tempFile = File.createTempFile("gen_image_", ".png")
+        return try {
+            tempFile.writeBytes(bytes)
+            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    /** Один заход в Gemini: картинка (байты) + дебаг-строка. */
+    private suspend fun generateViaGeminiOnce(
+        prompt: String,
+        refFile: File?,
+        imageModel: String,
+    ): Pair<ByteArray, String> {
         val requestBody = buildJsonObject {
             putJsonArray("contents") {
                 addJsonObject {
@@ -224,13 +251,61 @@ object AiImageGeneratorUtil {
         val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
         val debugInfo = "$dims · $imageModel · in $inTok tok · out $outTok tok$costStr"
 
-        val tempFile = File.createTempFile("gen_image_", ".png")
-        return try {
-            tempFile.writeBytes(bytes)
-            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
-        } finally {
-            tempFile.delete()
+        return bytes to debugInfo
+    }
+
+    /**
+     * QA-проверка анатомии дешёвой vision-моделью: лишние/недостающие конечности,
+     * дублированные лица, ничьи руки. Сбой проверки = дефектов нет (не блокируем выдачу).
+     */
+    private suspend fun hasAnatomyDefects(imageBytes: ByteArray): Boolean {
+        val qaModel = System.getenv("IMAGE_QA_MODEL") ?: "gemini-3.1-flash-lite"
+        val requestBody = buildJsonObject {
+            putJsonArray("contents") {
+                addJsonObject {
+                    put("role", "user")
+                    putJsonArray("parts") {
+                        addJsonObject {
+                            put(
+                                "text",
+                                "You are a strict image quality checker. Look at the image and " +
+                                    "answer with exactly one word: YES or NO. Answer YES only if " +
+                                    "the image has obvious anatomy errors: extra or missing arms, " +
+                                    "hands or legs, a hand with more than five fingers, duplicated " +
+                                    "or misplaced faces or heads, or body parts that belong to " +
+                                    "nobody. Minor style imperfections or stylized proportions are NO."
+                            )
+                        }
+                        addJsonObject {
+                            putJsonObject("inlineData") {
+                                put("mimeType", "image/png")
+                                put("data", Base64.getEncoder().encodeToString(imageBytes))
+                            }
+                        }
+                    }
+                }
+            }
+            putJsonObject("generationConfig") {
+                put("temperature", 0)
+                put("maxOutputTokens", 10)
+            }
         }
+        val response = httpClient.post("$geminiApiUrl/$qaModel:generateContent?key=$geminiApiKey") {
+            contentType(ContentType.Application.Json)
+            setBody(requestBody)
+        }
+        if (response.status != HttpStatusCode.OK) {
+            logger.error("Image QA check failed: ${response.status}")
+            return false
+        }
+        val answer = Json.parseToJsonElement(response.bodyAsText()).jsonObject["candidates"]?.jsonArray
+            ?.firstOrNull()?.jsonObject
+            ?.get("content")?.jsonObject
+            ?.get("parts")?.jsonArray
+            ?.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
+            ?.joinToString(" ")?.trim().orEmpty()
+        logger.debug("Image QA answer: $answer")
+        return answer.uppercase().startsWith("YES")
     }
 
     /**
