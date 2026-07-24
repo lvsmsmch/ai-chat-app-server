@@ -73,7 +73,9 @@ fun Application.module() {
         }
 
         register(RateLimitName("ip-based")) {
-            rateLimiter(limit = 100, refillPeriod = 1.minutes)
+            // 100/мин не хватало: активная навигация по приложению (профили,
+            // лента, лимиты, синки) легко превышала порог и валила экраны в 429
+            rateLimiter(limit = 400, refillPeriod = 1.minutes)
             requestKey { call ->
                 call.request.origin.remoteHost
             }
