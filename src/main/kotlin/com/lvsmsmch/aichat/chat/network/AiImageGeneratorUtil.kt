@@ -6,6 +6,7 @@ import com.lvsmsmch.aichat.utils.ImageServer
 import com.lvsmsmch.aichat.utils.defaultJson
 import com.lvsmsmch.aichat.utils.logger
 import io.ktor.client.*
+import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -94,12 +95,15 @@ object AiImageGeneratorUtil {
         // (первые генерации месяца — Gemini-топ, дальше активный провайдер)
         val goXai = if (debugModel != null) debugModel.startsWith("grok")
         else providerIsXai && !useTopModel
+        // fal.ai (FLUX.2 / Seedream) — пока только через [DEBUG] оверрайд, для тестов
+        val goFal = debugModel != null &&
+            (debugModel.startsWith("flux") || debugModel.startsWith("seedream"))
 
         // Референс внешности/стиля: последняя сгенерированная картинка этого чата
         // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа.
         // Grok'у ПРОШЛЫЙ КАДР НЕ ДАЁМ ВООБЩЕ: его /edits копирует референс почти
         // один-в-один, игнорируя просьбы сменить ракурс — только аватар, сцена текстом
-        val lastGenFile = if (goXai) null else ImageServer.localFileForUrl(
+        val lastGenFile = if (goXai || goFal) null else ImageServer.localFileForUrl(
             messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
         )
         val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
@@ -138,6 +142,7 @@ object AiImageGeneratorUtil {
         }
 
         if (goXai) return generateViaXai(prompt, refFile)
+        if (goFal) return generateViaFal(debugModel!!, prompt, refFile)
 
         // Gemini: генерация + QA-проверка анатомии дешёвой vision-моделью.
         // Каша с конечностями — главный провал модели; ловим и перегенерируем один раз
@@ -357,6 +362,75 @@ object AiImageGeneratorUtil {
         }.getOrNull() ?: "?x?"
         val costStr = cost?.let { " · ~$" + ((it * 10000).toInt() / 10000.0) } ?: ""
         val debugInfo = "$dims · $xaiImageModel$costStr"
+
+        val tempFile = File.createTempFile("gen_image_", ".jpg")
+        return try {
+            tempFile.writeBytes(bytes)
+            ImageGenResult(ImageServer.uploadImageOnServer(tempFile).originalUrl, debugInfo)
+        } finally {
+            tempFile.delete()
+        }
+    }
+
+    // ---------- fal.ai: FLUX.2 [pro] и Seedream 4.5 (тестовый провайдер) ----------
+
+    private val falApiKey
+        get() = System.getenv("FAL_API_KEY") ?: throw Exception("Missing FAL_API_KEY key")
+
+    /**
+     * Синхронный вызов fal.run. Референс (аватар) уходит как data-URI в image_urls
+     * edit-эндпоинта; без референса — text-to-image. Safety checker выключен:
+     * цензуру нам честнее показывает сама модель.
+     */
+    private suspend fun generateViaFal(model: String, prompt: String, refFile: File?): ImageGenResult {
+        val isFlux = model.startsWith("flux")
+        val falModelId = when {
+            isFlux && refFile != null -> "fal-ai/flux-2-pro/edit"
+            isFlux -> "fal-ai/flux-2-pro"
+            refFile != null -> "fal-ai/bytedance/seedream/v4.5/edit"
+            else -> "fal-ai/bytedance/seedream/v4.5/text-to-image"
+        }
+        val requestBody = buildJsonObject {
+            put("prompt", prompt)
+            if (refFile != null) {
+                putJsonArray("image_urls") {
+                    add(JsonPrimitive("data:image/jpeg;base64," +
+                        Base64.getEncoder().encodeToString(refFile.readBytes())))
+                }
+            }
+            put("enable_safety_checker", false)
+        }
+        val response = httpClient.post("https://fal.run/$falModelId") {
+            header(HttpHeaders.Authorization, "Key $falApiKey")
+            contentType(ContentType.Application.Json)
+            setBody(requestBody)
+        }
+        if (response.status != HttpStatusCode.OK) {
+            val errorBody = response.bodyAsText()
+            logger.error("fal API error ($falModelId): ${response.status}, body: ${errorBody.take(500)}")
+            // Модерация fal/модели — честная цензура, а не сбой
+            if (errorBody.contains("nsfw", ignoreCase = true) ||
+                errorBody.contains("safety", ignoreCase = true) ||
+                errorBody.contains("content policy", ignoreCase = true)
+            ) {
+                throw CensoredException("fal moderation: ${errorBody.take(200)}")
+            }
+            throw Exception("fal API error: ${response.status}")
+        }
+        val jsonResponse = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val imageUrl = jsonResponse["images"]?.jsonArray
+            ?.firstOrNull()?.jsonObject
+            ?.get("url")?.jsonPrimitive?.contentOrNull
+            ?: throw Exception("No image in fal response ($falModelId)")
+        // Картинка приходит ссылкой на CDN fal — забираем байты к себе
+        val bytes: ByteArray = httpClient.get(imageUrl).body()
+
+        val dims = runCatching {
+            javax.imageio.ImageIO.read(bytes.inputStream())?.let { "${it.width}x${it.height}" }
+        }.getOrNull() ?: "?x?"
+        // Ориентировочные цены fal: flux-2-pro ~$0.03/MP, seedream 4.5 ~$0.04/img
+        val cost = if (isFlux) 0.03 else 0.04
+        val debugInfo = "$dims · $model (fal) · ~$" + ((cost * 10000).toInt() / 10000.0)
 
         val tempFile = File.createTempFile("gen_image_", ".jpg")
         return try {
