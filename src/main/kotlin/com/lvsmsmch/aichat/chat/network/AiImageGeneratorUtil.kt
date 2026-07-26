@@ -100,10 +100,9 @@ object AiImageGeneratorUtil {
             (debugModel.startsWith("flux") || debugModel.startsWith("seedream"))
 
         // Референс внешности/стиля: последняя сгенерированная картинка этого чата
-        // (держим дизайн и стиль рисовки), а для первой генерации — аватарка персонажа.
-        // fal-модели (тест FLUX/Seedream) получают ТОЛЬКО аватар: проверяем их
-        // умение строить новую сцену текстом при консистентном лице
-        val lastGenFile = if (goFal) null else ImageServer.localFileForUrl(
+        // (держим дизайн, стиль и ОБОИХ участников сцены — юзер иначе рисуется
+        // каждый раз по-новому), для первой генерации — аватарка персонажа
+        val lastGenFile = ImageServer.localFileForUrl(
             messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
         )
         val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
@@ -174,7 +173,9 @@ object AiImageGeneratorUtil {
     private fun finalDims(uploadedUrl: String): String =
         runCatching {
             ImageServer.localFileForUrl(uploadedUrl)?.let { f ->
-                javax.imageio.ImageIO.read(f)?.let { "${it.width}x${it.height} · " }
+                javax.imageio.ImageIO.read(f)?.let {
+                    "${it.width}x${it.height} · ${(f.length() / 1024).coerceAtLeast(1)} KB · "
+                }
             }
         }.getOrNull() ?: ""
 
