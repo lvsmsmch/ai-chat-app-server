@@ -404,7 +404,7 @@ class UserRepository(
         // Пока лимиты ВЫКЛЮЧЕНЫ для тестов: включаются env IMAGE_LIMITS_ENFORCED=true
         const val DAILY_IMAGES_PREMIUM = 10
         // Больше этого на топ-модели (Gemini) за месяц — дальше активный провайдер
-        const val MONTHLY_TOP_IMAGES_LIMIT = 10
+        const val MONTHLY_TOP_IMAGES_LIMIT = 60
         val imageLimitsEnforced: Boolean
             get() = System.getenv("IMAGE_LIMITS_ENFORCED")?.toBoolean() ?: false
     }
