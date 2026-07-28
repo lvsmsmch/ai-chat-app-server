@@ -124,6 +124,9 @@ fun Application.module() {
     val defaultRecommendationsCacheRepository = DefaultRecommendationsCacheRepository(
         database.getCollection<DefaultRecommendationsCacheDbo>("default_personalized_cache")
     )
+    val deviceLimitCarryoverRepository = com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository(
+        database.getCollection<com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverDbo>("device_limit_carryover")
+    )
     val searchSuggestionsRepository = SearchSuggestionsRepository(
         database.getCollection<SearchSuggestionDbo>("search_suggestions")
     )
@@ -245,6 +248,7 @@ fun Application.module() {
         messageRepository = messageRepository,
         sessionRepository = sessionRepository,
         userNotificationRepository = userNotificationRepository,
+        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
         followRepository = followRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         reviewLikeRepository = reviewLikeRepository,
@@ -344,6 +348,7 @@ fun Application.module() {
     )
 
     configureRouting(
+        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
         mapper = mapper,
         userRepository = userRepository,
         characterRepository = characterRepository,

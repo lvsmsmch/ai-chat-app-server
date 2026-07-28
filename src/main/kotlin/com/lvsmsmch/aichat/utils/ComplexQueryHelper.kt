@@ -26,6 +26,7 @@ class ComplexQueryHelper(
     private val messageRepository: MessageRepository,
     private val sessionRepository: com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository,
     private val userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
+    private val deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
     private val followRepository: FollowRepository,
     private val searchSuggestionsRepository: SearchSuggestionsRepository,
     private val reviewLikeRepository: ReviewLikeRepository,
@@ -303,6 +304,11 @@ class ComplexQueryHelper(
     }
 
     suspend fun deleteUser(userId: String) {
+        // Анти-абьюз: потраченные лимиты записываются на deviceId — новый гость
+        // на этом устройстве их унаследует, «удалил-пересоздал» не помогает
+        userRepository.getUserById(userId)?.let {
+            runCatching { deviceLimitCarryoverRepository.save(it) }
+        }
         transactionHelper.withTransaction { session ->
             deletedIdsStatsRepository.entityWasDeleted(session, EntityType.USER, userId)
 

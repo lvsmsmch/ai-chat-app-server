@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log
 
 fun Route.configureAuthRouting(
     userRepository: UserRepository,
+    deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
     sessionRepository: SessionRepository,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
@@ -72,12 +73,25 @@ fun Route.configureAuthRouting(
                 val userDbo =
                     null
                     ?: userRepository.findByDeviceId(request.deviceId)
-                    ?: UserDbo(
-                        id = idGenerator.generateId(EntityType.USER),
-                        username = usernameGenerator.generateUniqueUsername(),
-                        deviceId = request.deviceId
-                    ).also {
-                        complexQueryHelper.addUser(it)
+                    ?: run {
+                        // Анти-абьюз: на этом устройстве недавно удаляли аккаунт —
+                        // потраченные лимиты наследуются новым гостем
+                        val carry = runCatching {
+                            deviceLimitCarryoverRepository.take(request.deviceId)
+                        }.getOrNull()
+                        UserDbo(
+                            id = idGenerator.generateId(EntityType.USER),
+                            username = usernameGenerator.generateUniqueUsername(),
+                            deviceId = request.deviceId,
+                            hourlyMessageCount = carry?.hourlyMessageCount ?: 0,
+                            dailyMessageCount = carry?.dailyMessageCount ?: 0,
+                            monthlyMessageCount = carry?.monthlyMessageCount ?: 0,
+                            monthlyTopModelCount = carry?.monthlyTopModelCount ?: 0,
+                            dailyImageCount = carry?.dailyImageCount ?: 0,
+                            monthlyTopImageCount = carry?.monthlyTopImageCount ?: 0,
+                        ).also {
+                            complexQueryHelper.addUser(it)
+                        }
                     }
 
                 val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())

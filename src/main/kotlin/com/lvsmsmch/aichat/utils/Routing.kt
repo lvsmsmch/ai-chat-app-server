@@ -54,6 +54,7 @@ fun Application.configureRouting(
     complexQueryHelper: ComplexQueryHelper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
+    deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
 ) {
     routing {
         get("/test") {
@@ -68,6 +69,7 @@ fun Application.configureRouting(
         rateLimit(RateLimitName("ip-based")) {
             configureAuthRouting(
                 userRepository = userRepository,
+                deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
                 sessionRepository = sessionRepository,
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
