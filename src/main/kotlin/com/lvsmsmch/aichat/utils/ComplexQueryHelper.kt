@@ -24,6 +24,8 @@ class ComplexQueryHelper(
     private val reviewRepository: ReviewRepository,
     private val chatRepository: ChatRepository,
     private val messageRepository: MessageRepository,
+    private val sessionRepository: com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository,
+    private val userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
     private val followRepository: FollowRepository,
     private val searchSuggestionsRepository: SearchSuggestionsRepository,
     private val reviewLikeRepository: ReviewLikeRepository,
@@ -352,8 +354,15 @@ class ComplexQueryHelper(
                     }
             }
 
+            // Собственные чаты юзера и ВСЕ их сообщения (раньше оставались навсегда)
+            val ownChatIds = chatRepository.deleteAllChatsByUserId(session, userId)
+            messageRepository.deleteAllMessagesInChats(session, ownChatIds)
+
             userRepository.deleteUser(session, userId = userId)
         }
+        // Вне транзакции (не критично к атомарности): сессии и уведомления
+        sessionRepository.deleteAllByUserId(userId)
+        userNotificationRepository.deleteAllForUser(userId)
     }
 
 

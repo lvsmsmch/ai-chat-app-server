@@ -36,6 +36,11 @@ class SessionRepository(
     val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
 
+    /** Все сессии юзера — под нож при удалении аккаунта (токены гаснут сразу). */
+    suspend fun deleteAllByUserId(userId: String) {
+        collection.deleteMany(com.mongodb.client.model.Filters.eq("userId", userId))
+    }
+
     suspend fun createSession(userId: String, ipAddress: String): SessionDbo {
         val token = generateToken()
         val obj = SessionDbo(token = token, userId = userId, ipAddress = ipAddress)

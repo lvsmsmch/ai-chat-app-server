@@ -392,6 +392,20 @@ class MessageRepository(
         )
     }
 
+    /** Soft-delete сообщений сразу многих чатов (каскад удаления аккаунта). */
+    suspend fun deleteAllMessagesInChats(session: ClientSession, chatIds: List<String>) {
+        if (chatIds.isEmpty()) return
+        collection.updateMany(
+            session,
+            MessageDbo::chatId `in` chatIds,
+            combine(
+                setValue(MessageDbo::isDeleted, true),
+                setValue(MessageDbo::deletedAt, UtcTimestamp.now().toString()),
+                setValue(MessageDbo::lastModifiedAt, UtcTimestamp.now().toString()),
+            ),
+        )
+    }
+
     suspend fun deleteAllMessagesInChat(chatId: String) {
         collection.updateMany(
             MessageDbo::chatId eq chatId,

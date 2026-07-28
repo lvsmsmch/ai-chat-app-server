@@ -274,6 +274,26 @@ class ChatRepository(
         )
     }
 
+    /** Все чаты юзера (для каскада удаления аккаунта). */
+    suspend fun getChatIdsByUserId(session: ClientSession, userId: String): List<String> =
+        collection.find(session, ChatDbo::userId eq userId)
+            .toList().map { it.id }
+
+    /** Soft-delete всех чатов юзера; возвращает их id для каскада сообщений. */
+    suspend fun deleteAllChatsByUserId(session: ClientSession, userId: String): List<String> {
+        val ids = getChatIdsByUserId(session, userId)
+        if (ids.isEmpty()) return ids
+        collection.updateMany(
+            session,
+            ChatDbo::id `in` ids,
+            combine(
+                setValue(ChatDbo::isDeleted, true),
+                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
+            ),
+        )
+        return ids
+    }
+
     suspend fun deleteAllChatsByCharacterIds(session: ClientSession, characterIds: List<String>) {
         if (characterIds.isEmpty()) return
 

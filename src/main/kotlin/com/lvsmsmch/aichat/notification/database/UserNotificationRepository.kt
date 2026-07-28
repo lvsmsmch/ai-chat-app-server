@@ -8,6 +8,11 @@ class UserNotificationRepository(
     private val collection: CoroutineCollection<UserNotificationDbo>
 ) {
 
+    /** Уведомления юзера — удаляются вместе с аккаунтом. */
+    suspend fun deleteAllForUser(userId: String) {
+        collection.deleteMany(com.mongodb.client.model.Filters.eq("userId", userId))
+    }
+
     suspend fun ensureIndexes() {
         collection.ensureIndex(ascending(UserNotificationDbo::userId, UserNotificationDbo::updatedAt))
         collection.ensureIndex(ascending(UserNotificationDbo::userId, UserNotificationDbo::isRead))

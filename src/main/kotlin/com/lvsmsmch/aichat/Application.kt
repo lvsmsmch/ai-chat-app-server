@@ -243,6 +243,8 @@ fun Application.module() {
         reviewRepository = reviewRepository,
         chatRepository = chatRepository,
         messageRepository = messageRepository,
+        sessionRepository = sessionRepository,
+        userNotificationRepository = userNotificationRepository,
         followRepository = followRepository,
         searchSuggestionsRepository = searchSuggestionsRepository,
         reviewLikeRepository = reviewLikeRepository,
