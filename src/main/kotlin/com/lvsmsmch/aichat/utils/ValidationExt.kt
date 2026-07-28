@@ -153,8 +153,8 @@ fun validateCharacterTags(tags: String) {
 }
 
 fun validateCharactersSize(size: Int) {
-    if (size !in 1..10) {
-        throw ValidationException("Unsupported size of characters (should be from 1 to 10)")
+    if (size !in 1..25) {
+        throw ValidationException("Unsupported size of characters (should be from 1 to 25)")
     }
 }
 
