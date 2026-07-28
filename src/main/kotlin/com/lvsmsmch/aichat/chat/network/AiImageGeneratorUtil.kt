@@ -91,13 +91,15 @@ object AiImageGeneratorUtil {
             append(last8.joinToString("\n") { line(it) })
         }
 
-        // Куда пойдёт запрос: [DEBUG] оверрайд решает сам, иначе гибрид
-        // (первые генерации месяца — Gemini-топ, дальше активный провайдер)
+        // Куда пойдёт запрос: [DEBUG] оверрайд решает сам, иначе гибрид:
+        // ОСНОВНОЙ провайдер — Seedream (fal); юзер «переел» (превысил месячный
+        // топ-порог) — переключаем на Grok (дешевле). Gemini остался только
+        // через дебаг-оверрайд
         val goXai = if (debugModel != null) debugModel.startsWith("grok")
-        else providerIsXai && !useTopModel
-        // fal.ai (FLUX.2 / Seedream) — пока только через [DEBUG] оверрайд, для тестов
-        val goFal = debugModel != null &&
-            (debugModel.startsWith("flux") || debugModel.startsWith("seedream"))
+        else !useTopModel
+        val goFal = if (debugModel != null) {
+            debugModel.startsWith("flux") || debugModel.startsWith("seedream")
+        } else useTopModel
 
         // Референс внешности/стиля: последняя сгенерированная картинка этого чата
         // (держим дизайн, стиль и ОБОИХ участников сцены — юзер иначе рисуется
@@ -121,9 +123,10 @@ object AiImageGeneratorUtil {
                 lastGenFile != null -> append(
                     "\nThe attached image is the previous scene of this chat. Keep the SAME " +
                         "character design and art style; staying in the same location is fine " +
-                        "if the conversation continues there, but ALWAYS render a new shot: " +
-                        "different camera angle and distance, updated poses and details for the " +
-                        "current moment. Never return a near-copy of the reference."
+                        "if the conversation continues there, but you MUST render a completely " +
+                        "new shot: a clearly DIFFERENT camera angle, different distance and " +
+                        "framing, updated poses and details for the current moment. Returning " +
+                        "the same or nearly the same composition as the reference is a failure."
                 )
                 avatarFile != null -> append(
                     "\nThe attached image is ONLY a face/appearance reference for the character. " +
@@ -136,12 +139,15 @@ object AiImageGeneratorUtil {
             append(
                 "\nStyle: high quality digital art. Correct anatomy is critical: every person " +
                     "has exactly two arms and two hands, no extra, missing or deformed limbs. " +
+                    "STRICT: depict ONLY the people who are actually part of this conversation " +
+                    "and scene - the character and, if present in the scene, the user. Do NOT " +
+                    "add any extra people, bystanders, crowds or background characters. " +
                     "No text or captions in the image."
             )
         }
 
         if (goXai) return generateViaXai(prompt, refFile)
-        if (goFal) return generateViaFal(debugModel!!, prompt, refFile)
+        if (goFal) return generateViaFal(debugModel ?: "seedream-4.5", prompt, refFile)
 
         // Gemini: генерация + QA-проверка анатомии дешёвой vision-моделью.
         // Каша с конечностями — главный провал модели; ловим и перегенерируем один раз
