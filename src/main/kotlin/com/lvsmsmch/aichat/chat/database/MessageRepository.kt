@@ -393,6 +393,10 @@ class MessageRepository(
     }
 
     /** Soft-delete сообщений сразу многих чатов (каскад удаления аккаунта). */
+    /** Все senderId сообщений чата — включая удалённых из группы участников. */
+    suspend fun getDistinctSenderIds(chatId: String): List<String> =
+        collection.distinct(MessageDbo::senderId, MessageDbo::chatId eq chatId).toList()
+
     suspend fun deleteAllMessagesInChats(session: ClientSession, chatIds: List<String>) {
         if (chatIds.isEmpty()) return
         collection.updateMany(

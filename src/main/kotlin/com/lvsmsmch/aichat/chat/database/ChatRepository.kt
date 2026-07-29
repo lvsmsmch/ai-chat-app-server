@@ -225,12 +225,14 @@ class ChatRepository(
     suspend fun updateChat(
         chatId: String,
         isMuted: Boolean? = null,
-        customName: String? = null
+        customName: String? = null,
+        characterIds: List<String>? = null,
     ) {
         collection.findOneById(chatId) ?: return
         val updates = mutableListOf<Bson>()
         isMuted?.let { updates.add(setValue(ChatDbo::isMuted, it)) }
         customName?.let { updates.add(setValue(ChatDbo::customName, it)) }
+        characterIds?.let { updates.add(setValue(ChatDbo::characterIds, it)) }
         if (updates.isEmpty()) return
         collection.updateOneById(
             chatId,

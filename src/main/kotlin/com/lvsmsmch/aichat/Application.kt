@@ -280,6 +280,11 @@ fun Application.module() {
         updateIntervalMinutes = 60
     )
 
+    val similarCharactersUpdaterJob = configureSimilarCharactersUpdater(
+        databaseScope = databaseScope,
+        characterRepository = characterRepository,
+    )
+
     val userRecommendationsUpdaterJob = configureUserRecommendationsUpdater(
         databaseScope = databaseScope,
         userRepository = userRepository,

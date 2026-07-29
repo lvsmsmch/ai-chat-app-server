@@ -19,6 +19,12 @@ object ImageGenEta {
         )
     )
 
+    // Холодный старт: первая генерация после долгой паузы заметно дольше
+    // (наблюдалось 40–50с у Seedream против обычных ~20с) — если провайдер
+    // давно не дёргали, ожидаемое время удваиваем
+    private val lastGenAt = ConcurrentHashMap<String, Long>()
+    private const val WARM_WINDOW_MS = 20 * 60_000L
+
     /** Тот же выбор провайдера, что в [AiImageGeneratorUtil.generateImage]. */
     fun providerKey(useTopModel: Boolean): String {
         val debugModel = com.lvsmsmch.aichat.utils.DebugOverrides.imageModel
@@ -32,11 +38,21 @@ object ImageGenEta {
         }
     }
 
-    fun expectedMs(useTopModel: Boolean): Long =
-        avgMs[providerKey(useTopModel)] ?: 25_000L
+    fun expectedMs(useTopModel: Boolean): Long {
+        val key = providerKey(useTopModel)
+        val base = avgMs[key] ?: 25_000L
+        val last = lastGenAt[key]
+        val cold = last == null || System.currentTimeMillis() - last > WARM_WINDOW_MS
+        return if (cold) base * 2 else base
+    }
 
-    /** Скользящее среднее: 70% накопленного + 30% нового замера. */
+    /**
+     * Скользящее среднее: 70% накопленного + 30% нового замера. Холодные
+     * (после паузы) замеры в среднее не мешаем — они бы завышали тёплые оценки.
+     */
     fun record(key: String, ms: Long) {
-        avgMs.merge(key, ms) { old, new -> (old * 7 + new * 3) / 10 }
+        val last = lastGenAt.put(key, System.currentTimeMillis())
+        val wasWarm = last != null && System.currentTimeMillis() - ms - last < WARM_WINDOW_MS
+        if (wasWarm) avgMs.merge(key, ms) { old, new -> (old * 7 + new * 3) / 10 }
     }
 }

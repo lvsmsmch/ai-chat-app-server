@@ -246,7 +246,21 @@ fun Route.configureChatRouting(
             }
 
             val chatDto = chat.toChatDto(mapper)
-            call.respondSuccess(chatDto)
+            // Группа: в characters добавляем и УДАЛЁННЫХ участников, у которых
+            // остались сообщения (клиенту нужны их имена/авы для истории);
+            // актуальный состав — отдельным полем
+            val enriched = if (chat.type == ChatType.GROUP) {
+                val formerIds = messageRepository.getDistinctSenderIds(chat.id)
+                    .filter { it.isNotBlank() } - chat.characterIds.toSet()
+                val lang = mapper.languageOf(userId)
+                val formerDtos = formerIds.mapNotNull { characterRepository.getCharacter(it) }
+                    .map { it.toCharacterDto(mapper, lang) }
+                chatDto.copy(
+                    characters = chatDto.characters + formerDtos,
+                    activeCharacterIds = chat.characterIds,
+                )
+            } else chatDto
+            call.respondSuccess(enriched)
         }
 
         put("/{chatId}") {
@@ -264,9 +278,26 @@ fun Route.configureChatRouting(
 
             request.customName?.let { validateCustomChatName(it) }
 
+            // Смена состава группы: 2–25 существующих персонажей, только для
+            // GROUP-чатов. Сообщения удалённых участников остаются в истории
+            request.characterIds?.let { ids ->
+                if (chat.type != ChatType.GROUP) {
+                    throw BadRequestException("Only group chats can change characters")
+                }
+                val unique = ids.distinct()
+                if (unique.size < 2 || unique.size > 25) {
+                    throw BadRequestException("Group chat must have 2..25 characters")
+                }
+                unique.forEach { id ->
+                    characterRepository.getCharacter(id)
+                        ?: throw BadRequestException("Character not found: $id")
+                }
+            }
+
             chatRepository.updateChat(
                 chatId = chat.id,
-                customName = request.customName?.takeIf { it.isNotBlank() }
+                customName = request.customName?.takeIf { it.isNotBlank() },
+                characterIds = request.characterIds?.distinct(),
             )
 
             val updatedChat = chatRepository.getChatById(chat.id)!!

@@ -32,6 +32,10 @@ data class CharacterDbo(
     val recommendationsScoreMultiplier: Float? = null,
     val coOccurrenceScore: Map<String, Float> = emptyMap(),
     val coOccurrenceScoreUpdatedAt: String? = null,
+    // Контентные «похожие персонажи» (франшиза/теги/категория) — 5–25 id,
+    // пересчитываются апдейтером; поведенческий coOccurrence — отдельно
+    val similarCharacterIds: List<String> = emptyList(),
+    val similarCharactersUpdatedAt: String? = null,
     val color: String = AvatarColors.random(),
     // Место в топе своей категории за всё время (1..3); пересчитывается раз в день
     val topRank: Int? = null,

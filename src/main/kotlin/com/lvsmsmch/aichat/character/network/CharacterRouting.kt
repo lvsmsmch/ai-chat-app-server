@@ -303,12 +303,18 @@ fun Route.configureCharacterRouting(
                 throw CharacterNotFoundException(id = characterId)
             }
 
-            val similarCharacterIds = characterDbo.coOccurrenceScore
-                .toList().sortedByDescending { it.second }.take(30)
+            // Контентный список (франшиза/теги/категория, есть у всех) —
+            // приоритетно; поведенческий coOccurrence — фолбэк, пока апдейтер
+            // не успел посчитать новые персонажи
+            val similarCharacterIds = characterDbo.similarCharacterIds.ifEmpty {
+                characterDbo.coOccurrenceScore
+                    .toList().sortedByDescending { it.second }.take(30).map { it.first }
+            }
 
             val similarCharacterDtos = similarCharacterIds.mapNotNull {
-                characterRepository.getCharacter(it.first)
-            }.map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
+                characterRepository.getCharacter(it)
+            }.filter { it.visibility == CharacterVisibility.PUBLIC.code }
+                .map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
 
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))
         }

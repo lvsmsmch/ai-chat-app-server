@@ -326,6 +326,16 @@ class CharacterRepository(
         )
     }
 
+    suspend fun updateSimilarCharacters(characterId: String, ids: List<String>) {
+        collection.updateOneById(
+            characterId,
+            combine(
+                setValue(CharacterDbo::similarCharacterIds, ids),
+                setValue(CharacterDbo::similarCharactersUpdatedAt, UtcTimestamp.now().toString())
+            )
+        )
+    }
+
     suspend fun incrementReviewsCount(session: ClientSession, characterId: String, increment: Int) {
         collection.updateOneById(session, characterId, inc(CharacterDbo::totalReviews, increment))
     }

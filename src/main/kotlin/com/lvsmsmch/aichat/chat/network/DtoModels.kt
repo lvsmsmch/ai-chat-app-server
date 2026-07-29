@@ -12,7 +12,13 @@ data class ChatDto(
     @SerialName("customName") val customName: String? = null,
     @SerialName("characters") val characters: List<CharacterDto>,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("color") val color: String = ""
+    @SerialName("color") val color: String = "",
+    /**
+     * Актуальный состав группы. `characters` может содержать И УДАЛЁННЫХ из
+     * группы участников (их сообщения остаются в истории — клиенту нужны
+     * имена/авы); null — состав равен `characters` (директ-чаты, старые ответы).
+     */
+    @SerialName("activeCharacterIds") val activeCharacterIds: List<String>? = null,
 )
 
 @Serializable
@@ -110,6 +116,8 @@ data class CreateChatResponse(
 @Serializable
 data class UpdateChatRequest(
     @SerialName("customName") val customName: String? = null,
+    /** Новый состав группового чата (2–25 персонажей); null — не менять. */
+    @SerialName("characterIds") val characterIds: List<String>? = null,
     @SerialName("chatSyncRequest") val chatSyncRequest: ChatSyncRequest
 )
 
