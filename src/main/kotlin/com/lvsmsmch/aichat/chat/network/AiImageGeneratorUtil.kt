@@ -74,6 +74,20 @@ object AiImageGeneratorUtil {
         messagesHistory: List<MessageDbo>,
         useTopModel: Boolean = true,
     ): ImageGenResult {
+        // Замер полного времени (генерация + докачка + даунскейл) — уточняет
+        // ожидаемое время для прогресс-кружка на клиенте
+        val etaKey = ImageGenEta.providerKey(useTopModel)
+        val startedAt = System.currentTimeMillis()
+        return generateImageInner(characterDbo, messagesHistory, useTopModel).also {
+            ImageGenEta.record(etaKey, System.currentTimeMillis() - startedAt)
+        }
+    }
+
+    private suspend fun generateImageInner(
+        characterDbo: CharacterDbo,
+        messagesHistory: List<MessageDbo>,
+        useTopModel: Boolean,
+    ): ImageGenResult {
         // [DEBUG] Оверрайд из настроек приложения бьёт и гибрид, и тиры
         val debugModel = com.lvsmsmch.aichat.utils.DebugOverrides.imageModel
         val imageModel = debugModel?.takeIf { !it.startsWith("grok") }

@@ -200,6 +200,13 @@ data class IsSuccessResponse(
     @SerialName("isSuccess") val isSuccess: Boolean
 )
 
+@Serializable
+data class GenerateImageResponse(
+    @SerialName("isSuccess") val isSuccess: Boolean,
+    /** Ожидаемое время генерации — клиент рисует прогресс-кружок. */
+    @SerialName("expectedMs") val expectedMs: Long,
+)
+
 
 @Serializable
 data class GetMessagesRequest(

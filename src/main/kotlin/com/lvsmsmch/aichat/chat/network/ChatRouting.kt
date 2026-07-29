@@ -715,7 +715,16 @@ fun Route.configureChatRouting(
                     messageFinisher.finishMessageAsync(existing.id)
             }
 
-            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+            // Ожидаемое время генерации — по тому же выбору провайдера, что
+            // сделает MessageFinisher (топ-модель до месячного порога)
+            val useTop = user.monthlyTopImageCount <
+                com.lvsmsmch.aichat.user.database.UserRepository.MONTHLY_TOP_IMAGES_LIMIT
+            call.respondSuccess(
+                GenerateImageResponse(
+                    isSuccess = true,
+                    expectedMs = com.lvsmsmch.aichat.chat.network.ImageGenEta.expectedMs(useTop),
+                )
+            )
         }
 
         post("/{chatId}/messages/{messageId}/stream") {
