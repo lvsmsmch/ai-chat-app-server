@@ -242,6 +242,14 @@ class CharacterRepository(
         return collection.find(CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code).toList()
     }
 
+    /** Записывает перевод персонажа на один язык (translations.<lang>). */
+    suspend fun updateTranslation(characterId: String, lang: String, t: CharacterTranslationDbo) {
+        collection.updateOneById(
+            characterId,
+            setValue(CharacterDbo::translations.keyProjection(lang), t),
+        )
+    }
+
     suspend fun getCharacter(characterId: String): CharacterDbo? {
         return collection.findOneById(characterId)
     }

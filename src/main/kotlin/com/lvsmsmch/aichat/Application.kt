@@ -285,6 +285,11 @@ fun Application.module() {
         characterRepository = characterRepository,
     )
 
+    val characterTranslationsUpdaterJob = configureCharacterTranslationsUpdater(
+        databaseScope = databaseScope,
+        characterRepository = characterRepository,
+    )
+
     val userRecommendationsUpdaterJob = configureUserRecommendationsUpdater(
         databaseScope = databaseScope,
         userRepository = userRepository,
