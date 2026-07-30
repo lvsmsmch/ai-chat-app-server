@@ -176,7 +176,14 @@ private suspend fun translateCharacter(c: CharacterDbo, lang: String): Character
         prompt = field("prompt"),
         initialMessage = field("initialMessage"),
     )
-    if (t.name.isBlank() || t.prompt.isBlank()) throw Exception("Empty translation fields")
+    // Пустые в ОРИГИНАЛЕ поля легитимно остаются пустыми (юзерские персонажи
+    // бывают без описания/промпта) — требуем перевод только непустых
+    if (t.name.isBlank() ||
+        (c.prompt.isNotBlank() && t.prompt.isBlank()) ||
+        (c.initialMessage.isNotBlank() && t.initialMessage.isBlank())
+    ) {
+        throw Exception("Empty translation fields")
+    }
     return t
 }
 
