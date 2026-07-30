@@ -134,6 +134,22 @@ private suspend fun translateCharacter(c: CharacterDbo, lang: String): Character
             put("temperature", 0.2)
             put("responseMimeType", "application/json")
         }
+        // Ролевые карточки (и особенно их переводы на ar/uk и т.п.) иногда
+        // триггерят фильтр — для ПЕРЕВОДА уже опубликованного контента
+        // отключаем блокировку
+        putJsonArray("safetySettings") {
+            listOf(
+                "HARM_CATEGORY_HARASSMENT",
+                "HARM_CATEGORY_HATE_SPEECH",
+                "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "HARM_CATEGORY_DANGEROUS_CONTENT",
+            ).forEach { cat ->
+                addJsonObject {
+                    put("category", cat)
+                    put("threshold", "BLOCK_NONE")
+                }
+            }
+        }
     }
     val response = httpClient.post("$geminiApiUrl/$translationModel:generateContent?key=$geminiApiKey") {
         contentType(ContentType.Application.Json)
@@ -142,13 +158,14 @@ private suspend fun translateCharacter(c: CharacterDbo, lang: String): Character
     if (response.status != HttpStatusCode.OK) {
         throw Exception("Gemini $translationModel: ${response.status}")
     }
-    val text = Json.parseToJsonElement(response.bodyAsText()).jsonObject["candidates"]?.jsonArray
+    val rawBody = response.bodyAsText()
+    val text = Json.parseToJsonElement(rawBody).jsonObject["candidates"]?.jsonArray
         ?.firstOrNull()?.jsonObject
         ?.get("content")?.jsonObject
         ?.get("parts")?.jsonArray
         ?.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
         ?.joinToString("")
-        ?: throw Exception("No text in Gemini response")
+        ?: throw Exception("No text in Gemini response: ${rawBody.take(220)}")
     val json = Json.parseToJsonElement(text).jsonObject
     fun field(k: String) = json[k]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
     val t = CharacterTranslationDbo(
