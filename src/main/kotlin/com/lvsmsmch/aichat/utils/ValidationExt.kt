@@ -175,7 +175,7 @@ fun validateMessageText(messageText: String) {
 }
 
 fun validateCustomChatName(customName: String) {
-    if (customName.length > 100) {
+    if (customName.length > 50) {
         throw ValidationException("Chat name is too long")
     }
 }

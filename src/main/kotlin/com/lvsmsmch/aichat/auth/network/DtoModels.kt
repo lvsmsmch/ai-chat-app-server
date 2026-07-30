@@ -24,6 +24,8 @@ data class SuccessfulLoginDto(
     @SerialName("userPrivateInfo") val userPrivateInfoDto: UserPrivateInfoDto,
     @SerialName("userDto") val userDto: UserDto,
     @SerialName("userDetailsDto") val userDetailsDto: UserDetailsDto,
+    /** Лимиты + статус подписки сразу при входе — профиль не ждёт второй запрос. */
+    @SerialName("limits") val limitsResponse: com.lvsmsmch.aichat.chat.network.LimitsResponse? = null,
 )
 
 

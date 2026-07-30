@@ -61,6 +61,7 @@ fun Route.configureAuthRouting(
                         userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                         userDto = userDbo.toUserDto(mapper),
                         userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                        limitsResponse = userRepository.getLimits(userDbo.id),
                     )
                 )
             }
@@ -102,6 +103,7 @@ fun Route.configureAuthRouting(
                         userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
                         userDto = userDbo.toUserDto(mapper),
                         userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                        limitsResponse = userRepository.getLimits(userDbo.id),
                     )
                 )
             }
