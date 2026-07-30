@@ -159,13 +159,15 @@ private suspend fun translateCharacter(c: CharacterDbo, lang: String): Character
         throw Exception("Gemini $translationModel: ${response.status}")
     }
     val rawBody = response.bodyAsText()
-    val text = Json.parseToJsonElement(rawBody).jsonObject["candidates"]?.jsonArray
+    val geminiText = Json.parseToJsonElement(rawBody).jsonObject["candidates"]?.jsonArray
         ?.firstOrNull()?.jsonObject
         ?.get("content")?.jsonObject
         ?.get("parts")?.jsonArray
         ?.mapNotNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
         ?.joinToString("")
-        ?: throw Exception("No text in Gemini response: ${rawBody.take(220)}")
+    // Жёсткий фильтр Gemini (PROHIBITED_CONTENT) BLOCK_NONE не обходит —
+    // такие пары переводим Grok'ом, как и цензурные ответы в чатах
+    val text = geminiText ?: translateViaGrok(prompt)
     val json = Json.parseToJsonElement(text).jsonObject
     fun field(k: String) = json[k]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
     val t = CharacterTranslationDbo(
@@ -176,4 +178,35 @@ private suspend fun translateCharacter(c: CharacterDbo, lang: String): Character
     )
     if (t.name.isBlank() || t.prompt.isBlank()) throw Exception("Empty translation fields")
     return t
+}
+
+/** Фолбэк-переводчик: Grok через OpenAI-совместимый эндпоинт (без фильтра). */
+private suspend fun translateViaGrok(prompt: String): String {
+    val url = System.getenv("OPEN_AI_API_URL") ?: throw Exception("Missing OPEN_AI_API_URL")
+    val key = System.getenv("OPEN_AI_API_KEY") ?: throw Exception("Missing OPEN_AI_API_KEY")
+    val model = System.getenv("OPEN_AI_MODEL") ?: throw Exception("Missing OPEN_AI_MODEL")
+    val body = buildJsonObject {
+        put("model", model)
+        putJsonArray("messages") {
+            addJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            }
+        }
+        put("temperature", 0.2)
+        putJsonObject("response_format") { put("type", "json_object") }
+    }
+    val response = httpClient.post(url) {
+        header(HttpHeaders.Authorization, "Bearer $key")
+        contentType(ContentType.Application.Json)
+        setBody(body)
+    }
+    if (response.status != HttpStatusCode.OK) {
+        throw Exception("Grok translate: ${response.status}")
+    }
+    return Json.parseToJsonElement(response.bodyAsText()).jsonObject["choices"]?.jsonArray
+        ?.firstOrNull()?.jsonObject
+        ?.get("message")?.jsonObject
+        ?.get("content")?.jsonPrimitive?.contentOrNull
+        ?: throw Exception("No text in Grok response")
 }
