@@ -31,8 +31,8 @@ fun configureCharacterTranslationsUpdater(
     databaseScope: CoroutineScope,
     characterRepository: CharacterRepository,
     updateIntervalMinutes: Long = 60,
-    /** Параллельных запросов к Gemini — щадящий темп, лимиты не выедаем. */
-    parallelism: Int = 4,
+    /** Параллельных запросов к Gemini — flash-lite спокойно тянет десяток. */
+    parallelism: Int = 10,
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)
