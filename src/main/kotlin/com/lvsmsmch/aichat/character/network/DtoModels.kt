@@ -81,6 +81,20 @@ data class SimilarCharactersResponse(
     @SerialName("characters") val characters: List<CharacterDto>
 )
 
+@kotlinx.serialization.Serializable
+data class DiscoverSectionDto(
+    /** "for_you" | "trending" | "most_popular" | код категории. */
+    @SerialName("key") val key: String,
+    @SerialName("characters") val characters: List<CharacterDto>,
+    /** Сколько всего в кэше секции (для пагинации главных: 30). */
+    @SerialName("total") val total: Int,
+)
+
+@kotlinx.serialization.Serializable
+data class DiscoverSectionsResponse(
+    @SerialName("sections") val sections: List<DiscoverSectionDto>,
+)
+
 
 @Serializable
 data class SearchCharactersRequest(

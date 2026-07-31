@@ -26,6 +26,7 @@ fun Route.configureCharacterRouting(
     complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
+    discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
 ) {
 
     route("/characters") {
@@ -128,6 +129,51 @@ fun Route.configureCharacterRouting(
             }
 
             call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper, sessionDbo.userId))
+        }
+
+        /**
+         * Секции вкладки For you: главные секции обрезаны до 10 (пагинация —
+         * отдельным эндпоинтом ниже), категорийные целиком (10). Кэш юзера
+         * или дефолтный набор новорега.
+         */
+        get("/discover-sections") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+            val lang = mapper.languageOf(currentUserId)
+            val cache = discoverSectionsRepository.getForUserOrDefault(currentUserId)
+                ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
+            val sections = cache.sections.map { s ->
+                DiscoverSectionDto(
+                    key = s.key,
+                    characters = s.characterIds.take(10).mapNotNull { id ->
+                        characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                    },
+                    total = s.characterIds.size,
+                )
+            }
+            call.respondSuccess(DiscoverSectionsResponse(sections))
+        }
+
+        /** Пагинация секции: следующие 10 из кэша, начиная с offset. */
+        get("/discover-sections/{key}") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+            val key = call.parameters["key"] ?: throw BadRequestException("Missing key")
+            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
+            require(offset >= 0) { "Offset must be non-negative" }
+            val lang = mapper.languageOf(currentUserId)
+            val cache = discoverSectionsRepository.getForUserOrDefault(currentUserId)
+            val section = cache?.sections?.firstOrNull { it.key == key }
+                ?: return@get call.respondSuccess(
+                    DiscoverSectionDto(key = key, characters = emptyList(), total = 0)
+                )
+            call.respondSuccess(
+                DiscoverSectionDto(
+                    key = key,
+                    characters = section.characterIds.drop(offset).take(10).mapNotNull { id ->
+                        characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                    },
+                    total = section.characterIds.size,
+                )
+            )
         }
 
         get("/search") {

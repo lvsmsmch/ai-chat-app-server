@@ -55,6 +55,7 @@ fun Application.configureRouting(
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
     deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
+    discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
 ) {
     routing {
         get("/test") {
@@ -74,7 +75,8 @@ fun Application.configureRouting(
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper
+                complexQueryHelper = complexQueryHelper,
+                discoverSectionsRepository = discoverSectionsRepository,
             )
 
             configureAppDataRouting()
@@ -101,6 +103,7 @@ fun Application.configureRouting(
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
                 notificationService = notificationService,
+                discoverSectionsRepository = discoverSectionsRepository,
             )
 
             configureCommentRouting(

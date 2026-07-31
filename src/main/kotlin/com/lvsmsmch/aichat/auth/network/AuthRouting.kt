@@ -28,7 +28,8 @@ fun Route.configureAuthRouting(
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
     complexQueryHelper: ComplexQueryHelper,
-    mapper: Mapper
+    mapper: Mapper,
+    discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
 ) {
     route("/auth") {
 
@@ -51,6 +52,8 @@ fun Route.configureAuthRouting(
                         accountType = AccountType.REGISTERED
                     ).also {
                         complexQueryHelper.addUser(it)
+                        // Секции Discover — мгновенно из дефолтного набора
+                        runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                     }
 
                 val sessionDbo = sessionRepository.createSession(userDbo.id, call.getUserIp())
@@ -92,6 +95,8 @@ fun Route.configureAuthRouting(
                             monthlyTopImageCount = carry?.monthlyTopImageCount ?: 0,
                         ).also {
                             complexQueryHelper.addUser(it)
+                            // Секции Discover — мгновенно из дефолтного набора
+                            runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                         }
                     }
 

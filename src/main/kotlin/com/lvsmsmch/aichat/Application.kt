@@ -39,6 +39,7 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.websocket.*
@@ -61,6 +62,8 @@ fun Application.module() {
     install(ContentNegotiation) {
         json()
     }
+    // gzip: JSON жмётся в 4-6 раз, крупные списки перестают весить сотни КБ
+    install(Compression) { gzip() }
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(60)
@@ -120,6 +123,9 @@ fun Application.module() {
     )
     val userRecommendationsCacheRepository = UserRecommendationsCacheRepository(
         database.getCollection<UserRecommendationsCacheDbo>("user_recommendations_cache")
+    )
+    val discoverSectionsRepository = com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository(
+        database.getCollection<com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheDbo>("discover_sections")
     )
     val defaultRecommendationsCacheRepository = DefaultRecommendationsCacheRepository(
         database.getCollection<DefaultRecommendationsCacheDbo>("default_personalized_cache")
@@ -285,6 +291,14 @@ fun Application.module() {
         characterRepository = characterRepository,
     )
 
+    val discoverSectionsUpdaterJob = configureDiscoverSectionsUpdater(
+        databaseScope = databaseScope,
+        userRepository = userRepository,
+        characterRepository = characterRepository,
+        userCacheRepository = userRecommendationsCacheRepository,
+        discoverSectionsRepository = discoverSectionsRepository,
+    )
+
     val characterTranslationsUpdaterJob = configureCharacterTranslationsUpdater(
         databaseScope = databaseScope,
         characterRepository = characterRepository,
@@ -380,6 +394,7 @@ fun Application.module() {
         complexQueryHelper = complexQueryHelper,
         notificationService = notificationService,
         userNotificationRepository = userNotificationRepository,
+        discoverSectionsRepository = discoverSectionsRepository,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {

@@ -31,6 +31,7 @@ dependencies {
     implementation("io.ktor:ktor-server-websockets:$ktorVersion")
     testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
     implementation("io.ktor:ktor-server-rate-limit:$ktorVersion")
+    implementation("io.ktor:ktor-server-compression:$ktorVersion")
 
     implementation("org.litote.kmongo:kmongo:5.2.0")
     implementation("org.litote.kmongo:kmongo-coroutine:5.2.0")
