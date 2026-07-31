@@ -78,8 +78,9 @@ fun validateCharacterName(name: String) {
 }
 
 fun validateCharacterDescription(description: String) {
-    if (description.length > 1000) {
-        throw ValidationException("Description must be between 0 and 1000 characters")
+    // Короткое описание: помещается на карточке каталога в 2 строки
+    if (description.length > 100) {
+        throw ValidationException("Short description must be 100 characters or less")
     }
 }
 
