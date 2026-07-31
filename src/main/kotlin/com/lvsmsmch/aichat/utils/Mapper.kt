@@ -31,6 +31,7 @@ class Mapper(
     val reviewRepository: ReviewRepository,
     val reviewLikeRepository: ReviewLikeRepository,
     val followRepository: FollowRepository,
+    val characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
 ) {
     /** Кэш языка персонажей по юзеру (инвалидируется при смене языка). */
     val userLanguageCache = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -103,8 +104,22 @@ suspend fun UserDbo.toUserLoginInfoDto(
     )
 }
 
-suspend fun CharacterDbo.toCharacterDto(mapper: Mapper, lang: String? = null): CharacterDto {
+/**
+ * [likerId] — чей лайк проверяем (текущий юзер); [likedIds] — заранее собранный
+ * батч лайков для списков (чтобы не ходить в базу на каждый элемент).
+ */
+suspend fun CharacterDbo.toCharacterDto(
+    mapper: Mapper,
+    lang: String? = null,
+    likerId: String? = null,
+    likedIds: Set<String>? = null,
+): CharacterDto {
     val c = this.localized(lang)
+    val liked = when {
+        likedIds != null -> id in likedIds
+        likerId != null -> mapper.characterLikeRepository.isLiked(likerId, id)
+        else -> false
+    }
     return CharacterDto(
         id = id,
         createdAt = createdAt.toString(),
@@ -123,13 +138,23 @@ suspend fun CharacterDbo.toCharacterDto(mapper: Mapper, lang: String? = null): C
         picUrlThumbnail = picUrlThumbnail ?: picUrl,
         color = color,
         topRank = topRank,
+        totalLikes = totalLikes,
+        isLikedByCurrentUser = liked,
     )
 }
 
-suspend fun CachedCharactersResult.toDto(mapper: Mapper, lang: String? = null): CachedCharactersResultDto {
+suspend fun CachedCharactersResult.toDto(
+    mapper: Mapper,
+    lang: String? = null,
+    likerId: String? = null,
+): CachedCharactersResultDto {
+    // Лайки списка — ОДНИМ батч-запросом, а не по персонажу
+    val liked = likerId?.let {
+        mapper.characterLikeRepository.getLikedIds(it, items.map { c -> c.id })
+    }
     return CachedCharactersResultDto(
         refreshed = refreshed,
-        items = items.map { it.toCharacterDto(mapper, lang) },
+        items = items.map { it.toCharacterDto(mapper, lang, likedIds = liked) },
         nextCursor = nextCursor?.toString(),
     )
 }
@@ -157,7 +182,7 @@ suspend fun CharacterDbo.toCharacterPrivateInfoDto(mapper: Mapper, lang: String?
 suspend fun CharacterDbo.toCharacterFullInfoDto(mapper: Mapper, demanderId: String): CharacterFullInfoDto {
     val lang = mapper.languageOf(demanderId)
     return CharacterFullInfoDto(
-        character = toCharacterDto(mapper, lang),
+        character = toCharacterDto(mapper, lang, likerId = demanderId),
         characterDetails = toCharacterDetailsDto(mapper, demanderId),
         characterPrivateInfo = toCharacterPrivateInfoDto(mapper, lang)
     )

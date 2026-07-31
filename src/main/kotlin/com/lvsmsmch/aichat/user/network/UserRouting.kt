@@ -15,6 +15,7 @@ import io.ktor.server.routing.*
 import java.io.File
 
 fun Route.configureUserRouting(
+    characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
     userRepository: UserRepository,
     sessionRepository: SessionRepository,
     followRepository: FollowRepository,
@@ -80,12 +81,40 @@ fun Route.configureUserRouting(
                 size = request.size
             )
 
-            val charactersDto = result.items.map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
+            val likedIds = characterLikeRepository.getLikedIds(currentUserId, result.items.map { it.id })
+            val charactersDto = result.items.map {
+                it.toCharacterDto(mapper, mapper.languageOf(currentUserId), likedIds = likedIds)
+            }
             val response = UserCharactersResponse(
                 characters = charactersDto,
                 nextCursor = result.nextCursor
             )
             call.respondSuccess(data = response)
+        }
+
+        /** Лайкнутые персонажи (только свои — чужие «Liked» приватны). */
+        get("/{userId}/liked-characters") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != currentUserId) {
+                throw ForbiddenException("Liked characters are private")
+            }
+            val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+            require(size in 1..100) { "Size must be between 1 and 100" }
+            val cursor = call.request.queryParameters["cursor"]
+
+            val (ids, next) = characterLikeRepository.getLikedCharacterIds(userId, cursor, size)
+            val lang = mapper.languageOf(currentUserId)
+            val characters = ids.mapNotNull { id ->
+                characterRepository.getCharacter(id)
+                    // Приватные чужие персонажи в чужой ленте не показываем
+                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code || it.authorId == userId }
+                    ?.toCharacterDto(mapper, lang, likedIds = ids.toSet())
+            }
+            call.respondSuccess(
+                data = UserCharactersResponse(characters = characters, nextCursor = next)
+            )
         }
 
         get("/{userId}/followers") {

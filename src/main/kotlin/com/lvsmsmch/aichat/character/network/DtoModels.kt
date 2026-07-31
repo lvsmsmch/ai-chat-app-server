@@ -21,6 +21,8 @@ data class CharacterDto(
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,
     @SerialName("totalComments") val totalComments: Int = 0,
+    @SerialName("totalLikes") val totalLikes: Int = 0,
+    @SerialName("isLikedByCurrentUser") val isLikedByCurrentUser: Boolean = false,
     @SerialName("averageRating") val averageRating: Float,
     @SerialName("color") val color: String = "",
     @SerialName("topRank") val topRank: Int? = null

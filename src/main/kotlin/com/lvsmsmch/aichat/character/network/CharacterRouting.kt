@@ -27,6 +27,7 @@ fun Route.configureCharacterRouting(
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
+    characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
 ) {
 
     route("/characters") {
@@ -140,13 +141,18 @@ fun Route.configureCharacterRouting(
             val lang = mapper.languageOf(currentUserId)
             val cache = discoverSectionsRepository.getForUserOrDefault(currentUserId)
                 ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
+            val sectionLiked = characterLikeRepository.getLikedIds(
+                currentUserId,
+                cache.sections.flatMap { it.characterIds },
+            )
             val sections = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
                 .map { s ->
                     DiscoverSectionDto(
                         key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
                         characters = s.characterIds.mapNotNull { id ->
-                            characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                            characterRepository.getCharacter(id)
+                                ?.toCharacterDto(mapper, lang, likedIds = sectionLiked)
                         },
                         total = s.characterIds.size,
                     )
@@ -194,7 +200,7 @@ fun Route.configureCharacterRouting(
                 cursorPosition = cursor
             )
 
-            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId)))
+            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId))
         }
 
         get("/search/suggestions") {
@@ -248,8 +254,9 @@ fun Route.configureCharacterRouting(
                 val ids = discoverSectionsRepository.getForUserOrDefault(currentUserId)
                     ?.sections?.firstOrNull { it.key == category }?.characterIds.orEmpty()
                 val page = ids.drop(cursor).take(request.size)
+                val likedIds = characterLikeRepository.getLikedIds(currentUserId, page)
                 val characters = page.mapNotNull { id ->
-                    characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                    characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang, likedIds = likedIds)
                 }
                 val next = (cursor + page.size).takeIf { it < ids.size }?.toString()
                 return@get call.respondSuccess(
@@ -285,7 +292,7 @@ fun Route.configureCharacterRouting(
                 )
             }
 
-            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId)))
+            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId))
         }
 
         get("/{id}") {
@@ -301,7 +308,11 @@ fun Route.configureCharacterRouting(
                 throw CharacterNotFoundException(id = characterId)
             }
 
-            call.respondSuccess(data = characterDbo.toCharacterDto(mapper, mapper.languageOf(currentUserId)))
+            call.respondSuccess(
+                data = characterDbo.toCharacterDto(
+                    mapper, mapper.languageOf(currentUserId), likerId = currentUserId,
+                )
+            )
         }
 
         get("/{id}/details") {
@@ -359,10 +370,11 @@ fun Route.configureCharacterRouting(
                     .toList().sortedByDescending { it.second }.take(30).map { it.first }
             }
 
+            val similarLiked = characterLikeRepository.getLikedIds(currentUserId, similarCharacterIds)
             val similarCharacterDtos = similarCharacterIds.mapNotNull {
                 characterRepository.getCharacter(it)
             }.filter { it.visibility == CharacterVisibility.PUBLIC.code }
-                .map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId)) }
+                .map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId), likedIds = similarLiked) }
 
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))
         }
@@ -475,6 +487,29 @@ fun Route.configureCharacterRouting(
             complexQueryHelper.deleteCharacter(characterId)
 
             call.respondSuccess()
+        }
+
+        /** Лайк персонажа (идемпотентно: повтор не накручивает счётчик). */
+        post("/{characterId}/like") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val characterId = call.parameters["characterId"]
+                ?: throw BadRequestException("Missing characterId parameter")
+            characterRepository.getCharacter(characterId)
+                ?: throw CharacterNotFoundException(id = characterId)
+            if (characterLikeRepository.like(userId, characterId)) {
+                characterRepository.incrementLikesCount(characterId, 1)
+            }
+            call.respondSuccess(com.lvsmsmch.aichat.chat.network.IsSuccessResponse(isSuccess = true))
+        }
+
+        post("/{characterId}/unlike") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val characterId = call.parameters["characterId"]
+                ?: throw BadRequestException("Missing characterId parameter")
+            if (characterLikeRepository.unlike(userId, characterId)) {
+                characterRepository.incrementLikesCount(characterId, -1)
+            }
+            call.respondSuccess(com.lvsmsmch.aichat.chat.network.IsSuccessResponse(isSuccess = true))
         }
 
         post("/{characterId}/report") {

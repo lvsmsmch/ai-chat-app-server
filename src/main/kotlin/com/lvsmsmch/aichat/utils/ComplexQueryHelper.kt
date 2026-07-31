@@ -30,6 +30,7 @@ class ComplexQueryHelper(
     private val followRepository: FollowRepository,
     private val searchSuggestionsRepository: SearchSuggestionsRepository,
     private val reviewLikeRepository: ReviewLikeRepository,
+    private val characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
     private val commentRepository: CommentRepository,
     private val commentLikeRepository: CommentLikeRepository,
     private val deletedIdsStatsRepository: DeletedIdsStatsRepository,
@@ -236,6 +237,8 @@ class ComplexQueryHelper(
             val userId = character.authorId
             characterRepository.deleteCharacter(session, characterId)
             deletedIdsStatsRepository.entityWasDeleted(session, EntityType.CHARACTER, characterId)
+            // Лайки удалённого персонажа не нужны никому
+            characterLikeRepository.removeAllForCharacters(session, listOf(characterId))
             if (character.visibility == CharacterVisibility.PUBLIC.code) {
                 userRepository.incrementPublicCharacterCount(session, userId, -1)
             } else {
@@ -359,6 +362,15 @@ class ComplexQueryHelper(
                         characterRepository.incrementCommentsCount(session, charId, -list.size)
                     }
             }
+
+            // Лайки, поставленные юзером: снимаем и чиним счётчики персонажей
+            val userLikes = characterLikeRepository.getLikesByUser(session, userId)
+            characterLikeRepository.removeAllByUser(session, userId)
+            userLikes.map { it.characterId }.filter { it !in characterIds }
+                .groupingBy { it }.eachCount()
+                .forEach { (charId, n) -> characterRepository.incrementLikesCount(charId, -n) }
+            // Лайки на удалённых персонажах юзера — просто убираем
+            characterLikeRepository.removeAllForCharacters(session, characterIds)
 
             // Собственные чаты юзера и ВСЕ их сообщения (раньше оставались навсегда)
             val ownChatIds = chatRepository.deleteAllChatsByUserId(session, userId)

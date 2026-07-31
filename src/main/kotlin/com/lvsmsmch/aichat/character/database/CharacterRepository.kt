@@ -334,6 +334,10 @@ class CharacterRepository(
         )
     }
 
+    suspend fun incrementLikesCount(characterId: String, increment: Int) {
+        collection.updateOneById(characterId, inc(CharacterDbo::totalLikes, increment))
+    }
+
     suspend fun updateSimilarCharacters(characterId: String, ids: List<String>) {
         collection.updateOneById(
             characterId,

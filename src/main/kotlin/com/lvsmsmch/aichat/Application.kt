@@ -166,6 +166,9 @@ fun Application.module() {
     val commentLikeRepository = CommentLikeRepository(
         database.getCollection<CommentLikeDbo>("comment_likes")
     )
+    val characterLikeRepository = com.lvsmsmch.aichat.character.database.CharacterLikeRepository(
+        database.getCollection<com.lvsmsmch.aichat.character.database.CharacterLikeDbo>("character_likes")
+    )
     val userNotificationRepository = com.lvsmsmch.aichat.notification.database.UserNotificationRepository(
         database.getCollection<com.lvsmsmch.aichat.notification.database.UserNotificationDbo>("user_notifications")
     )
@@ -193,6 +196,7 @@ fun Application.module() {
             reviewLikeRepository.ensureIndexes()
             commentRepository.ensureIndexes()
             commentLikeRepository.ensureIndexes()
+            characterLikeRepository.ensureIndexes()
             userNotificationRepository.ensureIndexes()
             feedbackRepository.ensureIndexes()
             logger.info("Database indexes ensured")
@@ -236,6 +240,7 @@ fun Application.module() {
         reviewRepository = reviewRepository,
         reviewLikeRepository = reviewLikeRepository,
         followRepository = followRepository,
+        characterLikeRepository = characterLikeRepository,
     )
 
     val notificationService = com.lvsmsmch.aichat.notification.NotificationService(
@@ -263,6 +268,7 @@ fun Application.module() {
         deletedIdsStatsRepository = deletedIdsStatsRepository,
         characterActivityLogRepository = characterActivityLogRepository,
         notificationService = notificationService,
+        characterLikeRepository = characterLikeRepository,
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
@@ -395,6 +401,7 @@ fun Application.module() {
         notificationService = notificationService,
         userNotificationRepository = userNotificationRepository,
         discoverSectionsRepository = discoverSectionsRepository,
+        characterLikeRepository = characterLikeRepository,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {
