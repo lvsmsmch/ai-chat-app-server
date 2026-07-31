@@ -132,48 +132,26 @@ fun Route.configureCharacterRouting(
         }
 
         /**
-         * Секции вкладки For you: главные секции обрезаны до 10 (пагинация —
-         * отдельным эндпоинтом ниже), категорийные целиком (10). Кэш юзера
-         * или дефолтный набор новорега.
+         * Секции вкладки All: по 4 персонажа в каждой (три главные + категории),
+         * все уникальны в пределах экрана. Кэш юзера или дефолт новорега.
          */
         get("/discover-sections") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val lang = mapper.languageOf(currentUserId)
             val cache = discoverSectionsRepository.getForUserOrDefault(currentUserId)
                 ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
-            val sections = cache.sections.map { s ->
-                DiscoverSectionDto(
-                    key = s.key,
-                    characters = s.characterIds.take(10).mapNotNull { id ->
-                        characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
-                    },
-                    total = s.characterIds.size,
-                )
-            }
+            val sections = cache.sections
+                .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
+                .map { s ->
+                    DiscoverSectionDto(
+                        key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
+                        characters = s.characterIds.mapNotNull { id ->
+                            characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                        },
+                        total = s.characterIds.size,
+                    )
+                }
             call.respondSuccess(DiscoverSectionsResponse(sections))
-        }
-
-        /** Пагинация секции: следующие 10 из кэша, начиная с offset. */
-        get("/discover-sections/{key}") {
-            val currentUserId = sessionRepository.verifyToken(call).userId
-            val key = call.parameters["key"] ?: throw BadRequestException("Missing key")
-            val offset = call.request.queryParameters["offset"]?.toIntOrNull() ?: 0
-            require(offset >= 0) { "Offset must be non-negative" }
-            val lang = mapper.languageOf(currentUserId)
-            val cache = discoverSectionsRepository.getForUserOrDefault(currentUserId)
-            val section = cache?.sections?.firstOrNull { it.key == key }
-                ?: return@get call.respondSuccess(
-                    DiscoverSectionDto(key = key, characters = emptyList(), total = 0)
-                )
-            call.respondSuccess(
-                DiscoverSectionDto(
-                    key = key,
-                    characters = section.characterIds.drop(offset).take(10).mapNotNull { id ->
-                        characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
-                    },
-                    total = section.characterIds.size,
-                )
-            )
         }
 
         get("/search") {
@@ -246,7 +224,11 @@ fun Route.configureCharacterRouting(
                 refresh = call.request.queryParameters["refresh"]?.toBooleanStrictOrNull() ?: false,
             )
 
-            if (category != "personalized") {
+            val mainKeys = setOf(
+                com.lvsmsmch.aichat.utils.updaters.KEY_TRENDING,
+                com.lvsmsmch.aichat.utils.updaters.KEY_MOST_POPULAR,
+            )
+            if (category != "personalized" && category !in mainKeys) {
                 validateCharacterCategory(category)
             }
             require(request.size in 1..100) { "Size must be between 1 and 100" }
@@ -258,6 +240,26 @@ fun Route.configureCharacterRouting(
             }
 
             require(cursor >= 0) { "Cursor position must be non-negative" }
+
+            // Вкладки Trending / Most popular — из кэша Discover (200 персонажей),
+            // курсор = offset; пагинация та же, что у категорий
+            if (category in mainKeys) {
+                val lang = mapper.languageOf(currentUserId)
+                val ids = discoverSectionsRepository.getForUserOrDefault(currentUserId)
+                    ?.sections?.firstOrNull { it.key == category }?.characterIds.orEmpty()
+                val page = ids.drop(cursor).take(request.size)
+                val characters = page.mapNotNull { id ->
+                    characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang)
+                }
+                val next = (cursor + page.size).takeIf { it < ids.size }?.toString()
+                return@get call.respondSuccess(
+                    CachedCharactersResultDto(
+                        refreshed = request.refresh,
+                        items = characters,
+                        nextCursor = next,
+                    )
+                )
+            }
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
 
