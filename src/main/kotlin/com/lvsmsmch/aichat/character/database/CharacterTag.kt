@@ -15,6 +15,12 @@ enum class CharacterTag(val code: String) {
     ROOMMATE("roommate"),
     COWORKER("coworker"),
     STRANGER("stranger"),
+    ENEMY("enemy"),
+    BEST_FRIEND("best_friend"),
+    PARENT("parent"),
+    SIBLING("sibling"),
+    CRUSH("crush"),
+    PARTNER("partner"),
 
     ROMANTIC("romantic"),
     FLIRTY("flirty"),
@@ -26,6 +32,14 @@ enum class CharacterTag(val code: String) {
     MYSTERIOUS("mysterious"),
     CHEERFUL("cheerful"),
     SERIOUS("serious"),
+    COLD("cold"),
+    WILD("wild"),
+    CALM("calm"),
+    CONFIDENT("confident"),
+    JEALOUS("jealous"),
+    PROTECTIVE("protective"),
+    SARCASTIC("sarcastic"),
+    FUNNY("funny"),
 
     HERO("hero"),
     VILLAIN("villain"),
@@ -36,6 +50,13 @@ enum class CharacterTag(val code: String) {
     DETECTIVE("detective"),
     TEACHER("teacher"),
     BOSS("boss"),
+    SCIENTIST("scientist"),
+    ATHLETE("athlete"),
+    SINGER("singer"),
+    ARTIST("artist"),
+    DOCTOR("doctor"),
+    ASSASSIN("assassin"),
+    KNIGHT("knight"),
 
     DARK_HAIR("dark_hair"),
     LIGHT_HAIR("light_hair"),
@@ -43,13 +64,25 @@ enum class CharacterTag(val code: String) {
     MUSCULAR("muscular"),
     CUTE("cute"),
     ELEGANT("elegant"),
+    SHORT_HAIR("short_hair"),
+    LONG_HAIR("long_hair"),
+    TATTOOS("tattoos"),
+    GLASSES("glasses"),
+    FRECKLES("freckles"),
+    SHORT("short"),
 
     STRONG("strong"),
     SMART("smart"),
     RICH("rich"),
     POPULAR("popular"),
     LONELY("lonely"),
-    DANGEROUS("dangerous");
+    DANGEROUS("dangerous"),
+    LOYAL("loyal"),
+    AMBITIOUS("ambitious"),
+    CREATIVE("creative"),
+    STUBBORN("stubborn"),
+    KIND("kind"),
+    BRAVE("brave");
 
     companion object {
         fun getByCode(code: String) = CharacterTag.entries.first { it.code == code }

@@ -33,7 +33,7 @@ fun configureDiscoverSectionsUpdater(
     characterRepository: CharacterRepository,
     userCacheRepository: UserRecommendationsCacheRepository,
     discoverSectionsRepository: DiscoverSectionsCacheRepository,
-    updateIntervalMinutes: Long = 60,
+    updateIntervalMinutes: Long = 20,
 ): Job {
     val parentJob = SupervisorJob()
     val updaterScope = CoroutineScope(databaseScope.coroutineContext + parentJob)
@@ -48,21 +48,33 @@ fun configureDiscoverSectionsUpdater(
                 val mixedPool = interleave(trendingPool, popularPool)
                 val byCategory = all.groupBy { it.category }
 
-                fun buildFor(personalPool: List<CharacterDbo>): List<DiscoverSectionDbo> =
-                    buildMainLists(personalPool, trendingPool, popularPool) +
-                        buildAllScreen(personalPool, trendingPool, popularPool, byCategory)
+                // personalized = есть настоящие рекомендации; иначе секцию For you
+                // не отдаём вовсе — она появится, когда наберётся история чатов
+                fun buildFor(
+                    personalPool: List<CharacterDbo>,
+                    personalized: Boolean,
+                ): List<DiscoverSectionDbo> =
+                    (buildMainLists(personalPool, trendingPool, popularPool) +
+                        buildAllScreen(personalPool, trendingPool, popularPool, byCategory))
+                        .filterNot { !personalized && it.key.removePrefix(ALL_PREFIX) == KEY_FOR_YOU }
 
-                discoverSectionsRepository.upsert(DEFAULT_DISCOVER_CACHE_ID, buildFor(mixedPool))
+                discoverSectionsRepository.upsert(
+                    DEFAULT_DISCOVER_CACHE_ID,
+                    buildFor(mixedPool, personalized = false),
+                )
 
                 val byId = all.associateBy { it.id }
                 var updated = 0
                 val monthAgo = com.lvsmsmch.aichat.utils.UtcTimestamp.now().subtractDays(30)
                 userRepository.getActiveUsersSince(monthAgo).chunked(50).forEach { batch ->
                     batch.forEach { user ->
-                        val personalPool = userCacheRepository.getCachedRecommendations(user.id)
+                        val recommended = userCacheRepository.getCachedRecommendations(user.id)
                             .mapNotNull { byId[it] }
-                            .ifEmpty { mixedPool }
-                        discoverSectionsRepository.upsert(user.id, buildFor(personalPool))
+                        val personalPool = recommended.ifEmpty { mixedPool }
+                        discoverSectionsRepository.upsert(
+                            user.id,
+                            buildFor(personalPool, personalized = recommended.isNotEmpty()),
+                        )
                         updated++
                     }
                     delay(50)
