@@ -35,8 +35,8 @@ fun validateUserName(name: String) {
 }
 
 fun validateUserBio(bio: String) {
-    if (bio.length > 1000) {
-        throw ValidationException("Name must be less than 1000 characters")
+    if (bio.length > 500) {
+        throw ValidationException("Bio must be less than 500 characters")
     }
 }
 
@@ -234,7 +234,7 @@ private fun validatePicture(
  * сохраняется как есть, дальше остаются только первые [keep], остальные
  * становятся пробелами. Так «лесенка» из десятков пустых строк не ломает вёрстку.
  */
-fun collapseExcessLineBreaks(text: String, keep: Int = 5, threshold: Int = 10): String {
+fun collapseExcessLineBreaks(text: String, keep: Int = 5, threshold: Int = 5): String {
     if (text.count { it == '\n' } <= threshold) return text
     val sb = StringBuilder(text.length)
     var seen = 0
