@@ -107,6 +107,21 @@ class FollowRepository(
         return collection.countDocuments(FollowDbo::followerId eq userId).toInt()
     }
 
+    /**
+     * Из [followeeIds] возвращает те, на кого [followerId] реально подписан.
+     * Нужно спискам followers/following: кнопка в строке показывает
+     * настоящее состояние, а не предположение клиента.
+     */
+    suspend fun getFollowedIds(followerId: String, followeeIds: List<String>): Set<String> {
+        if (followeeIds.isEmpty()) return emptySet()
+        return collection.find(
+            and(
+                FollowDbo::followerId eq followerId,
+                FollowDbo::followeeId `in` followeeIds,
+            )
+        ).toList().map { it.followeeId }.toSet()
+    }
+
     suspend fun doesConnectionExist(followerId: String, followeeId: String): Boolean {
         return collection.findOne(
             and(

@@ -40,12 +40,16 @@ data class UserFullInfoDto(
 data class FollowerDto(
     @SerialName("follower") val follower: UserDto,
     @SerialName("followedAt") val followedAt: String,
+    /** Подписан ли текущий пользователь на этого подписчика. */
+    @SerialName("isFollowing") val isFollowing: Boolean = false,
 )
 
 @Serializable
 data class FollowingDto(
     @SerialName("following") val following: UserDto,
     @SerialName("followedAt") val followedAt: String,
+    /** Подписан ли текущий пользователь на этого пользователя. */
+    @SerialName("isFollowing") val isFollowing: Boolean = false,
 )
 
 @Serializable

@@ -139,11 +139,20 @@ fun Route.configureUserRouting(
             val hasMore = followsDbos.size > request.size
             val followersToReturn = if (hasMore) followsDbos.dropLast(1) else followsDbos
 
+            // Настоящее состояние подписки текущего пользователя на каждого
+            // из списка — иначе кнопка в строке врёт после перезахода
+            val currentUserId = sessionRepository.verifyToken(call).userId
+            val followedIds = followRepository.getFollowedIds(
+                followerId = currentUserId,
+                followeeIds = followersToReturn.map { it.followerId },
+            )
+
             val followers = followersToReturn.mapNotNull {
                 val follower = userRepository.getUserById(it.followerId) ?: return@mapNotNull null
                 FollowerDto(
                     followedAt = it.followedAt,
-                    follower = follower.toUserDto(mapper)
+                    follower = follower.toUserDto(mapper),
+                    isFollowing = it.followerId in followedIds,
                 )
             }
 
@@ -179,11 +188,18 @@ fun Route.configureUserRouting(
             val hasMore = followsDbos.size > request.size
             val followingToReturn = if (hasMore) followsDbos.dropLast(1) else followsDbos
 
+            val currentUserId = sessionRepository.verifyToken(call).userId
+            val followedIds = followRepository.getFollowedIds(
+                followerId = currentUserId,
+                followeeIds = followingToReturn.map { it.followeeId },
+            )
+
             val following = followingToReturn.mapNotNull {
                 val followingUser = userRepository.getUserById(it.followeeId) ?: return@mapNotNull null
                 FollowingDto(
                     followedAt = it.followedAt,
-                    following = followingUser.toUserDto(mapper)
+                    following = followingUser.toUserDto(mapper),
+                    isFollowing = it.followeeId in followedIds,
                 )
             }
 
