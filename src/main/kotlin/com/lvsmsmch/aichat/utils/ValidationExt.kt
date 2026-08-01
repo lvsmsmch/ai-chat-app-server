@@ -97,8 +97,10 @@ fun validateCharacterInitialMessage(initialMessage: String) {
 }
 
 fun validateCharacterSearchQuery(searchQuery: String) {
-    if (searchQuery.isEmpty() || searchQuery.length > 50) {
-        throw ValidationException("Search query should be not empty and less than 50 characters")
+    // Пустой запрос разрешён: это «browse»-режим (каталог с сортировкой,
+    // используется пикером персонажей для Top/Newest)
+    if (searchQuery.length > 50) {
+        throw ValidationException("Search query should be less than 50 characters")
     }
 }
 

@@ -185,7 +185,9 @@ fun Route.configureCharacterRouting(
 
             userRepository.getUserById(currentUserId) ?: throw UserNotFoundException(currentUserId)
 
-            searchSuggestionsRepository.recordSearch(request.searchQuery)
+            if (request.searchQuery.isNotBlank()) {
+                searchSuggestionsRepository.recordSearch(request.searchQuery)
+            }
 
             val searchListType = CacheListType.Search(
                 searchQuery = request.searchQuery,
