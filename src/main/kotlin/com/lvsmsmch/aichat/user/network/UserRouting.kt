@@ -233,6 +233,7 @@ fun Route.configureUserRouting(
             var bio: String? = null
             var pictureFile: File? = null
             var removePicture: Boolean? = false
+            var color: String? = null
 
             call.receiveMultipart().forEachPart { part ->
                 when (part) {
@@ -242,6 +243,7 @@ fun Route.configureUserRouting(
                             "name" -> name = part.value
                             "bio" -> bio = part.value
                             "removePicture" -> removePicture = part.value.toBoolean()
+                            "color" -> color = part.value
                         }
                     }
 
@@ -284,7 +286,9 @@ fun Route.configureUserRouting(
                 bio = bio?.let { collapseExcessLineBreaks(it) },
                 profilePictureUrl = images?.originalUrl,
                 profilePictureUrlThumbnail = images?.thumbnailUrl,
-                removePicture = removePicture
+                removePicture = removePicture,
+                // Свой цвет — только из общей палитры, чужие значения игнорируем
+                color = color?.takeIf { it in com.lvsmsmch.aichat._common.AvatarColors.palette },
             )
 
             val updatedUser = userRepository.getUserById(userId)

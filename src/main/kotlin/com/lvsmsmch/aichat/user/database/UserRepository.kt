@@ -120,6 +120,7 @@ class UserRepository(
         profilePictureUrlThumbnail: String? = null,
         removePicture: Boolean? = null,
         hashedPassword: String? = null,
+        color: String? = null,
     ) {
         collection.findOneById(userId) ?: return
         val updates = mutableListOf<Bson>()
@@ -130,6 +131,7 @@ class UserRepository(
         profilePictureUrl?.let { updates.add(setValue(UserDbo::profilePictureUrl, it)) }
         profilePictureUrlThumbnail?.let { updates.add(setValue(UserDbo::profilePictureUrlThumbnail, it)) }
         hashedPassword?.let { updates.add(setValue(UserDbo::hashedPassword, it)) }
+        color?.let { updates.add(setValue(UserDbo::color, it)) }
         removePicture?.let {
             if (it) {
                 updates.add(setValue(UserDbo::profilePictureUrl, null))

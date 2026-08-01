@@ -275,6 +275,7 @@ class ComplexQueryHelper(
         profilePictureUrl: String?,
         profilePictureUrlThumbnail: String?,
         removePicture: Boolean?,
+        color: String? = null,
     ) {
         transactionHelper.withTransaction { session ->
             userRepository.updateUser(
@@ -285,7 +286,8 @@ class ComplexQueryHelper(
                 bio = bio,
                 profilePictureUrl = profilePictureUrl,
                 profilePictureUrlThumbnail = profilePictureUrlThumbnail,
-                removePicture = removePicture
+                removePicture = removePicture,
+                color = color,
             )
         }
     }
