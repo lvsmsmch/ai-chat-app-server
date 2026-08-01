@@ -281,7 +281,7 @@ fun Route.configureUserRouting(
                 userId = userId,
                 username = username?.lowercase(),
                 name = name,
-                bio = bio,
+                bio = bio?.let { collapseExcessLineBreaks(it) },
                 profilePictureUrl = images?.originalUrl,
                 profilePictureUrlThumbnail = images?.thumbnailUrl,
                 removePicture = removePicture

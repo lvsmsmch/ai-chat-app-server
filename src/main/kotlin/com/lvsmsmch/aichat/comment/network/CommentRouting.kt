@@ -76,7 +76,7 @@ fun Route.configureCommentRouting(
                 authorId = sessionDbo.userId,
                 parentId = rootId,
                 replyToUserId = request.replyToUserId,
-                text = request.text.trim(),
+                text = collapseExcessLineBreaks(request.text.trim()),
             )
 
             complexQueryHelper.addComment(commentDbo)
@@ -156,10 +156,11 @@ fun Route.configureCommentRouting(
             }
             validateCommentText(request.text)
 
-            commentRepository.updateText(commentId, request.text.trim())
+            val editedText = collapseExcessLineBreaks(request.text.trim())
+            commentRepository.updateText(commentId, editedText)
 
             call.respondSuccess(
-                data = toDtos(listOf(commentDbo.copy(text = request.text.trim(), editedAt = UtcTimestamp.now().toString())), sessionDbo.userId).first()
+                data = toDtos(listOf(commentDbo.copy(text = editedText, editedAt = UtcTimestamp.now().toString())), sessionDbo.userId).first()
             )
         }
 

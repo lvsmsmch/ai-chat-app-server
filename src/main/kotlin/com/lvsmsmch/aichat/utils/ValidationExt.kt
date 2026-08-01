@@ -227,3 +227,24 @@ private fun validatePicture(
         throw ValidationException("Invalid image format")
     }
 }
+
+/**
+ * Схлопывает лишние переносы строк в пользовательских текстах (описание
+ * персонажа, био, комментарий): пока переносов не больше [threshold] — текст
+ * сохраняется как есть, дальше остаются только первые [keep], остальные
+ * становятся пробелами. Так «лесенка» из десятков пустых строк не ломает вёрстку.
+ */
+fun collapseExcessLineBreaks(text: String, keep: Int = 5, threshold: Int = 10): String {
+    if (text.count { it == '\n' } <= threshold) return text
+    val sb = StringBuilder(text.length)
+    var seen = 0
+    for (ch in text) {
+        if (ch == '\n') {
+            seen++
+            if (seen <= keep) sb.append(ch) else if (sb.lastOrNull() != ' ') sb.append(' ')
+        } else {
+            sb.append(ch)
+        }
+    }
+    return sb.toString().trimEnd()
+}
