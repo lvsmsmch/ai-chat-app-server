@@ -136,6 +136,28 @@ fun Route.configureCharacterRouting(
          * Секции вкладки All: по 4 персонажа в каждой (три главные + категории),
          * все уникальны в пределах экрана. Кэш юзера или дефолт новорега.
          */
+        // Публичная версия для экрана логина: дефолтный набор нового юзера,
+        // язык en, без авторизации; лайков нет — юзера ещё нет
+        get("/discover-sections/public") {
+            val cache = discoverSectionsRepository.getForUserOrDefault("")
+                ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
+            val sections = cache.sections
+                .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
+                // for_you в дефолтном наборе нет, но на всякий случай фильтруем
+                .filterNot { it.key.contains("for_you") }
+                .map { s ->
+                    DiscoverSectionDto(
+                        key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
+                        characters = s.characterIds.mapNotNull { id ->
+                            characterRepository.getCharacter(id)
+                                ?.toCharacterDto(mapper, "en", likedIds = emptySet())
+                        },
+                        total = s.characterIds.size,
+                    )
+                }
+            call.respondSuccess(DiscoverSectionsResponse(sections))
+        }
+
         get("/discover-sections") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val lang = mapper.languageOf(currentUserId)
