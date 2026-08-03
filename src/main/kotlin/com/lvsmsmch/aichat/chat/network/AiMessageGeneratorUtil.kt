@@ -86,6 +86,14 @@ object AiMessageGeneratorUtil {
         "gemini-2.5-pro" to (1.25 to 10.00),
         "gemini-2.5-flash" to (0.30 to 2.50),
         "gemini-2.5-flash-lite" to (0.10 to 0.40),
+        // xAI: цены до 200k токенов в запросе; выше они удваиваются, но наша
+        // история туда не дотягивает
+        "grok-4.5" to (2.00 to 6.00),
+        "grok-4.3" to (1.25 to 2.50),
+        "grok-4.20-0309-reasoning" to (1.25 to 2.50),
+        "grok-4.20-0309-non-reasoning" to (1.25 to 2.50),
+        "grok-4.20-multi-agent-0309" to (1.25 to 2.50),
+        "grok-build-0.1" to (1.00 to 2.00),
     )
 
     private fun buildTextDebugInfo(model: String, inTok: Int, outTok: Int): String {
