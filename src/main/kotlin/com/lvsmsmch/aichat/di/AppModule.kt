@@ -27,6 +27,7 @@ import com.lvsmsmch.aichat.comment.CommentService
 import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
 import com.lvsmsmch.aichat.comment.database.CommentRepository
 import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
+import com.lvsmsmch.aichat.jobs.BackgroundJobs
 import com.lvsmsmch.aichat.mail.MailSender
 import com.lvsmsmch.aichat.mail.MailSenderFactory
 import com.lvsmsmch.aichat.notification.NotificationService
@@ -142,6 +143,26 @@ val appModule = module {
             userRepository = get(),
             characterRepository = get(),
             followRepository = get(),
+        )
+    }
+
+    // ---- фоновые задачи ----
+    single {
+        BackgroundJobs(
+            userRepository = get(),
+            characterRepository = get(),
+            chatRepository = get(),
+            messageRepository = get(),
+            characterActivityLogRepository = get(),
+            userRecommendationsCacheRepository = get(),
+            categoryRecommendationsCacheRepository = get(),
+            defaultRecommendationsCacheRepository = get(),
+            discoverSectionsRepository = get(),
+            searchSuggestionsRepository = get(),
+            authCodeRepository = get(),
+            idGenerator = get(),
+            usernameGenerator = get(),
+            userService = get(),
         )
     }
 
