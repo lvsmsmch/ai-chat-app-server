@@ -20,7 +20,6 @@ import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.comment.database.CommentDbo
 import com.lvsmsmch.aichat.comment.database.CommentLikeDbo
 import com.lvsmsmch.aichat.feedback.database.FeedbackDbo
-import com.lvsmsmch.aichat.notification.database.RecommendationsDbo
 import com.lvsmsmch.aichat.notification.database.UserNotificationDbo
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
@@ -78,7 +77,6 @@ fun ResultRow.toUserDbo(): UserDbo = with(Tables.Users) {
         hasSubscription = this@toUserDbo[hasSubscription],
         characterLanguage = this@toUserDbo[characterLanguage],
         deviceId = this@toUserDbo[deviceId],
-        facebookOauthId = this@toUserDbo[facebookOauthId],
         appleOauthId = this@toUserDbo[appleOauthId],
         hashedPassword = this@toUserDbo[hashedPassword],
         privateCharacterCount = this@toUserDbo[privateCharacterCount],
@@ -119,7 +117,6 @@ fun UpdateBuilder<*>.from(dbo: UserDbo) = with(Tables.Users) {
     this@from[hasSubscription] = dbo.hasSubscription
     this@from[characterLanguage] = dbo.characterLanguage
     this@from[deviceId] = dbo.deviceId
-    this@from[facebookOauthId] = dbo.facebookOauthId
     this@from[appleOauthId] = dbo.appleOauthId
     this@from[hashedPassword] = dbo.hashedPassword
     this@from[privateCharacterCount] = dbo.privateCharacterCount
@@ -573,24 +570,6 @@ fun UpdateBuilder<*>.from(dbo: CharacterActivityLogDbo) = with(Tables.CharacterA
     this@from[characterId] = dbo.characterId
     this@from[activityType] = dbo.activityType
     this@from[userId] = dbo.userId
-}
-
-// ---- recommendations ----
-
-fun ResultRow.toRecommendationsDbo(): RecommendationsDbo = with(Tables.Recommendations) {
-    RecommendationsDbo(
-        id = this@toRecommendationsDbo[id],
-        createdAt = this@toRecommendationsDbo[createdAt],
-        userId = this@toRecommendationsDbo[userId],
-        characterIds = this@toRecommendationsDbo[characterIds].toStringList(),
-    )
-}
-
-fun UpdateBuilder<*>.from(dbo: RecommendationsDbo) = with(Tables.Recommendations) {
-    this@from[id] = dbo.id
-    this@from[createdAt] = dbo.createdAt
-    this@from[userId] = dbo.userId
-    this@from[characterIds] = dbo.characterIds.toJson()
 }
 
 // ---- кэши рекомендаций ----

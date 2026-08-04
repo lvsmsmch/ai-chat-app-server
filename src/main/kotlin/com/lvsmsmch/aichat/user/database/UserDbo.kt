@@ -22,7 +22,6 @@ data class UserDbo(
     /** Язык персонажей (каталог, промпты, ответы в чате). */
     val characterLanguage: String = "en",
     val deviceId: String? = null,
-    val facebookOauthId: String? = null,
     /** Apple sub: почту Apple отдаёт только при первой авторизации, id — всегда. */
     val appleOauthId: String? = null,
     val hashedPassword: String? = null,

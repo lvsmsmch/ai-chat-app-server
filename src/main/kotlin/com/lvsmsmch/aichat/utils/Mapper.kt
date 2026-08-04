@@ -7,7 +7,6 @@ import com.lvsmsmch.aichat.character.database.*
 import com.lvsmsmch.aichat.character.network.*
 import com.lvsmsmch.aichat.chat.database.*
 import com.lvsmsmch.aichat.chat.network.*
-import com.lvsmsmch.aichat.notification.database.RecommendationsDbo
 import com.lvsmsmch.aichat.notification.network.RecommendationsDto
 import com.lvsmsmch.aichat.notification.network.NotificationDto
 import com.lvsmsmch.aichat.notification.network.NotificationType
@@ -44,6 +43,56 @@ class Mapper(
         return lang
     }
 }
+
+/**
+ * Авторы списка персонажей ОДНИМ запросом. Без этого каждый элемент ленты
+ * тянул своего автора отдельно: страница каталога в 20 плиток давала 20
+ * лишних запросов, а список чатов — по запросу на участника.
+ */
+suspend fun Mapper.authorsOf(characters: Collection<CharacterDbo>): Map<String, UserDto> {
+    val ids = characters.map { it.authorId }.toSet()
+    return userRepository.getUsersByIds(ids).associate { it.id to it.toUserDto(this) }
+}
+
+/**
+ * Персонажи по списку id: ОДИН запрос за персонажами, ОДИН за авторами.
+ * Порядок [ids] сохраняется — на нём держатся ленты рекомендаций и секции.
+ * Пропавшие id молча выпадают, как и раньше.
+ */
+suspend fun Mapper.charactersDtoByIds(
+    ids: List<String>,
+    lang: String? = null,
+    likedIds: Set<String>? = null,
+    publicOnly: Boolean = false,
+): List<CharacterDto> {
+    if (ids.isEmpty()) return emptyList()
+    val dbos = characterRepository.getByIds(ids)
+        .let { list ->
+            if (publicOnly) {
+                list.filter { it.visibility == CharacterVisibility.PUBLIC.code }
+            } else {
+                list
+            }
+        }
+    val authors = authorsOf(dbos)
+    val byId = dbos.associateBy { it.id }
+    return ids.mapNotNull { id ->
+        byId[id]?.toCharacterDto(this, lang, likedIds = likedIds, authors = authors)
+    }
+}
+
+/**
+ * Автора не нашли (удалён, а персонаж остался). Раньше здесь стоял `!!` и
+ * ОДНА такая запись роняла весь список пятисоткой; теперь ломается ровно одна
+ * плитка, и то косметически.
+ */
+private fun deletedAuthorDto(authorId: String) = UserDto(
+    id = authorId,
+    username = "deleted",
+    name = null,
+    profilePicUrlThumbnail = null,
+    color = "",
+)
 
 suspend fun UserDbo.toUserDto(mapper: Mapper): UserDto {
     return UserDto(
@@ -113,6 +162,8 @@ suspend fun CharacterDbo.toCharacterDto(
     lang: String? = null,
     likerId: String? = null,
     likedIds: Set<String>? = null,
+    /** Заранее собранные авторы (см. [authorsOf]) — для списков. */
+    authors: Map<String, UserDto>? = null,
 ): CharacterDto {
     val c = this.localized(lang)
     val liked = when {
@@ -123,7 +174,9 @@ suspend fun CharacterDbo.toCharacterDto(
     return CharacterDto(
         id = id,
         createdAt = createdAt.toString(),
-        author = mapper.userRepository.getUserById(authorId)!!.toUserDto(mapper),
+        author = authors?.get(authorId)
+            ?: mapper.userRepository.getUserById(authorId)?.toUserDto(mapper)
+            ?: deletedAuthorDto(authorId),
         visibility = visibility,
         name = c.name,
         description = c.description,
@@ -152,9 +205,10 @@ suspend fun CachedCharactersResult.toDto(
     val liked = likerId?.let {
         mapper.characterLikeRepository.getLikedIds(it, items.map { c -> c.id })
     }
+    val authors = mapper.authorsOf(items)
     return CachedCharactersResultDto(
         refreshed = refreshed,
-        items = items.map { it.toCharacterDto(mapper, lang, likedIds = liked) },
+        items = items.map { it.toCharacterDto(mapper, lang, likedIds = liked, authors = authors) },
         nextCursor = nextCursor?.toString(),
     )
 }
@@ -215,9 +269,8 @@ suspend fun ChatDbo.toChatDto(
 ): ChatDto {
     // Язык владельца чата: имена/авы участников локализованы и в списке чатов
     val lang = mapper.languageOf(userId)
-    val characters = characterIds.mapNotNull { charId ->
-        mapper.characterRepository.getCharacter(charId)?.toCharacterDto(mapper, lang)
-    }
+    // Участники и их авторы — двумя запросами на чат вместо двух на участника
+    val characters = mapper.charactersDtoByIds(characterIds, lang)
 
     return ChatDto(
         id = clientId,
@@ -245,16 +298,5 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         imageUrl = imageUrl,
         isImage = isImage,
         imageDebugInfo = imageDebugInfo
-    )
-}
-
-suspend fun RecommendationsDbo.toNotificationDto(mapper: Mapper): NotificationDto {
-    return NotificationDto(
-        type = NotificationType.Recommendations.code,
-        notification = RecommendationsDto(
-            characters = characterIds.mapNotNull {
-                mapper.characterRepository.getCharacter(it)?.toCharacterDto(mapper, mapper.languageOf(userId))
-            }
-        )
     )
 }

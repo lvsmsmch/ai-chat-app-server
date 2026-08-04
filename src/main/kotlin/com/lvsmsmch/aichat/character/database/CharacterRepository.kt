@@ -92,6 +92,19 @@ class CharacterRepository {
     private fun escapeLike(value: String): String =
         value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
+    /**
+     * Батч по id, БЕЗ фильтра по видимости: нужен там, где персонажи уже
+     * привязаны к сущности (участники чата) и приватность проверена раньше.
+     */
+    suspend fun getByIds(characterIds: Collection<String>): List<CharacterDbo> {
+        if (characterIds.isEmpty()) return emptyList()
+        return dbQuery {
+            table.selectAll()
+                .where { table.id inList characterIds.toList() }
+                .map { it.toCharacterDbo() }
+        }
+    }
+
     private suspend fun getCharactersByIds(characterIds: List<String>): List<CharacterDbo> {
         if (characterIds.isEmpty()) return emptyList()
         val found = dbQuery {

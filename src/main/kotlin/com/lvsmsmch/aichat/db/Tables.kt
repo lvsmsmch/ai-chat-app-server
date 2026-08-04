@@ -36,7 +36,6 @@ object Tables {
         val hasSubscription = bool("has_subscription")
         val characterLanguage = text("character_language")
         val deviceId = text("device_id").nullable()
-        val facebookOauthId = text("facebook_oauth_id").nullable()
         /** Apple sub из identity-токена: у Apple это единственный стабильный id. */
         val appleOauthId = text("apple_oauth_id").nullable()
         val hashedPassword = text("hashed_password").nullable()
@@ -70,7 +69,6 @@ object Tables {
         init {
             index(false, email)
             index(false, googleOauthId)
-            index(false, facebookOauthId)
             index(false, appleOauthId)
             index(false, username)
             index(false, lastActiveAt)
@@ -446,21 +444,6 @@ object Tables {
         }
     }
 
-    object Recommendations : Table("recommendations") {
-        val id = text("id")
-        val createdAt = text("created_at")
-        val userId = text("user_id")
-        /** JSON-массив id. */
-        val characterIds = text("character_ids")
-
-        override val primaryKey = PrimaryKey(id)
-
-        init {
-            index(false, userId)
-            index(false, createdAt)
-        }
-    }
-
     object UserRecommendationsCache : Table("user_recommendations_cache") {
         val userId = text("user_id")
         val characterIds = text("character_ids")
@@ -548,7 +531,7 @@ object Tables {
         Users, AuthCodes, AuthLockouts, Characters, Chats, Messages, Sessions,
         Comments, CommentLikes, Reviews, ReviewLikes, CharacterLikes,
         Follows, Reports, Feedbacks, SearchSuggestions, UserNotifications,
-        CharacterActivityLogs, Recommendations, UserRecommendationsCache,
+        CharacterActivityLogs, UserRecommendationsCache,
         CategoryRecommendationsCache, DefaultRecommendationsCache,
         DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers,
         DeletedIdsStats,

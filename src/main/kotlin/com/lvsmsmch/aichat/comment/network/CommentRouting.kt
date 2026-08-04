@@ -29,10 +29,19 @@ fun Route.configureCommentRouting(
     mapper: Mapper
 ) {
 
+    /**
+     * Комменты в DTO. Авторы и те, кому отвечают, берутся ОДНИМ запросом на
+     * страницу: раньше на каждый коммент шёл запрос за автором и ещё один за
+     * именем адресата — страница из двадцати ответов давала под сорок запросов.
+     */
     suspend fun toDtos(comments: List<CommentDbo>, currentUserId: String): List<CommentDto> {
+        if (comments.isEmpty()) return emptyList()
         val liked = commentLikeRepository.getLikedCommentIds(currentUserId, comments.map { it.id })
+        val userIds = comments.flatMap { listOfNotNull(it.authorId, it.replyToUserId) }.toSet()
+        val users = userRepository.getUsersByIds(userIds).associateBy { it.id }
         return comments.mapNotNull { c ->
-            val author = userRepository.getUserById(c.authorId) ?: return@mapNotNull null
+            // Автор удалён вместе с аккаунтом — коммент пропускаем, как и раньше
+            val author = users[c.authorId] ?: return@mapNotNull null
             CommentDto(
                 id = c.id,
                 createdAt = c.createdAt,
@@ -40,7 +49,7 @@ fun Route.configureCommentRouting(
                 characterId = c.characterId,
                 author = author.toUserDto(mapper),
                 parentId = c.parentId,
-                replyToUsername = c.replyToUserId?.let { userRepository.getUserById(it)?.username },
+                replyToUsername = c.replyToUserId?.let { users[it]?.username },
                 text = c.text,
                 likesCount = c.likesCount,
                 repliesCount = c.repliesCount,

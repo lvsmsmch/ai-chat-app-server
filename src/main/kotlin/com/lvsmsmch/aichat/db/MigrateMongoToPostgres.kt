@@ -17,7 +17,6 @@ import com.lvsmsmch.aichat.chat.database.MessageDbo
 import com.lvsmsmch.aichat.comment.database.CommentDbo
 import com.lvsmsmch.aichat.comment.database.CommentLikeDbo
 import com.lvsmsmch.aichat.feedback.database.FeedbackDbo
-import com.lvsmsmch.aichat.notification.database.RecommendationsDbo
 import com.lvsmsmch.aichat.notification.database.UserNotificationDbo
 import com.lvsmsmch.aichat.review.database.ReviewDbo
 import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
@@ -117,11 +116,6 @@ fun main() = runBlocking {
         "character_activity_logs",
         mongo.getCollection<CharacterActivityLogDbo>("character_activity_logs"),
         Tables.CharacterActivityLogs,
-    ) { from(it) }
-    move(
-        "recommendations",
-        mongo.getCollection<RecommendationsDbo>("recommendations"),
-        Tables.Recommendations,
     ) { from(it) }
     move(
         "user_recommendations_cache",

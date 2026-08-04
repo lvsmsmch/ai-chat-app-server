@@ -253,8 +253,7 @@ fun Route.configureChatRouting(
                 val formerIds = messageRepository.getDistinctSenderIds(chat.id)
                     .filter { it.isNotBlank() } - chat.characterIds.toSet()
                 val lang = mapper.languageOf(userId)
-                val formerDtos = formerIds.mapNotNull { characterRepository.getCharacter(it) }
-                    .map { it.toCharacterDto(mapper, lang) }
+                val formerDtos = mapper.charactersDtoByIds(formerIds, lang)
                 chatDto.copy(
                     characters = chatDto.characters + formerDtos,
                     activeCharacterIds = chat.characterIds,

@@ -118,7 +118,19 @@ object AiMessageGeneratorUtil {
      * цензуру во ВСЕХ попытках, повторно в API не отправляется — короткая пауза
      * для видимости и сразу censored. Изменённое сообщение = новый ключ = новый шанс.
      */
-    private val censoredMessages = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private const val CENSORED_MEMORY_SIZE = 500
+
+    /**
+     * Ограниченная память: держим последние [CENSORED_MEMORY_SIZE] ключей и
+     * вытесняем самые старые. Прежний вариант (просто множество) только
+     * пополнялся и за время жизни процесса рос без предела.
+     */
+    private val censoredMessages: MutableSet<String> = java.util.Collections.newSetFromMap(
+        object : java.util.LinkedHashMap<String, Boolean>(64, 0.75f, false) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>?): Boolean =
+                size > CENSORED_MEMORY_SIZE
+        }.let { java.util.Collections.synchronizedMap(it) }
+    )
 
     private fun censorKey(chatDbo: ChatDbo, messagesHistory: List<MessageDbo>): String =
         chatDbo.id + ":" + (messagesHistory.lastOrNull { it.isSentByUser }?.text?.hashCode() ?: 0)

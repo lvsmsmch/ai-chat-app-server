@@ -13,6 +13,13 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
+/**
+ * ВНИМАНИЕ: этот роутинг НЕ ЗАРЕГИСТРИРОВАН в Routing.kt и наружу не торчит —
+ * отзывы в приложении заменены комментариями. Файл оставлен намеренно: сами
+ * отзывы (219 записей) живы, на них считается рейтинг персонажа, и репозиторий
+ * используется в каскадах удаления. Если отзывы вернут — достаточно вызвать
+ * configureReviewRouting из Routing.kt.
+ */
 fun Route.configureReviewRouting(
     sessionRepository: SessionRepository,
     reviewRepository: ReviewRepository,

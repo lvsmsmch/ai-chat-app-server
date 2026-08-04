@@ -162,8 +162,14 @@ fun Route.configureAuthRouting(
 }
 
 
+/**
+ * Один клиент на процесс. Раньше на КАЖДЫЙ вход через Google создавался новый
+ * HttpClient — это свой пул соединений и потоки на один запрос.
+ */
+private val googleClient by lazy { HttpClient() }
+
 private suspend fun getOauthUserData(googleToken: String): OAuthUserData {
-    return HttpClient().use { client ->
+    return googleClient.let { client ->
         val googleOauthTokenInfoUrl = System.getenv("GOOGLE_OAUTH_TOKEN_INFO_URL")
             ?: throw Exception("Missing GOOGLE_OAUTH_TOKEN_INFO_URL key")
         val apiUrl = "$googleOauthTokenInfoUrl?id_token=${googleToken}"

@@ -141,20 +141,22 @@ fun Route.configureCharacterRouting(
         get("/discover-sections/public") {
             val cache = discoverSectionsRepository.getForUserOrDefault("")
                 ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
-            val sections = cache.sections
+            val sectionsRaw = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
                 // for_you в дефолтном наборе нет, но на всякий случай фильтруем
                 .filterNot { it.key.contains("for_you") }
-                .map { s ->
-                    DiscoverSectionDto(
-                        key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
-                        characters = s.characterIds.mapNotNull { id ->
-                            characterRepository.getCharacter(id)
-                                ?.toCharacterDto(mapper, "en", likedIds = emptySet())
-                        },
-                        total = s.characterIds.size,
-                    )
-                }
+            // Персонажи ВСЕХ секций разом: раньше на каждого шёл свой запрос,
+            // то есть тринадцать секций по тридцать давали под четыреста
+            val byId = mapper
+                .charactersDtoByIds(sectionsRaw.flatMap { it.characterIds }.distinct(), "en", emptySet())
+                .associateBy { it.id }
+            val sections = sectionsRaw.map { s ->
+                DiscoverSectionDto(
+                    key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
+                    characters = s.characterIds.mapNotNull { byId[it] },
+                    total = s.characterIds.size,
+                )
+            }
             call.respondSuccess(DiscoverSectionsResponse(sections))
         }
 
@@ -167,18 +169,18 @@ fun Route.configureCharacterRouting(
                 currentUserId,
                 cache.sections.flatMap { it.characterIds },
             )
-            val sections = cache.sections
+            val sectionsRaw = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
-                .map { s ->
-                    DiscoverSectionDto(
-                        key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
-                        characters = s.characterIds.mapNotNull { id ->
-                            characterRepository.getCharacter(id)
-                                ?.toCharacterDto(mapper, lang, likedIds = sectionLiked)
-                        },
-                        total = s.characterIds.size,
-                    )
-                }
+            val byId = mapper.charactersDtoByIds(
+                sectionsRaw.flatMap { it.characterIds }.distinct(), lang, sectionLiked,
+            ).associateBy { it.id }
+            val sections = sectionsRaw.map { s ->
+                DiscoverSectionDto(
+                    key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
+                    characters = s.characterIds.mapNotNull { byId[it] },
+                    total = s.characterIds.size,
+                )
+            }
             call.respondSuccess(DiscoverSectionsResponse(sections))
         }
 
@@ -279,9 +281,7 @@ fun Route.configureCharacterRouting(
                     ?.sections?.firstOrNull { it.key == category }?.characterIds.orEmpty()
                 val page = ids.drop(cursor).take(request.size)
                 val likedIds = characterLikeRepository.getLikedIds(currentUserId, page)
-                val characters = page.mapNotNull { id ->
-                    characterRepository.getCharacter(id)?.toCharacterDto(mapper, lang, likedIds = likedIds)
-                }
+                val characters = mapper.charactersDtoByIds(page, lang, likedIds)
                 val next = (cursor + page.size).takeIf { it < ids.size }?.toString()
                 return@get call.respondSuccess(
                     CachedCharactersResultDto(
@@ -395,10 +395,12 @@ fun Route.configureCharacterRouting(
             }
 
             val similarLiked = characterLikeRepository.getLikedIds(currentUserId, similarCharacterIds)
-            val similarCharacterDtos = similarCharacterIds.mapNotNull {
-                characterRepository.getCharacter(it)
-            }.filter { it.visibility == CharacterVisibility.PUBLIC.code }
-                .map { it.toCharacterDto(mapper, mapper.languageOf(currentUserId), likedIds = similarLiked) }
+            val similarCharacterDtos = mapper.charactersDtoByIds(
+                ids = similarCharacterIds,
+                lang = mapper.languageOf(currentUserId),
+                likedIds = similarLiked,
+                publicOnly = true,
+            )
 
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))
         }

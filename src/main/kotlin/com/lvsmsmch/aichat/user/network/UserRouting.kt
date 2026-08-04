@@ -82,8 +82,15 @@ fun Route.configureUserRouting(
             )
 
             val likedIds = characterLikeRepository.getLikedIds(currentUserId, result.items.map { it.id })
+            // Авторы — одним запросом на страницу, а не по одному на персонажа
+            val authors = mapper.authorsOf(result.items)
             val charactersDto = result.items.map {
-                it.toCharacterDto(mapper, mapper.languageOf(currentUserId), likedIds = likedIds)
+                it.toCharacterDto(
+                    mapper,
+                    mapper.languageOf(currentUserId),
+                    likedIds = likedIds,
+                    authors = authors,
+                )
             }
             val response = UserCharactersResponse(
                 characters = charactersDto,
@@ -106,12 +113,12 @@ fun Route.configureUserRouting(
 
             val (ids, next) = characterLikeRepository.getLikedCharacterIds(userId, cursor, size)
             val lang = mapper.languageOf(currentUserId)
-            val characters = ids.mapNotNull { id ->
-                characterRepository.getCharacter(id)
-                    // Приватные чужие персонажи в чужой ленте не показываем
-                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code || it.authorId == userId }
-                    ?.toCharacterDto(mapper, lang, likedIds = ids.toSet())
-            }
+            // Лента лайков всегда своя (чужая запрещена выше), поэтому здесь
+            // видны и собственные приватные персонажи
+            val characters = mapper.charactersDtoByIds(ids, lang, ids.toSet())
+                .filter { dto ->
+                    dto.visibility == CharacterVisibility.PUBLIC.code || dto.author.id == userId
+                }
             call.respondSuccess(
                 data = UserCharactersResponse(characters = characters, nextCursor = next)
             )

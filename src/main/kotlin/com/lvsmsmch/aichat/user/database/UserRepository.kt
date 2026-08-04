@@ -62,6 +62,16 @@ class UserRepository {
     suspend fun findByGoogleId(googleId: String): UserDbo? =
         findOneBy(Tables.Users.googleOauthId, googleId)
 
+    /** Батч: один запрос вместо запроса на каждый элемент списка. */
+    suspend fun getUsersByIds(userIds: Collection<String>): List<UserDbo> {
+        if (userIds.isEmpty()) return emptyList()
+        return dbQuery {
+            Tables.Users.selectAll()
+                .where { Tables.Users.id inList userIds.toList() }
+                .map { it.toUserDbo() }
+        }
+    }
+
     suspend fun findByAppleId(appleId: String): UserDbo? =
         findOneBy(Tables.Users.appleOauthId, appleId)
 

@@ -73,9 +73,14 @@ class MessageRepository {
         val imageDebugInfo: String? = null,
     )
 
+    /**
+     * Событие о вставке НЕ публикуется: вставка идёт внутри составной
+     * транзакции (сообщение + счётчики), и событие ушло бы до коммита —
+     * подписчик увидел бы запись, которой при откате не станет. Подписчиков у
+     * Created сейчас нет: SSE-стрим слушает только апдейты.
+     */
     suspend fun insertMessage(session: DbSession, messageDbo: MessageDbo) {
         dbQuery { table.insert { it.from(messageDbo) } }
-        events.created(messageDbo)
     }
 
     suspend fun getMessageById(messageId: String): MessageDbo? = dbQuery {
