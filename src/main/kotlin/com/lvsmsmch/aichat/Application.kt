@@ -196,6 +196,51 @@ fun Application.module() {
         followRepository = followRepository,
     )
 
+    val characterService = com.lvsmsmch.aichat.character.CharacterService(
+        characterRepository = characterRepository,
+        userRepository = userRepository,
+        chatRepository = chatRepository,
+        reviewRepository = reviewRepository,
+        reviewLikeRepository = reviewLikeRepository,
+        commentRepository = commentRepository,
+        commentLikeRepository = commentLikeRepository,
+        characterLikeRepository = characterLikeRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        transactionHelper = transactionHelper,
+    )
+
+    val userService = com.lvsmsmch.aichat.user.UserService(
+        userRepository = userRepository,
+        characterRepository = characterRepository,
+        chatRepository = chatRepository,
+        messageRepository = messageRepository,
+        reviewRepository = reviewRepository,
+        reviewLikeRepository = reviewLikeRepository,
+        commentRepository = commentRepository,
+        commentLikeRepository = commentLikeRepository,
+        characterLikeRepository = characterLikeRepository,
+        followRepository = followRepository,
+        sessionRepository = sessionRepository,
+        userNotificationRepository = userNotificationRepository,
+        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        transactionHelper = transactionHelper,
+    )
+
+    val commentService = com.lvsmsmch.aichat.comment.CommentService(
+        commentRepository = commentRepository,
+        commentLikeRepository = commentLikeRepository,
+        characterRepository = characterRepository,
+        characterActivityLogRepository = characterActivityLogRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        userRepository = userRepository,
+        notificationService = notificationService,
+        transactionHelper = transactionHelper,
+        idGenerator = idGenerator,
+        mapper = mapper,
+    )
+
+
     val complexQueryHelper = ComplexQueryHelper(
         transactionHelper = transactionHelper,
         userRepository = userRepository,
@@ -357,6 +402,9 @@ fun Application.module() {
         authLockoutRepository = authLockoutRepository,
         mailSender = mailSender,
         appleVerifier = appleVerifier,
+        commentService = commentService,
+        characterService = characterService,
+        userService = userService,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {

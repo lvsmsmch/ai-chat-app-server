@@ -1,63 +1,29 @@
 package com.lvsmsmch.aichat.comment.network
 
-import com.lvsmsmch.aichat._common.IdGenerator
-import com.lvsmsmch.aichat._common.database.EntityType
 import com.lvsmsmch.aichat._common.database.ReportDbo
 import com.lvsmsmch.aichat._common.database.ReportEntity
 import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.character.database.CharacterRepository
-import com.lvsmsmch.aichat.comment.database.CommentDbo
-import com.lvsmsmch.aichat.comment.database.CommentLikeRepository
-import com.lvsmsmch.aichat.comment.database.CommentRepository
-import com.lvsmsmch.aichat.user.database.UserRepository
-import com.lvsmsmch.aichat.utils.*
+import com.lvsmsmch.aichat.comment.CommentService
+import com.lvsmsmch.aichat.utils.BadRequestException
+import com.lvsmsmch.aichat.utils.CharacterNotFoundException
+import com.lvsmsmch.aichat.utils.respondSuccess
+import com.lvsmsmch.aichat.utils.validateCommentText
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 
+/**
+ * HTTP-слой комментариев: разбор параметров, вызов [CommentService], код
+ * ответа. Бизнес-логики здесь нет намеренно — она в сервисе.
+ */
 fun Route.configureCommentRouting(
     sessionRepository: SessionRepository,
-    commentRepository: CommentRepository,
-    commentLikeRepository: CommentLikeRepository,
     characterRepository: CharacterRepository,
     reportRepository: ReportRepository,
-    userRepository: UserRepository,
-    idGenerator: IdGenerator,
-    complexQueryHelper: ComplexQueryHelper,
-    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
-    mapper: Mapper
+    commentService: CommentService,
 ) {
-
-    /**
-     * Комменты в DTO. Авторы и те, кому отвечают, берутся ОДНИМ запросом на
-     * страницу: раньше на каждый коммент шёл запрос за автором и ещё один за
-     * именем адресата — страница из двадцати ответов давала под сорок запросов.
-     */
-    suspend fun toDtos(comments: List<CommentDbo>, currentUserId: String): List<CommentDto> {
-        if (comments.isEmpty()) return emptyList()
-        val liked = commentLikeRepository.getLikedCommentIds(currentUserId, comments.map { it.id })
-        val userIds = comments.flatMap { listOfNotNull(it.authorId, it.replyToUserId) }.toSet()
-        val users = userRepository.getUsersByIds(userIds).associateBy { it.id }
-        return comments.mapNotNull { c ->
-            // Автор удалён вместе с аккаунтом — коммент пропускаем, как и раньше
-            val author = users[c.authorId] ?: return@mapNotNull null
-            CommentDto(
-                id = c.id,
-                createdAt = c.createdAt,
-                editedAt = c.editedAt,
-                characterId = c.characterId,
-                author = author.toUserDto(mapper),
-                parentId = c.parentId,
-                replyToUsername = c.replyToUserId?.let { users[it]?.username },
-                text = c.text,
-                likesCount = c.likesCount,
-                repliesCount = c.repliesCount,
-                isLikedByCurrentUser = c.id in liked
-            )
-        }
-    }
-
     route("/comments") {
 
         post {
@@ -66,64 +32,37 @@ fun Route.configureCommentRouting(
 
             characterRepository.getCharacter(request.characterId)
                 ?: throw CharacterNotFoundException(id = request.characterId)
-
             validateCommentText(request.text)
 
-            // Ответ на ответ нормализуем к корню ветки (модель YouTube: ветки плоские)
-            val rootId = request.parentId?.let { parentId ->
-                val parent = commentRepository.getCommentById(parentId)
-                    ?: throw CommentNotFoundException(id = parentId)
-                if (parent.characterId != request.characterId) {
-                    throw BadRequestException("Parent comment belongs to another character")
-                }
-                parent.parentId ?: parent.id
-            }
-
-            val commentDbo = CommentDbo(
-                id = idGenerator.generateId(EntityType.COMMENT),
-                characterId = request.characterId,
-                authorId = sessionDbo.userId,
-                parentId = rootId,
-                replyToUserId = request.replyToUserId,
-                text = collapseExcessLineBreaks(request.text.trim()),
+            call.respondSuccess(
+                data = commentService.add(
+                    characterId = request.characterId,
+                    authorId = sessionDbo.userId,
+                    text = request.text,
+                    parentId = request.parentId,
+                    replyToUserId = request.replyToUserId,
+                )
             )
-
-            complexQueryHelper.addComment(commentDbo)
-            // Автору персонажа — уведомление о новом комменте
-            notificationService.onCharacterComment(commentDbo)
-
-            call.respondSuccess(data = toDtos(listOf(commentDbo), sessionDbo.userId).first())
         }
 
         get {
             val sessionDbo = sessionRepository.verifyToken(call)
             val characterId = call.request.queryParameters["characterId"]
                 ?: throw BadRequestException("Missing characterId parameter")
-            val cursor = call.request.queryParameters["cursor"]
             val sortCriteria = call.request.queryParameters["sortCriteria"]?.toIntOrNull() ?: 0
             val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
             require(size in 1..100) { "Size must be between 1 and 100" }
             require(sortCriteria in 0..2) { "Unknown sortCriteria" }
 
-            val dbos = commentRepository.getRootComments(
+            val page = commentService.rootComments(
                 characterId = characterId,
+                currentUserId = sessionDbo.userId,
                 sortCriteria = sortCriteria,
-                cursor = cursor,
-                size = size + 1
+                cursor = call.request.queryParameters["cursor"],
+                size = size,
             )
-            val hasMore = dbos.size > size
-            val page = if (hasMore) dbos.dropLast(1) else dbos
-            val nextCursor = when {
-                !hasMore -> null
-                sortCriteria == 2 -> ((cursor?.toIntOrNull() ?: 0) + page.size).toString()
-                else -> page.lastOrNull()?.createdAt
-            }
-
             call.respondSuccess(
-                data = CommentsResponse(
-                    comments = toDtos(page, sessionDbo.userId),
-                    nextCursor = nextCursor
-                )
+                data = CommentsResponse(comments = page.comments, nextCursor = page.nextCursor)
             )
         }
 
@@ -131,23 +70,17 @@ fun Route.configureCommentRouting(
             val sessionDbo = sessionRepository.verifyToken(call)
             val commentId = call.parameters["id"]
                 ?: throw BadRequestException("Missing id parameter")
-            val cursor = call.request.queryParameters["cursor"]
             val size = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
             require(size in 1..100) { "Size must be between 1 and 100" }
 
-            val dbos = commentRepository.getReplies(
+            val page = commentService.replies(
                 parentId = commentId,
-                afterTime = cursor?.let { UtcTimestamp.parse(it) },
-                size = size + 1
+                currentUserId = sessionDbo.userId,
+                cursor = call.request.queryParameters["cursor"],
+                size = size,
             )
-            val hasMore = dbos.size > size
-            val page = if (hasMore) dbos.dropLast(1) else dbos
-
             call.respondSuccess(
-                data = CommentsResponse(
-                    comments = toDtos(page, sessionDbo.userId),
-                    nextCursor = if (hasMore) page.lastOrNull()?.createdAt else null
-                )
+                data = CommentsResponse(comments = page.comments, nextCursor = page.nextCursor)
             )
         }
 
@@ -157,19 +90,8 @@ fun Route.configureCommentRouting(
                 ?: throw BadRequestException("Missing id parameter")
             val request = call.receive<UpdateCommentRequest>()
 
-            val commentDbo = commentRepository.getCommentById(commentId)
-                ?: throw CommentNotFoundException(id = commentId)
-
-            if (commentDbo.authorId != sessionDbo.userId) {
-                throw ForbiddenException(errorMessage = "You are not allowed to edit this comment")
-            }
-            validateCommentText(request.text)
-
-            val editedText = collapseExcessLineBreaks(request.text.trim())
-            commentRepository.updateText(commentId, editedText)
-
             call.respondSuccess(
-                data = toDtos(listOf(commentDbo.copy(text = editedText, editedAt = UtcTimestamp.now().toString())), sessionDbo.userId).first()
+                data = commentService.edit(commentId, sessionDbo.userId, request.text)
             )
         }
 
@@ -178,15 +100,7 @@ fun Route.configureCommentRouting(
             val commentId = call.parameters["id"]
                 ?: throw BadRequestException("Missing id parameter")
 
-            val commentDbo = commentRepository.getCommentById(commentId)
-                ?: throw CommentNotFoundException(id = commentId)
-
-            if (commentDbo.authorId != sessionDbo.userId) {
-                throw ForbiddenException(errorMessage = "You are not allowed to delete this comment")
-            }
-
-            complexQueryHelper.deleteComment(commentDbo)
-
+            commentService.delete(commentId, sessionDbo.userId)
             call.respondSuccess()
         }
 
@@ -195,15 +109,7 @@ fun Route.configureCommentRouting(
             val commentId = call.parameters["id"]
                 ?: throw BadRequestException("Missing id parameter")
 
-            val likedComment = commentRepository.getCommentById(commentId)
-                ?: throw CommentNotFoundException(id = commentId)
-
-            // Идемпотентно: повторный лайк не ошибка (оптимистичный UI может дублировать)
-            if (!commentLikeRepository.isCommentLikedByUser(sessionDbo.userId, commentId)) {
-                complexQueryHelper.likeComment(commentId, sessionDbo.userId)
-                // Автору коммента — стакающееся «+1 лайк»
-                notificationService.onCommentLiked(likedComment, sessionDbo.userId)
-            }
+            commentService.like(commentId, sessionDbo.userId)
             call.respondSuccess()
         }
 
@@ -212,12 +118,7 @@ fun Route.configureCommentRouting(
             val commentId = call.parameters["id"]
                 ?: throw BadRequestException("Missing id parameter")
 
-            commentRepository.getCommentById(commentId)
-                ?: throw CommentNotFoundException(id = commentId)
-
-            if (commentLikeRepository.isCommentLikedByUser(sessionDbo.userId, commentId)) {
-                complexQueryHelper.unlikeComment(commentId, sessionDbo.userId)
-            }
+            commentService.unlike(commentId, sessionDbo.userId)
             call.respondSuccess()
         }
 
@@ -233,10 +134,9 @@ fun Route.configureCommentRouting(
                     entityType = ReportEntity.Comment.code,
                     entityId = commentId,
                     reason = request.reason,
-                    text = request.text
+                    text = request.text,
                 )
             )
-
             call.respondSuccess()
         }
     }

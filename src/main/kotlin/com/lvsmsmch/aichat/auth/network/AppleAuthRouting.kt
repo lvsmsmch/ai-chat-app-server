@@ -37,6 +37,7 @@ fun Route.configureAppleAuthRouting(
     complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
+    userService: com.lvsmsmch.aichat.user.UserService,
 ) {
     fun requireConfigured() {
         if (!AppleIdentityTokenVerifier.isConfigured()) {
@@ -74,7 +75,7 @@ fun Route.configureAppleAuthRouting(
                         name = request.fullName?.takeIf { it.isNotBlank() },
                         accountType = AccountType.REGISTERED,
                     ).also {
-                        complexQueryHelper.addUser(it)
+                        userService.addUser(it)
                         // Секции Discover — мгновенно из дефолтного набора
                         runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                     }

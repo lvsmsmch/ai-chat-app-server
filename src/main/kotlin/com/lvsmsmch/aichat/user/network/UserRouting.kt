@@ -24,6 +24,7 @@ fun Route.configureUserRouting(
     complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
+    userService: com.lvsmsmch.aichat.user.UserService,
 ) {
     route("/users") {
 
@@ -286,7 +287,7 @@ fun Route.configureUserRouting(
                 ImageServer.uploadImageOnServer(it)
             }
 
-            complexQueryHelper.updateUser(
+            userService.updateUser(
                 userId = userId,
                 username = username?.lowercase(),
                 name = name,
@@ -413,7 +414,7 @@ fun Route.configureUserRouting(
             }
 
             if (!followRepository.doesConnectionExist(currentUserId, targetUserId)) {
-                complexQueryHelper.followUser(
+                userService.followUser(
                     currentUserId = currentUserId,
                     targetUserId = targetUserId
                 )
@@ -437,7 +438,7 @@ fun Route.configureUserRouting(
             }
 
             if (followRepository.doesConnectionExist(currentUserId, targetUserId)) {
-                complexQueryHelper.unfollowUser(
+                userService.unfollowUser(
                     currentUserId = currentUserId,
                     targetUserId = targetUserId
                 )
@@ -456,7 +457,7 @@ fun Route.configureUserRouting(
                 throw BadRequestException("You can only edit your own profile")
             }
 
-            complexQueryHelper.deleteUser(sessionDbo.userId)
+            userService.deleteUser(sessionDbo.userId)
 
             call.respondSuccess()
         }

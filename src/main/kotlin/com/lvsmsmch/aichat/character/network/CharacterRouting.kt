@@ -28,6 +28,7 @@ fun Route.configureCharacterRouting(
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
+    characterService: com.lvsmsmch.aichat.character.CharacterService,
 ) {
 
     route("/characters") {
@@ -123,7 +124,7 @@ fun Route.configureCharacterRouting(
                 initialMessage = initialMessage!!,
             )
 
-            complexQueryHelper.addCharacter(characterDbo)
+            characterService.addCharacter(characterDbo)
             // Фолловерам автора — «добавил персонажа» (только публичные)
             if (characterDbo.visibility != CharacterVisibility.PRIVATE.code) {
                 notificationService.onFolloweeNewCharacter(characterDbo.authorId, characterDbo.id)
@@ -477,7 +478,7 @@ fun Route.configureCharacterRouting(
 
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
-            val updatedCharacter = complexQueryHelper.updateCharacter(
+            val updatedCharacter = characterService.updateCharacter(
                 characterId = characterId,
                 userId = character.authorId,
                 name = name,
@@ -510,7 +511,7 @@ fun Route.configureCharacterRouting(
                 throw ForbiddenException(errorMessage = "You are not allowed to modify this character")
             }
 
-            complexQueryHelper.deleteCharacter(characterId)
+            characterService.deleteCharacter(characterId)
 
             call.respondSuccess()
         }
@@ -522,9 +523,7 @@ fun Route.configureCharacterRouting(
                 ?: throw BadRequestException("Missing characterId parameter")
             characterRepository.getCharacter(characterId)
                 ?: throw CharacterNotFoundException(id = characterId)
-            if (characterLikeRepository.like(userId, characterId)) {
-                characterRepository.incrementLikesCount(characterId, 1)
-            }
+            characterService.like(characterId, userId)
             call.respondSuccess(com.lvsmsmch.aichat.chat.network.IsSuccessResponse(isSuccess = true))
         }
 
@@ -532,9 +531,7 @@ fun Route.configureCharacterRouting(
             val userId = sessionRepository.verifyToken(call).userId
             val characterId = call.parameters["characterId"]
                 ?: throw BadRequestException("Missing characterId parameter")
-            if (characterLikeRepository.unlike(userId, characterId)) {
-                characterRepository.incrementLikesCount(characterId, -1)
-            }
+            characterService.unlike(characterId, userId)
             call.respondSuccess(com.lvsmsmch.aichat.chat.network.IsSuccessResponse(isSuccess = true))
         }
 

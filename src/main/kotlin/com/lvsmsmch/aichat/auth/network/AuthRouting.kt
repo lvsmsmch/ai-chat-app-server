@@ -30,6 +30,7 @@ fun Route.configureAuthRouting(
     complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
+    userService: com.lvsmsmch.aichat.user.UserService,
 ) {
     route("/auth") {
 
@@ -51,7 +52,7 @@ fun Route.configureAuthRouting(
                         profilePictureUrl = null,
                         accountType = AccountType.REGISTERED
                     ).also {
-                        complexQueryHelper.addUser(it)
+                        userService.addUser(it)
                         // Секции Discover — мгновенно из дефолтного набора
                         runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                     }
@@ -94,7 +95,7 @@ fun Route.configureAuthRouting(
                             dailyImageCount = carry?.dailyImageCount ?: 0,
                             monthlyTopImageCount = carry?.monthlyTopImageCount ?: 0,
                         ).also {
-                            complexQueryHelper.addUser(it)
+                            userService.addUser(it)
                             // Секции Discover — мгновенно из дефолтного набора
                             runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                         }

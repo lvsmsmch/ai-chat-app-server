@@ -49,6 +49,7 @@ fun Route.configureEmailAuthRouting(
     complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
+    userService: com.lvsmsmch.aichat.user.UserService,
 ) {
     /**
      * Пароль в открытом виде по HTTP читается кем угодно на пути, поэтому вход
@@ -123,7 +124,7 @@ fun Route.configureEmailAuthRouting(
                     hashedPassword = Passwords.hash(request.password),
                     accountType = AccountType.REGISTERED,
                 ).also {
-                    complexQueryHelper.addUser(it)
+                    userService.addUser(it)
                     // Секции Discover — мгновенно из дефолтного набора
                     runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
                 }

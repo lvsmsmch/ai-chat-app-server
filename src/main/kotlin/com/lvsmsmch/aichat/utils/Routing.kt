@@ -63,6 +63,9 @@ fun Application.configureRouting(
     authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository,
     mailSender: com.lvsmsmch.aichat.mail.MailSender,
     appleVerifier: com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier,
+    commentService: com.lvsmsmch.aichat.comment.CommentService,
+    characterService: com.lvsmsmch.aichat.character.CharacterService,
+    userService: com.lvsmsmch.aichat.user.UserService,
 ) {
     routing {
         get("/test") {
@@ -84,6 +87,7 @@ fun Application.configureRouting(
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
                 discoverSectionsRepository = discoverSectionsRepository,
+                userService = userService,
             )
 
             configureEmailAuthRouting(
@@ -97,6 +101,7 @@ fun Application.configureRouting(
                 complexQueryHelper = complexQueryHelper,
                 mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
+                userService = userService,
             )
 
             configureAppleAuthRouting(
@@ -108,6 +113,7 @@ fun Application.configureRouting(
                 complexQueryHelper = complexQueryHelper,
                 mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
+                userService = userService,
             )
 
             configureAppDataRouting()
@@ -122,6 +128,7 @@ fun Application.configureRouting(
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
                 notificationService = notificationService,
+                userService = userService,
             )
 
             configureCharacterRouting(
@@ -137,19 +144,14 @@ fun Application.configureRouting(
                 notificationService = notificationService,
                 discoverSectionsRepository = discoverSectionsRepository,
                 characterLikeRepository = characterLikeRepository,
+                characterService = characterService,
             )
 
             configureCommentRouting(
                 sessionRepository = sessionRepository,
-                commentRepository = commentRepository,
-                commentLikeRepository = commentLikeRepository,
                 characterRepository = characterRepository,
                 reportRepository = reportRepository,
-                userRepository = userRepository,
-                idGenerator = idGenerator,
-                mapper = mapper,
-                complexQueryHelper = complexQueryHelper,
-                notificationService = notificationService,
+                commentService = commentService,
             )
 
             configureNotificationsRouting(
