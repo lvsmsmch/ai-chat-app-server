@@ -210,6 +210,7 @@ suspend fun CachedCharactersResult.toDto(
         refreshed = refreshed,
         items = items.map { it.toCharacterDto(mapper, lang, likedIds = liked, authors = authors) },
         nextCursor = nextCursor?.toString(),
+        totalFound = totalFound,
     )
 }
 

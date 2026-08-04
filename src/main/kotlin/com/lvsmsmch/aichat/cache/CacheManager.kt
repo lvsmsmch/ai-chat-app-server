@@ -159,7 +159,7 @@ class CacheManager(
             null
         }
 
-        return CachedCharactersResult(false, validCharacters.toList(), nextCursorPos)
+        return CachedCharactersResult(false, validCharacters.toList(), nextCursorPos, copy.totalFound)
     }
 
     private suspend fun doesNewerVersionExist(userId: String, deviceId: String, listType: CacheListType): Boolean {

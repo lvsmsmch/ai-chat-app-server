@@ -52,7 +52,9 @@ data class CharacterFullInfoDto(
 data class CachedCharactersResultDto(
     @SerialName("refreshed") val refreshed: Boolean = false,
     @SerialName("items") val items: List<CharacterDto>,
-    @SerialName("nextCursor") val nextCursor: String? = null
+    @SerialName("nextCursor") val nextCursor: String? = null,
+    /** Всего найдено по запросу — для строки «12 results for …». */
+    @SerialName("totalFound") val totalFound: Int? = null,
 )
 
 @Serializable
