@@ -31,6 +31,10 @@ object FailReason {
 
 object AiMessageGeneratorUtil {
 
+    /** Память чата: сколько символов истории уходит в запрос. */
+    private const val HISTORY_CHARS_FREE = 4000
+    private const val HISTORY_CHARS_PREMIUM = HISTORY_CHARS_FREE * 2
+
     private val groqApiUrl
         get() = System.getenv("GROQ_API_URL") ?: throw Exception("Missing GROQ_API_URL key")
     private val groqApiKey
@@ -221,7 +225,10 @@ object AiMessageGeneratorUtil {
                 val key = if (viaGroq) groqApiKey else openAiApiKey
                 val model = overrideModel ?: if (viaGroq) groqModel else openAiModel
 
-                val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage) +
+                val messages = buildMessageHistory(
+                    chatDbo, characterDbo, participants, messagesHistory, responseLanguage,
+                    maxCharacters = historyBudget(ownerDbo),
+                ) +
                     listOf(mapOf(
                         "role" to "user",
                         "content" to "[Instruction for your next reply - do not mention it:" + styleNudge + "]"
@@ -285,7 +292,10 @@ object AiMessageGeneratorUtil {
                     "parts" to listOf(mapOf("text" to
                         "[Instruction for your next reply - do not mention it:" + styleNudge + "]"))
                 )
-                val messages = buildGeminiMessageHistory(chatDbo, characterDbo, participants, messagesHistory) + styleMessage
+                val messages = buildGeminiMessageHistory(
+                    chatDbo, characterDbo, participants, messagesHistory,
+                    maxCharacters = historyBudget(ownerDbo),
+                ) + styleMessage
                 val requestBody = buildGeminiRequestBody(messages, chatDbo, characterDbo, responseLanguage)
 
                 logger.debug("Sending request to Gemini API")
@@ -346,7 +356,10 @@ object AiMessageGeneratorUtil {
                 if (genResult == null) {
                     // Фолбэк/ретрай через Grok (xAI): OpenAI-совместимый вызов
                     try {
-                        genResult = generateViaGrokFallback(chatDbo, characterDbo, participants, messagesHistory, responseLanguage, styleNudge)
+                        genResult = generateViaGrokFallback(
+                            chatDbo, characterDbo, participants, messagesHistory,
+                            responseLanguage, styleNudge, ownerDbo,
+                        )
                         usedModel = openAiModel
                     } catch (e: CensoredException) {
                         // Оба фильтра сказали нет — чёрный список: повторные ретраи
@@ -369,13 +382,24 @@ object AiMessageGeneratorUtil {
         }
     }
 
+    /**
+     * Сколько символов истории уходит в запрос.
+     *
+     * У премиума вдвое больше: это и есть «длинная память» из преимуществ
+     * подписки. Считаем в символах, а не в сообщениях — реплики бывают и в
+     * два слова, и на пол-экрана, и десять сообщений одного диалога могут
+     * весить как сто другого.
+     */
+    private fun historyBudget(owner: com.lvsmsmch.aichat.user.database.UserDbo?): Int =
+        if (owner?.hasSubscription == true) HISTORY_CHARS_PREMIUM else HISTORY_CHARS_FREE
+
     private fun buildMessageHistory(
         chatDbo: ChatDbo,
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
         responseLanguage: String? = null,
-        maxCharacters: Int = 4000
+        maxCharacters: Int = HISTORY_CHARS_FREE,
     ): List<Map<String, String>> {
         val systemMessage = mapOf(
             "role" to "system",
@@ -476,8 +500,12 @@ object AiMessageGeneratorUtil {
         messagesHistory: List<MessageDbo>,
         responseLanguage: String?,
         styleNudge: String,
+        ownerDbo: com.lvsmsmch.aichat.user.database.UserDbo?,
     ): GenText {
-        val messages = buildMessageHistory(chatDbo, characterDbo, participants, messagesHistory, responseLanguage) +
+        val messages = buildMessageHistory(
+            chatDbo, characterDbo, participants, messagesHistory, responseLanguage,
+            maxCharacters = historyBudget(ownerDbo),
+        ) +
             listOf(mapOf(
                 "role" to "user",
                 "content" to "[Instruction for your next reply - do not mention it:" + styleNudge + "]"
@@ -594,7 +622,7 @@ object AiMessageGeneratorUtil {
         characterDbo: CharacterDbo,
         participants: List<CharacterDbo>,
         messagesHistory: List<MessageDbo>,
-        maxCharacters: Int = 4000
+        maxCharacters: Int = HISTORY_CHARS_FREE,
     ): List<Map<String, Any>> {
         val selectedMessages = mutableListOf<MessageDbo>()
         var currentCharacterCount = 0
