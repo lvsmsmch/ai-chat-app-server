@@ -145,6 +145,7 @@ fun Application.configureRouting() {
                 discoverSectionsRepository = discoverSectionsRepository,
                 characterLikeRepository = characterLikeRepository,
                 characterService = characterService,
+                chatRepository = chatRepository,
             )
 
             configureCommentRouting(

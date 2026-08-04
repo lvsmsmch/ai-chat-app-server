@@ -28,6 +28,7 @@ fun Route.configureCharacterRouting(
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
     characterService: com.lvsmsmch.aichat.character.CharacterService,
+    chatRepository: com.lvsmsmch.aichat.chat.database.ChatRepository,
 ) {
 
     route("/characters") {
@@ -227,6 +228,62 @@ fun Route.configureCharacterRouting(
             )
 
             call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId))
+        }
+
+        /**
+         * Список для пикера группового чата — уже отсортированный по
+         * релевантности, без фильтров на клиенте.
+         *
+         * Порядок: сначала те, с кем юзер реально переписывался (свежие чаты
+         * сверху), затем сохранённые, затем популярные. Считается на сервере,
+         * потому что клиент видит только свою страницу списка и «часто
+         * взаимодействует» на ней не вычислит: нужны все чаты и все лайки
+         * разом.
+         *
+         * Пагинация страничная: курсор — номер страницы, как у ленты.
+         */
+        get("/picker") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val pageSize = call.request.queryParameters["size"]?.toIntOrNull() ?: 20
+            val page = call.request.queryParameters["cursor"]?.toIntOrNull() ?: 1
+            require(pageSize in 1..100) { "Size must be between 1 and 100" }
+            require(page >= 1) { "Cursor must be a positive page number" }
+
+            // Ранжирование строим ЦЕЛИКОМ, затем режем на страницы: порядок
+            // должен быть устойчивым между запросами, иначе на второй странице
+            // всплывут те же персонажи, что были на первой
+            val chats = chatRepository.getChatsByUserId(userId)
+            val chatted = chats.flatMap { it.characterIds }.distinct()
+            val (likedIds, _) = characterLikeRepository.getLikedCharacterIds(userId, null, 200)
+            val liked = likedIds.filterNot { it in chatted }
+
+            val ranked = chatted + liked
+            val needed = page * pageSize
+
+            // Хвост добираем популярными, пропуская уже попавших выше
+            val popular = if (ranked.size < needed) {
+                characterRepository.getCharacters(
+                    sortCriteria = CharacterSortCriteria.MOST_POPULAR.code,
+                    page = 1,
+                    size = needed + ranked.size,
+                ).map { it.id }.filterNot { it in ranked.toSet() }
+            } else emptyList()
+
+            val pageIds = (ranked + popular).drop((page - 1) * pageSize).take(pageSize)
+            val lang = mapper.languageOf(userId)
+            val pageLiked = characterLikeRepository.getLikedIds(userId, pageIds)
+            val characters = mapper
+                .charactersDtoByIds(pageIds, lang, pageLiked, publicOnly = false)
+                // Приватные чужие сюда попасть не должны: свои — можно, с ними
+                // юзер и переписывается
+                .filter { it.visibility == CharacterVisibility.PUBLIC.code || it.author.id == userId }
+
+            call.respondSuccess(
+                data = CachedCharactersResultDto(
+                    items = characters,
+                    nextCursor = if (characters.size < pageSize) null else (page + 1).toString(),
+                )
+            )
         }
 
         get("/search/suggestions") {
