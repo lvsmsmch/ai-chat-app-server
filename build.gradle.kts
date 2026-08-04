@@ -58,6 +58,10 @@ dependencies {
 
     implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
 
+    // Проверка identity-токена Apple (RS256). Подпись — библиотекой, а не руками:
+    // ошибка в самодельной проверке означала бы приём поддельных токенов
+    implementation("com.auth0:java-jwt:4.4.0")
+
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.0.20")
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("io.mockk:mockk:1.13.7")

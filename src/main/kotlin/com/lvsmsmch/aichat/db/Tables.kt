@@ -37,6 +37,8 @@ object Tables {
         val characterLanguage = text("character_language")
         val deviceId = text("device_id").nullable()
         val facebookOauthId = text("facebook_oauth_id").nullable()
+        /** Apple sub из identity-токена: у Apple это единственный стабильный id. */
+        val appleOauthId = text("apple_oauth_id").nullable()
         val hashedPassword = text("hashed_password").nullable()
         val privateCharacterCount = integer("private_character_count")
         val publicCharacterCount = integer("public_character_count")
@@ -69,6 +71,7 @@ object Tables {
             index(false, email)
             index(false, googleOauthId)
             index(false, facebookOauthId)
+            index(false, appleOauthId)
             index(false, username)
             index(false, lastActiveAt)
             index(false, deviceId)

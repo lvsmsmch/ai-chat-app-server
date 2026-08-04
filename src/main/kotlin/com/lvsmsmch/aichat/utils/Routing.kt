@@ -6,6 +6,7 @@ import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.app_data.network.configureAppDataRouting
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.auth.network.configureAuthRouting
+import com.lvsmsmch.aichat.auth.network.configureAppleAuthRouting
 import com.lvsmsmch.aichat.auth.network.configureEmailAuthRouting
 import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.character.database.CharacterRepository
@@ -61,6 +62,7 @@ fun Application.configureRouting(
     authCodeRepository: com.lvsmsmch.aichat.auth.database.AuthCodeRepository,
     authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository,
     mailSender: com.lvsmsmch.aichat.mail.MailSender,
+    appleVerifier: com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier,
 ) {
     routing {
         get("/test") {
@@ -90,6 +92,17 @@ fun Application.configureRouting(
                 authCodeRepository = authCodeRepository,
                 authLockoutRepository = authLockoutRepository,
                 mailSender = mailSender,
+                idGenerator = idGenerator,
+                usernameGenerator = usernameGenerator,
+                complexQueryHelper = complexQueryHelper,
+                mapper = mapper,
+                discoverSectionsRepository = discoverSectionsRepository,
+            )
+
+            configureAppleAuthRouting(
+                userRepository = userRepository,
+                sessionRepository = sessionRepository,
+                appleVerifier = appleVerifier,
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
                 complexQueryHelper = complexQueryHelper,

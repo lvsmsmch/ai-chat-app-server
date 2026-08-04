@@ -193,6 +193,23 @@ class EmailAuthDisabledException(
     errorMessage = errorMessage
 )
 
+class AppleAccountAlreadyInUseException(
+    errorMessage: String = "This Apple account is already connected to another account."
+) : ApiException(
+    httpStatus = HttpStatusCode.Conflict,
+    errorCode = "already_apple_connected",
+    errorMessage = errorMessage
+)
+
+/** APPLE_CLIENT_IDS не задан — проверять aud токена нечем, вход запрещён. */
+class AppleAuthNotConfiguredException(
+    errorMessage: String = "Apple sign-in is not available yet."
+) : ApiException(
+    httpStatus = HttpStatusCode.ServiceUnavailable,
+    errorCode = "apple_auth_not_configured",
+    errorMessage = errorMessage
+)
+
 class InternalServerErrorException(
     errorMessage: String = "An unexpected error occurred"
 ) : ApiException(

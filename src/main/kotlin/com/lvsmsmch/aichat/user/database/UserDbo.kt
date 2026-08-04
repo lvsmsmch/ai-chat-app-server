@@ -23,6 +23,8 @@ data class UserDbo(
     val characterLanguage: String = "en",
     val deviceId: String? = null,
     val facebookOauthId: String? = null,
+    /** Apple sub: почту Apple отдаёт только при первой авторизации, id — всегда. */
+    val appleOauthId: String? = null,
     val hashedPassword: String? = null,
     val privateCharacterCount: Int = 0,
     val publicCharacterCount: Int = 0,

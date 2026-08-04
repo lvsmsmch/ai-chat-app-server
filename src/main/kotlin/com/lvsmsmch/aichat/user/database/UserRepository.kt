@@ -62,6 +62,9 @@ class UserRepository {
     suspend fun findByGoogleId(googleId: String): UserDbo? =
         findOneBy(Tables.Users.googleOauthId, googleId)
 
+    suspend fun findByAppleId(appleId: String): UserDbo? =
+        findOneBy(Tables.Users.appleOauthId, appleId)
+
     suspend fun findByDeviceId(deviceId: String): UserDbo? =
         findOneBy(Tables.Users.deviceId, deviceId)
 
@@ -153,6 +156,28 @@ class UserRepository {
             it[Tables.Users.deviceId] = null
             it[Tables.Users.googleOauthId] = googleId
             it[Tables.Users.email] = email
+        }
+    }
+
+    /**
+     * Привязка Apple. Почта пишется только если пришла: Apple отдаёт её лишь
+     * при первой авторизации, и перетирать имеющийся адрес пустотой нельзя.
+     * Адрес от Apple считается подтверждённым — его проверил сам Apple.
+     */
+    suspend fun linkAppleToUser(
+        userId: String,
+        appleId: String,
+        email: String? = null,
+        emailVerifiedByApple: Boolean = false,
+    ) {
+        updateById(userId) {
+            it[Tables.Users.accountType] = AccountType.REGISTERED.name
+            it[Tables.Users.deviceId] = null
+            it[Tables.Users.appleOauthId] = appleId
+            if (email != null) {
+                it[Tables.Users.email] = email
+                if (emailVerifiedByApple) it[Tables.Users.emailVerified] = true
+            }
         }
     }
 

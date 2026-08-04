@@ -146,6 +146,11 @@ fun Application.module() {
         }
     )
 
+    // Проверка токенов Apple: тем же HTTP-клиентом, что и письма
+    val appleVerifier = com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier(
+        HttpClient()
+    )
+
     val cacheManager = CacheManager(
         characterRepository = characterRepository,
         userRecommendationsCacheRepository = userRecommendationsCacheRepository,
@@ -351,6 +356,7 @@ fun Application.module() {
         authCodeRepository = authCodeRepository,
         authLockoutRepository = authLockoutRepository,
         mailSender = mailSender,
+        appleVerifier = appleVerifier,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {
