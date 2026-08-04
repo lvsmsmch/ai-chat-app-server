@@ -1,49 +1,51 @@
 package com.lvsmsmch.aichat.cache.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toDefaultRecommendationsCacheDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.client.model.ReplaceOptions
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upsert
 
 @Serializable
 data class DefaultRecommendationsCacheDbo(
-    @BsonId val id: String = "default_recommendations_cache",
+    @BsonId val id: String = DEFAULT_CACHE_ID,
     val characterIds: List<String>,
     val updatedAt: String = UtcTimestamp.now().toString(),
     val version: String = ObjectId().toString()
 )
 
-class DefaultRecommendationsCacheRepository(
-    private val collection: CoroutineCollection<DefaultRecommendationsCacheDbo>
-) {
+private const val DEFAULT_CACHE_ID = "default_recommendations_cache"
 
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+class DefaultRecommendationsCacheRepository {
 
     suspend fun updateDefaultCache(characterIds: List<String>) {
         val cache = DefaultRecommendationsCacheDbo(
             characterIds = characterIds,
-            updatedAt = UtcTimestamp.now().toString()
+            updatedAt = UtcTimestamp.now().toString(),
         )
-        
-        collection.replaceOneById("default_recommendations_cache", cache, ReplaceOptions().upsert(true))
+        dbQuery { Tables.DefaultRecommendationsCache.upsert { it.from(cache) } }
     }
 
-    suspend fun getDefaultRecommendations(): List<String> {
-        val cache = collection.findOneById("default_recommendations_cache")
-        return cache?.characterIds ?: emptyList()
-    }
+    suspend fun getDefaultRecommendations(): List<String> =
+        getDefaultCache()?.characterIds ?: emptyList()
 
-    suspend fun getDefaultCache(): DefaultRecommendationsCacheDbo? {
-        return collection.findOneById("default_recommendations_cache")
+    suspend fun getDefaultCache(): DefaultRecommendationsCacheDbo? = dbQuery {
+        Tables.DefaultRecommendationsCache.selectAll()
+            .where { Tables.DefaultRecommendationsCache.id eq DEFAULT_CACHE_ID }
+            .limit(1)
+            .firstOrNull()
+            ?.toDefaultRecommendationsCacheDbo()
     }
 
     suspend fun hasRecentCache(maxAgeHours: Long = 1): Boolean {
-        val cache = collection.findOneById("default_recommendations_cache") ?: return false
-        val cutoff = UtcTimestamp.now().subtractHours(maxAgeHours)
-        return UtcTimestamp.parse(cache.updatedAt).isAfter(cutoff)
+        val cache = getDefaultCache() ?: return false
+        return UtcTimestamp.parse(cache.updatedAt)
+            .isAfter(UtcTimestamp.now().subtractHours(maxAgeHours))
     }
 }

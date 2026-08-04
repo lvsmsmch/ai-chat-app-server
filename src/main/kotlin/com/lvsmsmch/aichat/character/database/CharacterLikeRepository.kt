@@ -1,11 +1,21 @@
 package com.lvsmsmch.aichat.character.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toCharacterLikeDbo
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
 /** Лайк персонажа: id = "<userId>_<characterId>" (естественная уникальность). */
 @Serializable
@@ -16,44 +26,53 @@ data class CharacterLikeDbo(
     val likedAt: String = UtcTimestamp.now().toString(),
 )
 
-class CharacterLikeRepository(
-    private val collection: CoroutineCollection<CharacterLikeDbo>,
-) {
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(CharacterLikeDbo::userId))
-        collection.ensureIndex(ascending(CharacterLikeDbo::characterId))
-        // Лента «Liked» юзера: свежие сверху
-        collection.ensureIndex(
-            com.mongodb.client.model.Indexes.compoundIndex(
-                ascending(CharacterLikeDbo::userId),
-                descending(CharacterLikeDbo::likedAt),
-            )
-        )
-    }
+class CharacterLikeRepository {
 
     private fun likeId(userId: String, characterId: String) = "${userId}_${characterId}"
 
     /** @return true, если лайк реально добавлен (а не повтор). */
-    suspend fun like(userId: String, characterId: String): Boolean {
+    suspend fun like(userId: String, characterId: String): Boolean = dbQuery {
         val id = likeId(userId, characterId)
-        if (collection.findOneById(id) != null) return false
-        collection.insertOne(CharacterLikeDbo(id = id, userId = userId, characterId = characterId))
-        return true
+        val exists = Tables.CharacterLikes.selectAll()
+            .where { Tables.CharacterLikes.id eq id }
+            .limit(1)
+            .any()
+        if (exists) {
+            false
+        } else {
+            Tables.CharacterLikes.insert {
+                it.from(CharacterLikeDbo(id = id, userId = userId, characterId = characterId))
+            }
+            true
+        }
     }
 
     /** @return true, если лайк реально снят. */
-    suspend fun unlike(userId: String, characterId: String): Boolean =
-        collection.deleteOneById(likeId(userId, characterId)).deletedCount > 0
+    suspend fun unlike(userId: String, characterId: String): Boolean = dbQuery {
+        Tables.CharacterLikes.deleteWhere {
+            Tables.CharacterLikes.id eq likeId(userId, characterId)
+        } > 0
+    }
 
-    suspend fun isLiked(userId: String, characterId: String): Boolean =
-        collection.findOneById(likeId(userId, characterId)) != null
+    suspend fun isLiked(userId: String, characterId: String): Boolean = dbQuery {
+        Tables.CharacterLikes.selectAll()
+            .where { Tables.CharacterLikes.id eq likeId(userId, characterId) }
+            .limit(1)
+            .any()
+    }
 
     /** Батч-проверка для списков: какие из [characterIds] лайкнуты юзером. */
     suspend fun getLikedIds(userId: String, characterIds: List<String>): Set<String> {
         if (characterIds.isEmpty()) return emptySet()
-        return collection.find(
-            CharacterLikeDbo::id `in` characterIds.map { likeId(userId, it) }
-        ).toList().map { it.characterId }.toSet()
+        return dbQuery {
+            Tables.CharacterLikes.selectAll()
+                .where {
+                    (Tables.CharacterLikes.userId eq userId) and
+                        (Tables.CharacterLikes.characterId inList characterIds)
+                }
+                .map { it[Tables.CharacterLikes.characterId] }
+                .toSet()
+        }
     }
 
     /** Лайкнутые персонажи юзера, свежие сверху; курсор — likedAt. */
@@ -61,33 +80,44 @@ class CharacterLikeRepository(
         userId: String,
         cursor: String?,
         size: Int,
-    ): Pair<List<String>, String?> {
-        val filters = listOfNotNull(
-            CharacterLikeDbo::userId eq userId,
-            cursor?.let { CharacterLikeDbo::likedAt lt it },
-        )
-        val items = collection.find(and(filters))
-            .sort(descending(CharacterLikeDbo::likedAt))
+    ): Pair<List<String>, String?> = dbQuery {
+        val items = Tables.CharacterLikes.selectAll()
+            .where {
+                val base = Tables.CharacterLikes.userId eq userId
+                if (cursor == null) base else base and (Tables.CharacterLikes.likedAt less cursor)
+            }
+            .orderBy(Tables.CharacterLikes.likedAt to SortOrder.DESC)
             .limit(size + 1)
-            .toList()
+            .map { it.toCharacterLikeDbo() }
         val page = items.take(size)
         val next = if (items.size > size) page.lastOrNull()?.likedAt else null
-        return page.map { it.characterId } to next
+        page.map { it.characterId } to next
     }
 
-    suspend fun countForCharacter(characterId: String): Int =
-        collection.countDocuments(CharacterLikeDbo::characterId eq characterId).toInt()
+    suspend fun countForCharacter(characterId: String): Int = dbQuery {
+        Tables.CharacterLikes.selectAll()
+            .where { Tables.CharacterLikes.characterId eq characterId }
+            .count()
+            .toInt()
+    }
 
-    suspend fun removeAllForCharacters(session: ClientSession, characterIds: List<String>) {
+    suspend fun removeAllForCharacters(session: DbSession, characterIds: List<String>) {
         if (characterIds.isEmpty()) return
-        collection.deleteMany(session, CharacterLikeDbo::characterId `in` characterIds)
+        dbQuery {
+            Tables.CharacterLikes.deleteWhere {
+                Tables.CharacterLikes.characterId inList characterIds
+            }
+        }
     }
 
     /** Лайки, поставленные юзером (при удалении аккаунта). */
-    suspend fun getLikesByUser(session: ClientSession, userId: String): List<CharacterLikeDbo> =
-        collection.find(CharacterLikeDbo::userId eq userId).toList()
+    suspend fun getLikesByUser(session: DbSession, userId: String): List<CharacterLikeDbo> = dbQuery {
+        Tables.CharacterLikes.selectAll()
+            .where { Tables.CharacterLikes.userId eq userId }
+            .map { it.toCharacterLikeDbo() }
+    }
 
-    suspend fun removeAllByUser(session: ClientSession, userId: String) {
-        collection.deleteMany(session, CharacterLikeDbo::userId eq userId)
+    suspend fun removeAllByUser(session: DbSession, userId: String) {
+        dbQuery { Tables.CharacterLikes.deleteWhere { Tables.CharacterLikes.userId eq userId } }
     }
 }

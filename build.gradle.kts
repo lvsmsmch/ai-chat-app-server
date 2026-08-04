@@ -33,8 +33,17 @@ dependencies {
     implementation("io.ktor:ktor-server-rate-limit:$ktorVersion")
     implementation("io.ktor:ktor-server-compression:$ktorVersion")
 
+    // Mongo остаётся только для одноразовой переливки данных в Postgres
+    // (MigrateMongoToPostgres). Рантайм сервера на него больше не смотрит.
     implementation("org.litote.kmongo:kmongo:5.2.0")
     implementation("org.litote.kmongo:kmongo-coroutine:5.2.0")
+
+    // Postgres: Exposed + пул соединений
+    val exposedVersion = "0.61.0"
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.postgresql:postgresql:42.7.4")
+    implementation("com.zaxxer:HikariCP:5.1.0")
 
     implementation("software.amazon.awssdk:s3:2.20.45")
     implementation("software.amazon.awssdk:aws-core:2.20.45")

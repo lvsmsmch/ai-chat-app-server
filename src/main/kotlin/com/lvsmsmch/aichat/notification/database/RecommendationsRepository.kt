@@ -1,80 +1,62 @@
 package com.lvsmsmch.aichat.notification.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toRecommendationsDbo
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.reactivestreams.client.ClientSession
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
-class RecommendationsRepository(
-    private val collection: CoroutineCollection<RecommendationsDbo>
-) {
-
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(RecommendationsDbo::userId))
-        collection.ensureIndex(descending(RecommendationsDbo::createdAt))
-
-        collection.ensureIndex(
-            ascending(
-                RecommendationsDbo::userId,
-                RecommendationsDbo::createdAt
-            )
-        )
-    }
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
+class RecommendationsRepository {
 
     suspend fun insertNotification(
-        session: ClientSession? = null,
-        notification: RecommendationsDbo
+        session: DbSession? = null,
+        notification: RecommendationsDbo,
     ) {
-        if (session != null) {
-            collection.insertOne(session, notification)
-        } else {
-            collection.insertOne(notification)
-        }
+        dbQuery { Tables.Recommendations.insert { it.from(notification) } }
     }
 
-
-
-
-    suspend fun getNotificationById(notificationId: String): RecommendationsDbo? {
-        return collection.findOneById(notificationId)
+    suspend fun getNotificationById(notificationId: String): RecommendationsDbo? = dbQuery {
+        Tables.Recommendations.selectAll()
+            .where { Tables.Recommendations.id eq notificationId }
+            .limit(1)
+            .firstOrNull()
+            ?.toRecommendationsDbo()
     }
 
     suspend fun getNotificationsAfter(
         userId: String,
-        timestamp: UtcTimestamp
-    ): List<RecommendationsDbo> {
-        val filter = and(
-            RecommendationsDbo::userId eq userId,
-            RecommendationsDbo::createdAt gt timestamp.toString()
-        )
-
-        return collection.find(filter)
-            .sort(descending(RecommendationsDbo::createdAt))
-            .toList()
+        timestamp: UtcTimestamp,
+    ): List<RecommendationsDbo> = dbQuery {
+        Tables.Recommendations.selectAll()
+            .where {
+                (Tables.Recommendations.userId eq userId) and
+                    (Tables.Recommendations.createdAt greater timestamp.toString())
+            }
+            .orderBy(Tables.Recommendations.createdAt to SortOrder.DESC)
+            .map { it.toRecommendationsDbo() }
     }
 
-
-
     suspend fun deleteNotification(notificationId: String) {
-        collection.deleteOneById(notificationId)
+        dbQuery { Tables.Recommendations.deleteWhere { Tables.Recommendations.id eq notificationId } }
     }
 
     suspend fun deleteNotifications(notificationIds: List<String>) {
         if (notificationIds.isEmpty()) return
-
-        collection.deleteMany(
-            RecommendationsDbo::id `in` notificationIds
-        )
+        dbQuery {
+            Tables.Recommendations.deleteWhere { Tables.Recommendations.id inList notificationIds }
+        }
     }
 
     suspend fun deleteUserNotifications(userId: String) {
-        collection.deleteMany(
-            RecommendationsDbo::userId eq userId
-        )
+        dbQuery { Tables.Recommendations.deleteWhere { Tables.Recommendations.userId eq userId } }
     }
 }

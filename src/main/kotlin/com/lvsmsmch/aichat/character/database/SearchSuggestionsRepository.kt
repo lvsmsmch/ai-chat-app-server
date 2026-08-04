@@ -1,162 +1,179 @@
 package com.lvsmsmch.aichat.character.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toSearchSuggestionDbo
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.client.model.Indexes.compoundIndex
-import com.mongodb.reactivestreams.client.ClientSession
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
-import org.litote.kmongo.coroutine.insertOne
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.batchInsert
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 
-class SearchSuggestionsRepository(
-    private val collection: CoroutineCollection<SearchSuggestionDbo>
-) {
+class SearchSuggestionsRepository {
 
-
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(SearchSuggestionDbo::term))
-
-        collection.ensureIndex(descending(SearchSuggestionDbo::searchCount))
-
-        collection.ensureIndex(
-            compoundIndex(
-                ascending(SearchSuggestionDbo::term),
-                descending(SearchSuggestionDbo::searchCount)
-            )
-        )
+    private suspend fun exists(term: String): Boolean = dbQuery {
+        Tables.SearchSuggestions.selectAll()
+            .where { Tables.SearchSuggestions.term eq term }
+            .limit(1)
+            .any()
     }
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
 
     suspend fun addDefaultSuggestions(suggestions: List<String>) {
         if (suggestions.isEmpty()) return
-
-        val suggestionsToInsert = mutableListOf<SearchSuggestionDbo>()
-
-        suggestions.forEach { originalText ->
+        val toInsert = suggestions.mapNotNull { originalText ->
             val normalizedTerm = originalText.trim().lowercase()
-            val existing = collection.findOneById(normalizedTerm)
-            if (existing == null) {
-                val suggestion = SearchSuggestionDbo(
-                    term = normalizedTerm,
-                    displayText = originalText.trim(),
-                    isAllowedToShow = true,
-                    searchCount = 1,
-                    isCharacterName = false,
-                    lastSearchedAt = UtcTimestamp.now().toString()
-                )
-                suggestionsToInsert.add(suggestion)
+            if (exists(normalizedTerm)) null
+            else SearchSuggestionDbo(
+                term = normalizedTerm,
+                displayText = originalText.trim(),
+                isAllowedToShow = true,
+                searchCount = 1,
+                isCharacterName = false,
+                lastSearchedAt = UtcTimestamp.now().toString(),
+            )
+        }
+        if (toInsert.isEmpty()) return
+        dbQuery {
+            Tables.SearchSuggestions.batchInsert(toInsert, shouldReturnGeneratedValues = false) {
+                from(it)
             }
         }
-
-        if (suggestionsToInsert.isNotEmpty()) {
-            collection.insertMany(suggestionsToInsert)
-        }
     }
 
-    suspend fun addCharacterName(session: ClientSession, originalText: String) {
+    suspend fun addCharacterName(session: DbSession, originalText: String) {
         val normalizedTerm = originalText.trim().lowercase()
-        val existing = collection.findOneById(normalizedTerm)
-        if (existing == null) {
-            val suggestion = SearchSuggestionDbo(
-                term = normalizedTerm,
-                // Показываем имя в оригинальном регистре, а не lowercase
-                displayText = originalText.trim(),
-                searchCount = 1,
-                isCharacterName = true,
-                lastSearchedAt = UtcTimestamp.now().toString()
-            )
-            collection.insertOne(session, suggestion)
-        }
+        if (exists(normalizedTerm)) return
+        val suggestion = SearchSuggestionDbo(
+            term = normalizedTerm,
+            // Показываем имя в оригинальном регистре, а не lowercase
+            displayText = originalText.trim(),
+            searchCount = 1,
+            isCharacterName = true,
+            lastSearchedAt = UtcTimestamp.now().toString(),
+        )
+        dbQuery { Tables.SearchSuggestions.insert { it.from(suggestion) } }
     }
 
-    suspend fun updateCharacterName(session: ClientSession, oldText: String, newText: String) {
+    suspend fun updateCharacterName(session: DbSession, oldText: String, newText: String) {
         val oldNormalizedTerm = oldText.trim().lowercase()
         val newNormalizedTerm = newText.trim().lowercase()
-
         if (oldNormalizedTerm == newNormalizedTerm) return
 
-        collection.deleteOneById(session, oldNormalizedTerm)
+        dbQuery {
+            Tables.SearchSuggestions.deleteWhere {
+                Tables.SearchSuggestions.term eq oldNormalizedTerm
+            }
+            val existing = Tables.SearchSuggestions.selectAll()
+                .where { Tables.SearchSuggestions.term eq newNormalizedTerm }
+                .limit(1)
+                .firstOrNull()
+                ?.toSearchSuggestionDbo()
 
-        val existing = collection.findOneById(newNormalizedTerm)
-        if (existing == null) {
-            val suggestion = SearchSuggestionDbo(
-                term = newNormalizedTerm,
-                displayText = newText.trim(),
-                searchCount = 1,
-                isCharacterName = true,
-                lastSearchedAt = UtcTimestamp.now().toString()
-            )
-            collection.insertOne(session, suggestion)
-        } else {
-            collection.replaceOneById(
-                session,
-                newNormalizedTerm,
-                existing.copy(
+            if (existing == null) {
+                Tables.SearchSuggestions.insert {
+                    it.from(
+                        SearchSuggestionDbo(
+                            term = newNormalizedTerm,
+                            displayText = newText.trim(),
+                            searchCount = 1,
+                            isCharacterName = true,
+                            lastSearchedAt = UtcTimestamp.now().toString(),
+                        )
+                    )
+                }
+            } else {
+                val updated = existing.copy(
                     displayText = newText.trim(),
                     isCharacterName = true,
-                    lastSearchedAt = UtcTimestamp.now().toString()
+                    lastSearchedAt = UtcTimestamp.now().toString(),
                 )
-            )
+                Tables.SearchSuggestions.update({
+                    Tables.SearchSuggestions.term eq newNormalizedTerm
+                }) { it.from(updated) }
+            }
         }
     }
-    
+
     /**
      * Подсказки: имена персонажей + кураторские дефолты + популярные юзерские
      * запросы (от 5 поисков — защита от мусора и чужих случайных строк).
      * Матчинг: сначала префикс всего термина, потом начало любого слова
      * («shino» находит «Kaguya Shinomiya»).
      */
-    suspend fun getSuggestions(query: String, limit: Int): List<String> {
+    suspend fun getSuggestions(query: String, limit: Int): List<String> = dbQuery {
         val normalizedQuery = query.trim().lowercase()
-        val visible = org.litote.kmongo.or(
-            SearchSuggestionDbo::isCharacterName eq true,
-            SearchSuggestionDbo::isAllowedToShow eq true,
-            SearchSuggestionDbo::searchCount gte 5,
-        )
-        val prefix = collection.find(
-            and(visible, SearchSuggestionDbo::term.regex("^${Regex.escape(normalizedQuery)}", "i"))
-        ).sort(descending(SearchSuggestionDbo::searchCount))
+        val visible = (Tables.SearchSuggestions.isCharacterName eq true) or
+            (Tables.SearchSuggestions.isAllowedToShow eq true) or
+            (Tables.SearchSuggestions.searchCount greaterEq 5L)
+
+        // LIKE вместо регекса Mongo: term лежит уже в lowercase, поэтому
+        // сравнение и так регистронезависимое
+        val prefix = Tables.SearchSuggestions.selectAll()
+            .where { visible and (Tables.SearchSuggestions.term like "${escapeLike(normalizedQuery)}%") }
+            .orderBy(Tables.SearchSuggestions.searchCount to SortOrder.DESC)
             .limit(limit)
-            .toList()
+            .map { it.toSearchSuggestionDbo() }
+
         if (prefix.size >= limit || normalizedQuery.isBlank()) {
-            return prefix.take(limit).map { it.displayText }
+            prefix.take(limit).map { it.displayText }
+        } else {
+            // Добираем совпадениями по началу слова внутри термина
+            val wordStart = Tables.SearchSuggestions.selectAll()
+                .where {
+                    visible and (Tables.SearchSuggestions.term like "% ${escapeLike(normalizedQuery)}%")
+                }
+                .orderBy(Tables.SearchSuggestions.searchCount to SortOrder.DESC)
+                .limit(limit)
+                .map { it.toSearchSuggestionDbo() }
+            val known = prefix.map { it.term }.toSet()
+            (prefix + wordStart.filterNot { it.term in known })
+                .take(limit)
+                .map { it.displayText }
         }
-        // Добираем совпадениями по началу слова внутри термина
-        val wordStart = collection.find(
-            and(visible, SearchSuggestionDbo::term.regex("\\s${Regex.escape(normalizedQuery)}", "i"))
-        ).sort(descending(SearchSuggestionDbo::searchCount))
-            .limit(limit)
-            .toList()
-        val known = prefix.map { it.term }.toSet()
-        return (prefix + wordStart.filterNot { it.term in known })
-            .take(limit)
-            .map { it.displayText }
     }
-    
+
+    /** Спецсимволы LIKE в пользовательском вводе не должны работать как шаблон. */
+    private fun escapeLike(value: String): String =
+        value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
     suspend fun recordSearch(query: String) {
         val normalizedTerm = query.trim().lowercase()
-        val existing = collection.findOneById(normalizedTerm)
-        if (existing == null) {
-            val suggestion = SearchSuggestionDbo(
-                term = normalizedTerm,
-                displayText = normalizedTerm,
-                isAllowedToShow = false,
-                searchCount = 1,
-                isCharacterName = false,
-                lastSearchedAt = UtcTimestamp.now().toString()
-            )
-            collection.insertOne(suggestion)
-        } else {
-            collection.updateOneById(
-                normalizedTerm,
-                combine(
-                    inc(SearchSuggestionDbo::searchCount, 1),
-                    setValue(SearchSuggestionDbo::lastSearchedAt, UtcTimestamp.now().toString())
-                )
-            )
+        dbQuery {
+            val existing = Tables.SearchSuggestions.selectAll()
+                .where { Tables.SearchSuggestions.term eq normalizedTerm }
+                .limit(1)
+                .any()
+            if (!existing) {
+                Tables.SearchSuggestions.insert {
+                    it.from(
+                        SearchSuggestionDbo(
+                            term = normalizedTerm,
+                            displayText = normalizedTerm,
+                            isAllowedToShow = false,
+                            searchCount = 1,
+                            isCharacterName = false,
+                            lastSearchedAt = UtcTimestamp.now().toString(),
+                        )
+                    )
+                }
+            } else {
+                Tables.SearchSuggestions.update({
+                    Tables.SearchSuggestions.term eq normalizedTerm
+                }) {
+                    it[Tables.SearchSuggestions.searchCount] =
+                        Tables.SearchSuggestions.searchCount plus 1L
+                    it[Tables.SearchSuggestions.lastSearchedAt] = UtcTimestamp.now().toString()
+                }
+            }
         }
     }
 }

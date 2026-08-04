@@ -1,32 +1,38 @@
 package com.lvsmsmch.aichat.utils
 
-import com.mongodb.reactivestreams.client.ClientSession
-import org.litote.kmongo.coroutine.CoroutineClient
-import org.litote.kmongo.coroutine.abortTransactionAndAwait
-import org.litote.kmongo.coroutine.commitTransactionAndAwait
+import com.lvsmsmch.aichat.db.Db
 
-class TransactionHelper(val client: CoroutineClient) {
+/**
+ * Маркер «этот вызов идёт внутри транзакции».
+ *
+ * Саму транзакцию Exposed держит в контексте корутины, поэтому передавать
+ * наружу нечего. Но тип оставлен намеренно: он не даёт случайно позвать
+ * транзакционный метод репозитория снаружи транзакции — раньше эту роль играл
+ * Mongo-ClientSession, и все составные операции в ComplexQueryHelper построены
+ * на том, что сессию нужно откуда-то получить.
+ */
+class DbSession internal constructor()
 
-    suspend fun <T: Any> withTransaction(transactions: suspend (ClientSession) -> T): T {
-        val session = client.startSession()
-        try {
+/**
+ * Составная операция целиком: либо все запросы внутри применились, либо ни
+ * один. Вложенные вызовы репозиториев присоединяются к этой же транзакции
+ * автоматически — см. [Db.dbQuery].
+ */
+class TransactionHelper {
+
+    suspend fun <T : Any> withTransaction(transactions: suspend (DbSession) -> T): T =
+        Db.dbQuery {
             logger.info("TRANSACTION STARTED")
-            session.startTransaction()
-
-            val result = transactions(session)
-
-            session.commitTransactionAndAwait()
-            logger.info("TRANSACTION FINISHED")
-
-            return result
-        } catch (e: Exception) {
-            logger.error("TRANSACTION FAILED !!!")
-            logger.error("Error: ${e.message}", e)
-            logger.error("Error type: ${e::class.simpleName}")
-            session.abortTransactionAndAwait()
-            throw e
-        } finally {
-            session.close()
+            try {
+                val result = transactions(DbSession())
+                logger.info("TRANSACTION FINISHED")
+                result
+            } catch (e: Exception) {
+                // Откатывает сама Exposed, когда исключение выходит из блока
+                logger.error("TRANSACTION FAILED !!!")
+                logger.error("Error: ${e.message}", e)
+                logger.error("Error type: ${e::class.simpleName}")
+                throw e
+            }
         }
-    }
 }

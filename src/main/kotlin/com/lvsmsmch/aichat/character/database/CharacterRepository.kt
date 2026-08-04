@@ -1,65 +1,42 @@
 package com.lvsmsmch.aichat.character.database
 
-import com.lvsmsmch.aichat.utils.*
-import com.mongodb.client.model.Filters.regex
-import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.conversions.Bson
-import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.encodeFloatMap
+import com.lvsmsmch.aichat.db.encodeStringList
+import com.lvsmsmch.aichat.db.encodeTranslations
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toCharacterDbo
+import com.lvsmsmch.aichat.utils.DbSession
+import com.lvsmsmch.aichat.utils.UtcTimestamp
+import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.lowerCase
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.statements.UpdateStatement
+import org.jetbrains.exposed.sql.update
 
+class CharacterRepository {
 
-class CharacterRepository(
-    private val collection: CoroutineCollection<CharacterDbo>
-) {
+    private val table = Tables.Characters
 
-
-
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(CharacterDbo::authorId))
-        collection.ensureIndex(ascending(CharacterDbo::visibility))
-
-        collection.ensureIndex(
-            ascending(
-                CharacterDbo::visibility,
-                CharacterDbo::category
-            )
-        )
-
-        collection.ensureIndex(descending(CharacterDbo::createdAt))
-        collection.ensureIndex(descending(CharacterDbo::averageRating))
-        collection.ensureIndex(descending(CharacterDbo::totalMessages))
-        collection.ensureIndex(descending(CharacterDbo::trendingScore))
-        collection.ensureIndex(descending(CharacterDbo::recommendationScore))
-
-        collection.ensureIndex(ascending(CharacterDbo::name))
-        collection.ensureIndex(ascending(CharacterDbo::description))
-
-        collection.ensureIndex(
-            ascending(
-                CharacterDbo::authorId,
-                CharacterDbo::visibility
-            )
-        )
-
-        collection.ensureIndex(
-            ascending(
-                CharacterDbo::visibility,
-                CharacterDbo::recommendationScore
-            )
-        )
+    suspend fun addCharacter(session: DbSession, character: CharacterDbo) {
+        dbQuery { table.insert { it.from(character) } }
     }
 
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
-
-    suspend fun addCharacter(session: ClientSession, character: CharacterDbo) {
-        collection.insertOne(session, character)
-    }
+    /** Точечное обновление одного персонажа. */
+    private suspend fun updateById(characterId: String, body: (UpdateStatement) -> Unit): Int =
+        dbQuery { table.update({ table.id eq characterId }) { body(it) } }
 
     suspend fun getCharacters(
         searchQuery: String = "",
@@ -69,143 +46,114 @@ class CharacterRepository(
         size: Int,
         authorId: String? = null,
         visibilityFilter: Int? = null,
-    ): List<CharacterDbo> {
-        val sortCriteriaBson = when (sortCriteria) {
-            CharacterSortCriteria.NEWEST.code -> descending(CharacterDbo::createdAt)
-            CharacterSortCriteria.OLDEST.code -> ascending(CharacterDbo::createdAt)
-            CharacterSortCriteria.HIGHEST_RATING.code -> descending(CharacterDbo::averageRating)
-            CharacterSortCriteria.LOWEST_RATING.code -> ascending(CharacterDbo::averageRating)
-            CharacterSortCriteria.MOST_POPULAR.code -> descending(CharacterDbo::totalMessages)
-            CharacterSortCriteria.LEAST_POPULAR.code -> ascending(CharacterDbo::totalMessages)
-            CharacterSortCriteria.TRENDING.code -> descending(CharacterDbo::trendingScore)
-            CharacterSortCriteria.RECOMMENDED.code -> descending(CharacterDbo::recommendationScore)
-            else -> descending(CharacterDbo::createdAt)
+    ): List<CharacterDbo> = dbQuery {
+        val order: Pair<Column<*>, SortOrder> = when (sortCriteria) {
+            CharacterSortCriteria.NEWEST.code -> table.createdAt to SortOrder.DESC
+            CharacterSortCriteria.OLDEST.code -> table.createdAt to SortOrder.ASC
+            CharacterSortCriteria.HIGHEST_RATING.code -> table.averageRating to SortOrder.DESC
+            CharacterSortCriteria.LOWEST_RATING.code -> table.averageRating to SortOrder.ASC
+            CharacterSortCriteria.MOST_POPULAR.code -> table.totalMessages to SortOrder.DESC
+            CharacterSortCriteria.LEAST_POPULAR.code -> table.totalMessages to SortOrder.ASC
+            CharacterSortCriteria.TRENDING.code -> table.trendingScore to SortOrder.DESC
+            CharacterSortCriteria.RECOMMENDED.code -> table.recommendationScore to SortOrder.DESC
+            else -> table.createdAt to SortOrder.DESC
         }
 
-        val filters = and(
-            CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-            CharacterDbo::category `in` categories.map { it.code },
-            if (searchQuery.isNotBlank()) {
-                or(
-                    CharacterDbo::name.regex(".*$searchQuery.*", "i"),
-                    CharacterDbo::category.regex(".*$searchQuery.*", "i"),
-                    regex(CharacterDbo::tags.name, ".*$searchQuery.*", "i"),
-                    CharacterDbo::description.regex(".*$searchQuery.*", "i"),
-                    // Поиск работает на всех языках: локализованные имя/описание
-                    // матчатся независимо от языка приложения юзера
-                    *SUPPORTED_CHARACTER_LANGUAGES.flatMap { lang ->
-                        listOf(
-                            regex("translations.$lang.name", ".*$searchQuery.*", "i"),
-                            regex("translations.$lang.description", ".*$searchQuery.*", "i"),
-                        )
-                    }.toTypedArray(),
-                )
-            } else EMPTY_BSON,
-            if (authorId != null) {
-                CharacterDbo::authorId eq authorId
-            } else EMPTY_BSON,
-            if (visibilityFilter != null) {
-                CharacterDbo::visibility eq visibilityFilter
-            } else EMPTY_BSON
-        )
-
-        val all = collection.find(filters)
-
-        val skip = (page - 1) * size
-
-        val sortedList = all.sort(sortCriteriaBson).toList()
-
-        return sortedList.drop(skip).take(size)
+        table.selectAll()
+            .where {
+                var op: Op<Boolean> = (table.visibility eq CharacterVisibility.PUBLIC.code) and
+                    (table.category inList categories.map { it.code })
+                if (searchQuery.isNotBlank()) op = op and searchOp(searchQuery)
+                if (authorId != null) op = op and (table.authorId eq authorId)
+                if (visibilityFilter != null) op = op and (table.visibility eq visibilityFilter)
+                op
+            }
+            .orderBy(order)
+            .limit(size)
+            .offset(((page - 1).toLong() * size))
+            .map { it.toCharacterDbo() }
     }
 
+    /**
+     * Поиск по подстроке без учёта регистра: имя, категория, теги, описание и
+     * ВСЕ локализации (они лежат JSON-строкой, поэтому проверяются как текст).
+     * Так «Наруто» находится и когда приложение на английском.
+     */
+    private fun searchOp(searchQuery: String): Op<Boolean> {
+        val needle = "%${escapeLike(searchQuery.lowercase())}%"
+        return (table.name.lowerCase() like needle) or
+            (table.category.lowerCase() like needle) or
+            (table.tags.lowerCase() like needle) or
+            (table.description.lowerCase() like needle) or
+            (table.translations.lowerCase() like needle)
+    }
+
+    /** Спецсимволы LIKE в пользовательском вводе не должны работать как шаблон. */
+    private fun escapeLike(value: String): String =
+        value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     private suspend fun getCharactersByIds(characterIds: List<String>): List<CharacterDbo> {
-        val filters = and(
-            CharacterDbo::id `in` characterIds,
-            CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-        )
-
-        val characters = collection.find(filters).toList()
-
-        return characterIds.mapNotNull { id ->
-            characters.find { it.id == id }
+        if (characterIds.isEmpty()) return emptyList()
+        val found = dbQuery {
+            table.selectAll()
+                .where {
+                    (table.id inList characterIds) and
+                        (table.visibility eq CharacterVisibility.PUBLIC.code)
+                }
+                .map { it.toCharacterDbo() }
         }
-    }
-
-
-    suspend fun getCharactersByUserId(
-        userId: String,
-        includePrivate: Boolean = false
-    ): List<CharacterDbo> {
-        val filters = and(
-            CharacterDbo::authorId eq userId,
-            if (includePrivate) {
-                EMPTY_BSON
-            } else {
-                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
-            }
-        )
-
-        return collection.find(filters).toList()
+        // Порядок запрошенных id сохраняется: на нём держатся ленты рекомендаций
+        return characterIds.mapNotNull { id -> found.find { it.id == id } }
     }
 
     suspend fun getCharactersByUserId(
-        session: ClientSession,
         userId: String,
-        includePrivate: Boolean = false
-    ): List<CharacterDbo> {
-        val filters = and(
-            CharacterDbo::authorId eq userId,
-            if (includePrivate) {
-                EMPTY_BSON
-            } else {
-                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
+        includePrivate: Boolean = false,
+    ): List<CharacterDbo> = dbQuery {
+        table.selectAll()
+            .where {
+                val base = table.authorId eq userId
+                if (includePrivate) base
+                else base and (table.visibility eq CharacterVisibility.PUBLIC.code)
             }
-        )
-
-        return collection.find(session, filters).toList()
+            .map { it.toCharacterDbo() }
     }
+
+    suspend fun getCharactersByUserId(
+        session: DbSession,
+        userId: String,
+        includePrivate: Boolean = false,
+    ): List<CharacterDbo> = getCharactersByUserId(userId, includePrivate)
 
     suspend fun getUserCharactersWithCursor(
         userId: String,
         includePrivate: Boolean = false,
         visibility: Int? = null,
         cursor: String? = null,
-        size: Int = 10
-    ): CursorResult<CharacterDbo> {
+        size: Int = 10,
+    ): CursorResult<CharacterDbo> = dbQuery {
         val beforeTime = cursor?.let { UtcTimestamp.parse(it) }
-
-        val filters = and(
-            CharacterDbo::authorId eq userId,
-            if (includePrivate) {
-                if (visibility != null) {
-                    CharacterDbo::visibility eq visibility
+        val characters = table.selectAll()
+            .where {
+                var op: Op<Boolean> = table.authorId eq userId
+                op = if (includePrivate) {
+                    if (visibility != null) op and (table.visibility eq visibility) else op
                 } else {
-                    EMPTY_BSON
+                    op and (table.visibility eq CharacterVisibility.PUBLIC.code)
                 }
-            } else {
-                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code
-            },
-            if (beforeTime != null) {
-                CharacterDbo::createdAt lt beforeTime.toString()
-            } else {
-                EMPTY_BSON
+                if (beforeTime != null) op = op and (table.createdAt less beforeTime.toString())
+                op
             }
-        )
-
-        val characters = collection.find(filters)
-            .sort(descending(CharacterDbo::createdAt))
+            .orderBy(table.createdAt to SortOrder.DESC)
             .limit(size + 1)
-            .toList()
+            .map { it.toCharacterDbo() }
 
         val hasMore = characters.size > size
         val items = if (hasMore) characters.dropLast(1) else characters
-        val nextCursor = if (hasMore) items.lastOrNull()?.createdAt?.toString() else null
-
-        return CursorResult(
+        CursorResult(
             items = items,
-            nextCursor = nextCursor,
-            hasMore = hasMore
+            nextCursor = if (hasMore) items.lastOrNull()?.createdAt else null,
+            hasMore = hasMore,
         )
     }
 
@@ -229,38 +177,44 @@ class CharacterRepository(
         }
     }
 
-    suspend fun getAllPublicCharactersForCategory(category: CharacterCategory): List<CharacterDbo> {
-        return collection.find(
-            and(
-                CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code,
-                CharacterDbo::category eq category.code
-            )
-        ).toList()
+    suspend fun getAllPublicCharactersForCategory(category: CharacterCategory): List<CharacterDbo> =
+        dbQuery {
+            table.selectAll()
+                .where {
+                    (table.visibility eq CharacterVisibility.PUBLIC.code) and
+                        (table.category eq category.code)
+                }
+                .map { it.toCharacterDbo() }
+        }
+
+    suspend fun getAllPublicCharacters(): List<CharacterDbo> = dbQuery {
+        table.selectAll()
+            .where { table.visibility eq CharacterVisibility.PUBLIC.code }
+            .map { it.toCharacterDbo() }
     }
 
-    suspend fun getAllPublicCharacters(): List<CharacterDbo> {
-        return collection.find(CharacterDbo::visibility eq CharacterVisibility.PUBLIC.code).toList()
-    }
-
-    /** Записывает перевод персонажа на один язык (translations.<lang>). */
+    /** Записывает перевод персонажа на один язык (остальные не трогает). */
     suspend fun updateTranslation(characterId: String, lang: String, t: CharacterTranslationDbo) {
-        collection.updateOneById(
-            characterId,
-            setValue(CharacterDbo::translations.keyProjection(lang), t),
-        )
+        val current = getCharacter(characterId) ?: return
+        val merged = current.translations + (lang to t)
+        updateById(characterId) {
+            it[table.translations] = encodeTranslations(merged)
+        }
     }
 
-    suspend fun getCharacter(characterId: String): CharacterDbo? {
-        return collection.findOneById(characterId)
+    suspend fun getCharacter(characterId: String): CharacterDbo? = dbQuery {
+        table.selectAll()
+            .where { table.id eq characterId }
+            .limit(1)
+            .firstOrNull()
+            ?.toCharacterDbo()
     }
 
-    suspend fun getCharacter(session: ClientSession, characterId: String): CharacterDbo? {
-        return collection.findOneById(characterId, session)
-    }
-
+    suspend fun getCharacter(session: DbSession, characterId: String): CharacterDbo? =
+        getCharacter(characterId)
 
     suspend fun updateCharacter(
-        session: ClientSession,
+        session: DbSession,
         characterId: String,
         name: String? = null,
         description: String? = null,
@@ -273,107 +227,93 @@ class CharacterRepository(
         category: CharacterCategory? = null,
         tags: List<CharacterTag>? = null,
     ) {
-        val updates = mutableListOf<Bson>()
+        val nothingToDo = name == null && description == null && prompt == null &&
+            initialMessage == null && visibility == null && pictureUrl == null &&
+            pictureUrlThumbnail == null && category == null && tags == null &&
+            removePicture != true
+        if (nothingToDo) return
 
-        name?.let { updates.add(setValue(CharacterDbo::name, it)) }
-        description?.let { updates.add(setValue(CharacterDbo::description, it)) }
-        prompt?.let { updates.add(setValue(CharacterDbo::prompt, it)) }
-        initialMessage?.let { updates.add(setValue(CharacterDbo::initialMessage, it)) }
-        visibility?.let { updates.add(setValue(CharacterDbo::visibility, it)) }
-        pictureUrl?.let { updates.add(setValue(CharacterDbo::picUrl, it)) }
-        pictureUrlThumbnail?.let { updates.add(setValue(CharacterDbo::picUrlThumbnail, it)) }
-        removePicture?.let {
-            if (it) {
-                updates.add(setValue(CharacterDbo::picUrl, null))
-                updates.add(setValue(CharacterDbo::picUrlThumbnail, null))
+        updateById(characterId) { statement ->
+            name?.let { statement[table.name] = it }
+            description?.let { statement[table.description] = it }
+            prompt?.let { statement[table.prompt] = it }
+            initialMessage?.let { statement[table.initialMessage] = it }
+            visibility?.let { statement[table.visibility] = it }
+            pictureUrl?.let { statement[table.picUrl] = it }
+            pictureUrlThumbnail?.let { statement[table.picUrlThumbnail] = it }
+            if (removePicture == true) {
+                statement[table.picUrl] = null
+                statement[table.picUrlThumbnail] = null
+            }
+            category?.let { statement[table.category] = it.code }
+            tags?.let { list ->
+                statement[table.tags] = encodeStringList(list.map { tag -> tag.code })
             }
         }
-        category?.let { updates.add(setValue(CharacterDbo::category, it.code)) }
-        tags?.let { updates.add(setValue(CharacterDbo::tags, it.map { tag -> tag.code })) }
-
-        if (updates.isEmpty()) {
-            return
-        }
-
-        collection.updateOneById(session, characterId, combine(*updates.toTypedArray()))
     }
 
-    suspend fun updateAvgRating(session: ClientSession, characterId: String, newRating: Float) {
-        collection.updateOneById(session, characterId, setValue(CharacterDbo::averageRating, newRating))
+    suspend fun updateAvgRating(session: DbSession, characterId: String, newRating: Float) {
+        updateById(characterId) { it[table.averageRating] = newRating }
     }
 
     suspend fun updateTopRank(characterId: String, rank: Int?) {
-        collection.updateOneById(characterId, setValue(CharacterDbo::topRank, rank))
+        updateById(characterId) { it[table.topRank] = rank }
     }
 
     suspend fun updateTrendingScore(characterId: String, trendingScore: Float) {
-        collection.updateOneById(characterId, setValue(CharacterDbo::trendingScore, trendingScore))
-        collection.updateOneById(
-            characterId,
-            setValue(CharacterDbo::trendingScoreUpdatedAt, UtcTimestamp.now().toString())
-        )
+        updateById(characterId) {
+            it[table.trendingScore] = trendingScore
+            it[table.trendingScoreUpdatedAt] = UtcTimestamp.now().toString()
+        }
     }
 
     suspend fun updateRecommendationScore(characterId: String, recommendationScore: Float) {
-        collection.updateOneById(
-            characterId,
-            combine(
-                setValue(CharacterDbo::recommendationScore, recommendationScore),
-                setValue(CharacterDbo::recommendationScoreUpdatedAt, UtcTimestamp.now().toString())
-            )
-        )
+        updateById(characterId) {
+            it[table.recommendationScore] = recommendationScore
+            it[table.recommendationScoreUpdatedAt] = UtcTimestamp.now().toString()
+        }
     }
 
     suspend fun updateCoOccurrenceScore(characterId: String, scores: Map<String, Float>) {
-        collection.updateOneById(
-            characterId,
-            combine(
-                setValue(CharacterDbo::coOccurrenceScore, scores),
-                setValue(CharacterDbo::coOccurrenceScoreUpdatedAt, UtcTimestamp.now().toString())
-            )
-        )
+        updateById(characterId) {
+            it[table.coOccurrenceScore] = encodeFloatMap(scores)
+            it[table.coOccurrenceScoreUpdatedAt] = UtcTimestamp.now().toString()
+        }
     }
 
     suspend fun incrementLikesCount(characterId: String, increment: Int) {
-        collection.updateOneById(characterId, inc(CharacterDbo::totalLikes, increment))
+        updateById(characterId) { it[table.totalLikes] = table.totalLikes plus increment }
     }
 
     suspend fun updateSimilarCharacters(characterId: String, ids: List<String>) {
-        collection.updateOneById(
-            characterId,
-            combine(
-                setValue(CharacterDbo::similarCharacterIds, ids),
-                setValue(CharacterDbo::similarCharactersUpdatedAt, UtcTimestamp.now().toString())
-            )
-        )
+        updateById(characterId) {
+            it[table.similarCharacterIds] = encodeStringList(ids)
+            it[table.similarCharactersUpdatedAt] = UtcTimestamp.now().toString()
+        }
     }
 
-    suspend fun incrementReviewsCount(session: ClientSession, characterId: String, increment: Int) {
-        collection.updateOneById(session, characterId, inc(CharacterDbo::totalReviews, increment))
+    suspend fun incrementReviewsCount(session: DbSession, characterId: String, increment: Int) {
+        updateById(characterId) { it[table.totalReviews] = table.totalReviews plus increment }
     }
 
-    suspend fun incrementCommentsCount(session: ClientSession, characterId: String, increment: Int) {
-        collection.updateOneById(session, characterId, inc(CharacterDbo::totalComments, increment))
+    suspend fun incrementCommentsCount(session: DbSession, characterId: String, increment: Int) {
+        updateById(characterId) { it[table.totalComments] = table.totalComments plus increment }
     }
 
-    suspend fun incrementChatsCount(session: ClientSession, characterId: String, increment: Int) {
-        collection.updateOneById(session, characterId, inc(CharacterDbo::totalChats, increment))
+    suspend fun incrementChatsCount(session: DbSession, characterId: String, increment: Int) {
+        updateById(characterId) { it[table.totalChats] = table.totalChats plus increment }
     }
 
-    suspend fun incrementMessagesCount(session: ClientSession, characterId: String, increment: Int) {
-        collection.updateOneById(session, characterId, inc(CharacterDbo::totalMessages, increment))
+    suspend fun incrementMessagesCount(session: DbSession, characterId: String, increment: Int) {
+        updateById(characterId) { it[table.totalMessages] = table.totalMessages plus increment }
     }
 
-    suspend fun deleteCharacter(session: ClientSession, characterId: String) {
-        collection.deleteOneById(session, characterId)
+    suspend fun deleteCharacter(session: DbSession, characterId: String) {
+        dbQuery { table.deleteWhere { table.id eq characterId } }
     }
 
-    suspend fun deleteCharactersByIds(session: ClientSession, characterIds: List<String>) {
+    suspend fun deleteCharactersByIds(session: DbSession, characterIds: List<String>) {
         if (characterIds.isEmpty()) return
-
-        collection.deleteMany(
-            session,
-            CharacterDbo::id `in` characterIds
-        )
+        dbQuery { table.deleteWhere { table.id inList characterIds } }
     }
 }

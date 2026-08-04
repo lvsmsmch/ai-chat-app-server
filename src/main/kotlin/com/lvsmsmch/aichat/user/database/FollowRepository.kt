@@ -1,110 +1,97 @@
 package com.lvsmsmch.aichat.user.database
 
-import com.lvsmsmch.aichat.utils.*
-import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.serialization.Serializable
-import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toFollowDbo
+import com.lvsmsmch.aichat.utils.DbSession
+import com.lvsmsmch.aichat.utils.UtcTimestamp
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
 
+class FollowRepository {
 
-
-
-class FollowRepository(
-    private val collection: CoroutineCollection<FollowDbo>
-) {
-
-
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(FollowDbo::followerId))
-        collection.ensureIndex(ascending(FollowDbo::followeeId))
-        collection.ensureIndex(ascending(FollowDbo::followerId, FollowDbo::followeeId))
-        collection.ensureIndex(descending(FollowDbo::followedAt))
-    }
-
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
-
-    suspend fun addConnection(session: ClientSession, followerId: String, followeeId: String) {
+    suspend fun addConnection(session: DbSession, followerId: String, followeeId: String) {
         if (followerId == followeeId) {
             throw IllegalArgumentException("User cannot follow themselves")
         }
-
-        val existingConnection = collection.findOne(
-            and(
-                FollowDbo::followerId eq followerId,
-                FollowDbo::followeeId eq followeeId
-            )
-        )
-
-        if (existingConnection == null) {
-            collection.insertOne(
-                session,
-                FollowDbo(
-                    id = "${followerId}_${followeeId}",
-                    followerId = followerId,
-                    followeeId = followeeId
-                )
-            )
+        dbQuery {
+            val exists = Tables.Follows.selectAll()
+                .where {
+                    (Tables.Follows.followerId eq followerId) and
+                        (Tables.Follows.followeeId eq followeeId)
+                }
+                .limit(1)
+                .any()
+            if (!exists) {
+                Tables.Follows.insert {
+                    it.from(
+                        FollowDbo(
+                            id = "${followerId}_${followeeId}",
+                            followerId = followerId,
+                            followeeId = followeeId,
+                        )
+                    )
+                }
+            }
         }
     }
 
+    suspend fun getFollowers(userId: String, beforeTime: UtcTimestamp?, size: Int): List<FollowDbo> =
+        dbQuery {
+            Tables.Follows.selectAll()
+                .where {
+                    val base = Tables.Follows.followeeId eq userId
+                    if (beforeTime == null) base
+                    else base and (Tables.Follows.followedAt less beforeTime.toString())
+                }
+                .orderBy(Tables.Follows.followedAt to SortOrder.DESC)
+                .limit(size)
+                .map { it.toFollowDbo() }
+        }
 
-    suspend fun getFollowers(userId: String, beforeTime: UtcTimestamp?, size: Int): List<FollowDbo> {
-        return collection.find(
-            and(
-                FollowDbo::followeeId eq userId,
-                if (beforeTime != null) FollowDbo::followedAt lt beforeTime.toString() else EMPTY_BSON
-            )
-        ).sort(descending(FollowDbo::followedAt))
-            .limit(size)
-            .toList()
-    }
-
-    suspend fun getFollowings(userId: String, beforeTime: UtcTimestamp?, size: Int): List<FollowDbo> {
-        return collection.find(
-            and(
-                FollowDbo::followerId eq userId,
-                if (beforeTime != null) FollowDbo::followedAt lt beforeTime.toString() else EMPTY_BSON
-            )
-        ).sort(descending(FollowDbo::followedAt))
-            .limit(size)
-            .toList()
-    }
+    suspend fun getFollowings(userId: String, beforeTime: UtcTimestamp?, size: Int): List<FollowDbo> =
+        dbQuery {
+            Tables.Follows.selectAll()
+                .where {
+                    val base = Tables.Follows.followerId eq userId
+                    if (beforeTime == null) base
+                    else base and (Tables.Follows.followedAt less beforeTime.toString())
+                }
+                .orderBy(Tables.Follows.followedAt to SortOrder.DESC)
+                .limit(size)
+                .map { it.toFollowDbo() }
+        }
 
     /** Без транзакции — для рассылки уведомлений подписчикам. */
-    suspend fun getAllFollowerIds(userId: String): List<String> {
-        return collection.find(FollowDbo::followeeId eq userId)
-            .toList()
-            .map { it.followerId }
+    suspend fun getAllFollowerIds(userId: String): List<String> = dbQuery {
+        Tables.Follows.selectAll()
+            .where { Tables.Follows.followeeId eq userId }
+            .map { it[Tables.Follows.followerId] }
     }
 
-    suspend fun getAllFollowerIds(session: ClientSession, userId: String): List<String> {
-        return collection.find(
-            session,
-            FollowDbo::followeeId eq userId
-        ).toList()
-            .map { it.followerId }
+    suspend fun getAllFollowerIds(session: DbSession, userId: String): List<String> =
+        getAllFollowerIds(userId)
+
+    suspend fun getAllFollowingIds(session: DbSession, userId: String): List<String> = dbQuery {
+        Tables.Follows.selectAll()
+            .where { Tables.Follows.followerId eq userId }
+            .map { it[Tables.Follows.followeeId] }
     }
 
-    suspend fun getAllFollowingIds(session: ClientSession, userId: String): List<String> {
-        return collection.find(
-            session,
-            FollowDbo::followerId eq userId
-        ).toList()
-            .map { it.followeeId }
+    suspend fun countFollowers(userId: String): Int = dbQuery {
+        Tables.Follows.selectAll().where { Tables.Follows.followeeId eq userId }.count().toInt()
     }
 
-    suspend fun countFollowers(userId: String): Int {
-        return collection.countDocuments(FollowDbo::followeeId eq userId).toInt()
-    }
-
-    suspend fun countFollowings(userId: String): Int {
-        return collection.countDocuments(FollowDbo::followerId eq userId).toInt()
+    suspend fun countFollowings(userId: String): Int = dbQuery {
+        Tables.Follows.selectAll().where { Tables.Follows.followerId eq userId }.count().toInt()
     }
 
     /**
@@ -114,42 +101,41 @@ class FollowRepository(
      */
     suspend fun getFollowedIds(followerId: String, followeeIds: List<String>): Set<String> {
         if (followeeIds.isEmpty()) return emptySet()
-        return collection.find(
-            and(
-                FollowDbo::followerId eq followerId,
-                FollowDbo::followeeId `in` followeeIds,
-            )
-        ).toList().map { it.followeeId }.toSet()
+        return dbQuery {
+            Tables.Follows.selectAll()
+                .where {
+                    (Tables.Follows.followerId eq followerId) and
+                        (Tables.Follows.followeeId inList followeeIds)
+                }
+                .map { it[Tables.Follows.followeeId] }
+                .toSet()
+        }
     }
 
-    suspend fun doesConnectionExist(followerId: String, followeeId: String): Boolean {
-        return collection.findOne(
-            and(
-                FollowDbo::followerId eq followerId,
-                FollowDbo::followeeId eq followeeId
-            )
-        ) != null
+    suspend fun doesConnectionExist(followerId: String, followeeId: String): Boolean = dbQuery {
+        Tables.Follows.selectAll()
+            .where {
+                (Tables.Follows.followerId eq followerId) and
+                    (Tables.Follows.followeeId eq followeeId)
+            }
+            .limit(1)
+            .any()
     }
 
-
-
-    suspend fun removeConnection(session: ClientSession, followerId: String, followeeId: String) {
-        collection.deleteOne(
-            session,
-            and(
-                FollowDbo::followerId eq followerId,
-                FollowDbo::followeeId eq followeeId
-            )
-        )
+    suspend fun removeConnection(session: DbSession, followerId: String, followeeId: String) {
+        dbQuery {
+            Tables.Follows.deleteWhere {
+                (Tables.Follows.followerId eq followerId) and
+                    (Tables.Follows.followeeId eq followeeId)
+            }
+        }
     }
 
-    suspend fun removeAllConnectionsContainingUserId(session: ClientSession, userId: String) {
-        collection.deleteMany(
-            session,
-            or(
-                FollowDbo::followerId eq userId,
-                FollowDbo::followeeId eq userId
-            )
-        )
+    suspend fun removeAllConnectionsContainingUserId(session: DbSession, userId: String) {
+        dbQuery {
+            Tables.Follows.deleteWhere {
+                (Tables.Follows.followerId eq userId) or (Tables.Follows.followeeId eq userId)
+            }
+        }
     }
 }

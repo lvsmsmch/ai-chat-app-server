@@ -1,9 +1,16 @@
 package com.lvsmsmch.aichat.user.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toDeviceLimitCarryoverDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upsert
 
 /**
  * Анти-абьюз лимитов: снапшот потраченных счётчиков юзера по deviceId,
@@ -22,24 +29,21 @@ data class DeviceLimitCarryoverDbo(
     val savedAt: String = UtcTimestamp.now().toString(),
 )
 
-class DeviceLimitCarryoverRepository(
-    private val collection: CoroutineCollection<DeviceLimitCarryoverDbo>,
-) {
+class DeviceLimitCarryoverRepository {
 
     /** Записать снапшот лимитов удаляемого аккаунта (последний перекрывает прошлый). */
     suspend fun save(user: UserDbo) {
         val deviceId = user.deviceId?.takeIf { it.isNotBlank() } ?: return
-        collection.save(
-            DeviceLimitCarryoverDbo(
-                deviceId = deviceId,
-                hourlyMessageCount = user.hourlyMessageCount,
-                dailyMessageCount = user.dailyMessageCount,
-                monthlyMessageCount = user.monthlyMessageCount,
-                monthlyTopModelCount = user.monthlyTopModelCount,
-                dailyImageCount = user.dailyImageCount,
-                monthlyTopImageCount = user.monthlyTopImageCount,
-            )
+        val dbo = DeviceLimitCarryoverDbo(
+            deviceId = deviceId,
+            hourlyMessageCount = user.hourlyMessageCount,
+            dailyMessageCount = user.dailyMessageCount,
+            monthlyMessageCount = user.monthlyMessageCount,
+            monthlyTopModelCount = user.monthlyTopModelCount,
+            dailyImageCount = user.dailyImageCount,
+            monthlyTopImageCount = user.monthlyTopImageCount,
         )
+        dbQuery { Tables.DeviceLimitCarryovers.upsert { it.from(dbo) } }
     }
 
     /**
@@ -48,8 +52,20 @@ class DeviceLimitCarryoverRepository(
      * месячные — в тот же месяц.
      */
     suspend fun take(deviceId: String): DeviceLimitCarryoverDbo? {
-        val dbo = collection.findOneById(deviceId) ?: return null
-        collection.deleteOneById(deviceId)
+        val dbo = dbQuery {
+            val found = Tables.DeviceLimitCarryovers.selectAll()
+                .where { Tables.DeviceLimitCarryovers.deviceId eq deviceId }
+                .limit(1)
+                .firstOrNull()
+                ?.toDeviceLimitCarryoverDbo()
+            if (found != null) {
+                Tables.DeviceLimitCarryovers.deleteWhere {
+                    Tables.DeviceLimitCarryovers.deviceId eq deviceId
+                }
+            }
+            found
+        } ?: return null
+
         val saved = runCatching { UtcTimestamp.parse(dbo.savedAt) }.getOrNull() ?: return null
         val now = UtcTimestamp.now()
         val sameDay = saved.toString().take(10) == now.toString().take(10)

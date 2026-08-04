@@ -1,10 +1,17 @@
 package com.lvsmsmch.aichat._common.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toDeletedIdsStatsDbo
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 
 enum class EntityType(val code: String, val recommendedIdLength: Int) {
     USER("user", 6),
@@ -27,46 +34,41 @@ data class DeletedIdsStatsDbo(
     val lastUpdated: String = UtcTimestamp.now().toString()
 )
 
-class DeletedIdsStatsRepository(
-    private val collection: CoroutineCollection<DeletedIdsStatsDbo>
-) {
+/**
+ * Занятые когда-то id: генератор коротких id не должен выдать второй раз то,
+ * что уже было удалено (иначе старые ссылки указали бы на новую сущность).
+ */
+class DeletedIdsStatsRepository {
 
-    suspend fun isIdDeleted(entityType: EntityType, id: String): Boolean {
-        val stats = collection.findOneById(entityType.code)
-            ?: DeletedIdsStatsDbo(entityType = entityType.code).also {
-                collection.insertOne(it)
+    private suspend fun getOrCreate(entityType: EntityType): DeletedIdsStatsDbo = dbQuery {
+        Tables.DeletedIdsStats.selectAll()
+            .where { Tables.DeletedIdsStats.entityType eq entityType.code }
+            .limit(1)
+            .firstOrNull()
+            ?.toDeletedIdsStatsDbo()
+            ?: DeletedIdsStatsDbo(entityType = entityType.code).also { fresh ->
+                Tables.DeletedIdsStats.insert { it.from(fresh) }
             }
-
-        return stats.deletedIds.contains(id)
     }
 
-    suspend fun entityWasDeleted(session: ClientSession, entityType: EntityType, id: String) {
-        val current = collection.findOneById(entityType.code)
-            ?: DeletedIdsStatsDbo(entityType = entityType.code).also {
-                collection.insertOne(it)
-            }
+    suspend fun isIdDeleted(entityType: EntityType, id: String): Boolean =
+        getOrCreate(entityType).deletedIds.contains(id)
 
-        val new = current.copy(
-            deletedIds = current.deletedIds + id,
-            lastUpdated = UtcTimestamp.now().toString()
-        )
-
-        collection.replaceOneById(session, current.entityType, new)
+    suspend fun entityWasDeleted(session: DbSession, entityType: EntityType, id: String) {
+        entitiesWereDeleted(session, entityType, listOf(id))
     }
 
-    suspend fun entitiesWereDeleted(session: ClientSession, entityType: EntityType, ids: List<String>) {
+    suspend fun entitiesWereDeleted(session: DbSession, entityType: EntityType, ids: List<String>) {
         if (ids.isEmpty()) return
-
-        val current = collection.findOneById(entityType.code)
-            ?: DeletedIdsStatsDbo(entityType = entityType.code).also {
-                collection.insertOne(session, it)
-            }
-
+        val current = getOrCreate(entityType)
         val new = current.copy(
             deletedIds = current.deletedIds + ids,
-            lastUpdated = UtcTimestamp.now().toString()
+            lastUpdated = UtcTimestamp.now().toString(),
         )
-
-        collection.replaceOneById(session, current.entityType, new)
+        dbQuery {
+            Tables.DeletedIdsStats.update({ Tables.DeletedIdsStats.entityType eq new.entityType }) {
+                it.from(new)
+            }
+        }
     }
 }

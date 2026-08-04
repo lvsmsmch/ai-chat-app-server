@@ -1,9 +1,15 @@
 package com.lvsmsmch.aichat.cache.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toDiscoverSectionsCacheDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.mongodb.client.model.ReplaceOptions
 import org.bson.codecs.pojo.annotations.BsonId
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upsert
 
 /**
  * Секции вкладки For you (Discover): готовые списки id персонажей на юзера.
@@ -11,6 +17,7 @@ import org.litote.kmongo.coroutine.CoroutineCollection
  * пагинирует по 10), категорийные — по 10. Документ "__default" — набор для
  * свежерегнутых юзеров: копируется им мгновенно, без расчёта.
  */
+@kotlinx.serialization.Serializable
 data class DiscoverSectionDbo(
     val key: String,
     val characterIds: List<String>,
@@ -24,18 +31,20 @@ data class DiscoverSectionsCacheDbo(
 
 const val DEFAULT_DISCOVER_CACHE_ID = "__default"
 
-class DiscoverSectionsCacheRepository(
-    private val collection: CoroutineCollection<DiscoverSectionsCacheDbo>,
-) {
+class DiscoverSectionsCacheRepository {
+
     suspend fun upsert(id: String, sections: List<DiscoverSectionDbo>) {
-        collection.replaceOneById(
-            id,
-            DiscoverSectionsCacheDbo(id = id, sections = sections),
-            ReplaceOptions().upsert(true),
-        )
+        val dbo = DiscoverSectionsCacheDbo(id = id, sections = sections)
+        dbQuery { Tables.DiscoverSectionsCache.upsert { it.from(dbo) } }
     }
 
-    suspend fun get(id: String): DiscoverSectionsCacheDbo? = collection.findOneById(id)
+    suspend fun get(id: String): DiscoverSectionsCacheDbo? = dbQuery {
+        Tables.DiscoverSectionsCache.selectAll()
+            .where { Tables.DiscoverSectionsCache.id eq id }
+            .limit(1)
+            .firstOrNull()
+            ?.toDiscoverSectionsCacheDbo()
+    }
 
     /** Кэш юзера, а если его ещё нет — дефолтный набор новорега. */
     suspend fun getForUserOrDefault(userId: String): DiscoverSectionsCacheDbo? =
@@ -48,6 +57,8 @@ class DiscoverSectionsCacheRepository(
     }
 
     suspend fun delete(id: String) {
-        collection.deleteOneById(id)
+        dbQuery {
+            Tables.DiscoverSectionsCache.deleteWhere { Tables.DiscoverSectionsCache.id eq id }
+        }
     }
 }

@@ -1,13 +1,19 @@
 package com.lvsmsmch.aichat.cache.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toUserRecommendationsCacheDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.client.model.ReplaceOptions
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upsert
 
 @Serializable
 data class UserRecommendationsCacheDbo(
@@ -17,64 +23,63 @@ data class UserRecommendationsCacheDbo(
     val version: String = ObjectId().toString()
 )
 
-class UserRecommendationsCacheRepository(
-    private val collection: CoroutineCollection<UserRecommendationsCacheDbo>
-) {
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+class UserRecommendationsCacheRepository {
 
     suspend fun upsertUserCache(userId: String, characterIds: List<String>) {
         val cache = UserRecommendationsCacheDbo(
             userId = userId,
             characterIds = characterIds,
-            updatedAt = UtcTimestamp.now().toString()
+            updatedAt = UtcTimestamp.now().toString(),
         )
-        
-        collection.replaceOneById(userId, cache, ReplaceOptions().upsert(true))
+        dbQuery { Tables.UserRecommendationsCache.upsert { it.from(cache) } }
     }
 
-    suspend fun getUserCache(userId: String): UserRecommendationsCacheDbo? {
-        return collection.findOneById(userId)
+    suspend fun getUserCache(userId: String): UserRecommendationsCacheDbo? = dbQuery {
+        Tables.UserRecommendationsCache.selectAll()
+            .where { Tables.UserRecommendationsCache.userId eq userId }
+            .limit(1)
+            .firstOrNull()
+            ?.toUserRecommendationsCacheDbo()
     }
 
-    suspend fun getCachedRecommendations(userId: String): List<String> {
-        return collection.findOneById(userId)?.characterIds ?: emptyList()
-    }
+    suspend fun getCachedRecommendations(userId: String): List<String> =
+        getUserCache(userId)?.characterIds ?: emptyList()
 
     suspend fun hasFreshCache(userId: String, ttlHours: Long): Boolean {
-        val cache = collection.findOneById(userId) ?: return false
-        val expirationTime = UtcTimestamp.parse(cache.updatedAt).addHours(ttlHours)
-        return expirationTime.isAfter(UtcTimestamp.now())
+        val cache = getUserCache(userId) ?: return false
+        return UtcTimestamp.parse(cache.updatedAt).addHours(ttlHours).isAfter(UtcTimestamp.now())
     }
 
     suspend fun deleteUserCache(userId: String) {
-        collection.deleteOneById(userId)
+        dbQuery {
+            Tables.UserRecommendationsCache.deleteWhere {
+                Tables.UserRecommendationsCache.userId eq userId
+            }
+        }
     }
 
-    suspend fun deleteInactiveUserCaches(): Long {
+    suspend fun deleteInactiveUserCaches(): Long = dbQuery {
         val monthAgo = UtcTimestamp.now().subtractDays(30)
-        val result = collection.deleteMany(
-            UserRecommendationsCacheDbo::updatedAt lt monthAgo.toString()
-        )
-        return result.deletedCount
+        Tables.UserRecommendationsCache.deleteWhere {
+            Tables.UserRecommendationsCache.updatedAt less monthAgo.toString()
+        }.toLong()
     }
 
-    suspend fun getCacheStats(): CacheStats {
-        val totalCaches = collection.countDocuments()
+    suspend fun getCacheStats(): CacheStats = dbQuery {
         val now = UtcTimestamp.now()
-        
-        val freshCaches = collection.countDocuments(
-            UserRecommendationsCacheDbo::updatedAt gte now.subtractHours(24).toString()
-        )
-        
-        val oldCaches = collection.countDocuments(
-            UserRecommendationsCacheDbo::updatedAt lt now.subtractDays(7).toString()
-        )
-        
-        return CacheStats(
-            totalCaches = totalCaches.toInt(),
-            freshCaches = freshCaches.toInt(),
-            oldCaches = oldCaches.toInt()
+        val total = Tables.UserRecommendationsCache.selectAll().count()
+        val fresh = Tables.UserRecommendationsCache.selectAll()
+            .where {
+                Tables.UserRecommendationsCache.updatedAt greaterEq now.subtractHours(24).toString()
+            }
+            .count()
+        val old = Tables.UserRecommendationsCache.selectAll()
+            .where { Tables.UserRecommendationsCache.updatedAt less now.subtractDays(7).toString() }
+            .count()
+        CacheStats(
+            totalCaches = total.toInt(),
+            freshCaches = fresh.toInt(),
+            oldCaches = old.toInt(),
         )
     }
 }

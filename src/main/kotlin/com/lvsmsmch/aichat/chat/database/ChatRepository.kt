@@ -1,225 +1,198 @@
-
 package com.lvsmsmch.aichat.chat.database
 
-import com.lvsmsmch.aichat.utils.DatabaseEvent
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.encodeStringList
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toChatDbo
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.reactivestreams.client.ClientSession
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import org.bson.conversions.Bson
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.Op
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.update
 
-class ChatRepository(
-    private val collection: CoroutineCollection<ChatDbo>
-) {
+class ChatRepository {
 
+    private val table = Tables.Chats
 
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(ChatDbo::userId))
-        collection.ensureIndex(ascending(ChatDbo::clientId))
-        collection.ensureIndex(
-            ascending(
-                ChatDbo::userId,
-                ChatDbo::lastModifiedAt
-            )
-        )
-        collection.ensureIndex(
-            ascending(
-                ChatDbo::userId,
-                ChatDbo::isDeleted
-            )
-        )
+    /**
+     * Участники чата лежат JSON-массивом, поэтому «содержит персонажа» — это
+     * поиск закавыченного id в тексте. Ложных совпадений быть не может: id
+     * буквенно-цифровые и в JSON всегда в кавычках.
+     */
+    private fun containsCharacter(characterId: String): Op<Boolean> =
+        table.characterIds like "%\"$characterId\"%"
 
-        collection.ensureIndex(
-            ascending(
-                ChatDbo::userId,
-                ChatDbo::type,
-                ChatDbo::characterIds
-            )
-        )
+    private fun containsAnyCharacter(characterIds: List<String>): Op<Boolean> =
+        characterIds
+            .map { containsCharacter(it) }
+            .reduce { acc, op -> acc or op }
 
-        collection.ensureIndex(ascending(ChatDbo::characterIds))
-
-        collection.ensureIndex(
-            ascending(
-                ChatDbo::userId,
-                ChatDbo::createdAt
-            )
-        )
-
-        collection.ensureIndex(
-            ascending(
-                ChatDbo::userId,
-                ChatDbo::deletedAt
-            )
-        )
+    suspend fun insertChat(session: DbSession, chatDbo: ChatDbo) {
+        dbQuery { table.insert { it.from(chatDbo) } }
     }
 
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+    suspend fun getChatById(session: DbSession, chatId: String): ChatDbo? = getChatById(chatId)
 
-    fun collectAllEventsForUserId(userId: String): Flow<DatabaseEvent<ChatDbo>> {
-        return databaseEventsFlow.filter { it.latestObject.userId == userId }
+    suspend fun getChatById(chatId: String): ChatDbo? = dbQuery {
+        table.selectAll().where { table.id eq chatId }.limit(1).firstOrNull()?.toChatDbo()
     }
 
-    suspend fun insertChat(session: ClientSession, chatDbo: ChatDbo) {
-        collection.insertOne(session, chatDbo)
-    }
-
-    suspend fun getChatById(session: ClientSession, chatId: String): ChatDbo? {
-        return collection.findOneById(chatId, session)
-    }
-
-    suspend fun getChatById(chatId: String): ChatDbo? {
-        return collection.findOneById(chatId)
-    }
-
-    suspend fun getChatByClientId(clientId: String): ChatDbo? {
-        return collection.findOne(ChatDbo::clientId eq clientId)
+    suspend fun getChatByClientId(clientId: String): ChatDbo? = dbQuery {
+        table.selectAll().where { table.clientId eq clientId }.limit(1).firstOrNull()?.toChatDbo()
     }
 
     suspend fun getChatsByClientIds(clientIds: List<String>): List<ChatDbo> {
-        return collection.find(ChatDbo::clientId `in` clientIds).toList()
+        if (clientIds.isEmpty()) return emptyList()
+        return dbQuery {
+            table.selectAll().where { table.clientId inList clientIds }.map { it.toChatDbo() }
+        }
     }
 
-    suspend fun getChatsByUserId(userId: String): List<ChatDbo> {
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                ChatDbo::isDeleted eq false
-            )
-        ).sort(descending(ChatDbo::lastModifiedAt)).toList()
+    suspend fun getChatsByUserId(userId: String): List<ChatDbo> = dbQuery {
+        table.selectAll()
+            .where { (table.userId eq userId) and (table.isDeleted eq false) }
+            .orderBy(table.lastModifiedAt to SortOrder.DESC)
+            .map { it.toChatDbo() }
     }
 
-    suspend fun getChatsByUserIdAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                or(
-                    and(
-                        ChatDbo::createdAt gt timestamp.toString(),
-                        ChatDbo::isDeleted eq false
-                    ),
-                    and(
-                        ChatDbo::lastModifiedAt gt timestamp.toString(),
-                        ChatDbo::isDeleted eq false
-                    ),
-                    and(
-                        ChatDbo::deletedAt gt timestamp.toString(),
-                        ChatDbo::isDeleted eq true
-                    )
-                )
-            )
-        ).sort(descending(ChatDbo::lastModifiedAt)).toList()
-    }
+    suspend fun getChatsByUserIdAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> =
+        dbQuery {
+            val ts = timestamp.toString()
+            table.selectAll()
+                .where {
+                    (table.userId eq userId) and (
+                        ((table.createdAt greater ts) and (table.isDeleted eq false)) or
+                            ((table.lastModifiedAt greater ts) and (table.isDeleted eq false)) or
+                            ((table.deletedAt greater ts) and (table.isDeleted eq true))
+                        )
+                }
+                .orderBy(table.lastModifiedAt to SortOrder.DESC)
+                .map { it.toChatDbo() }
+        }
 
-    suspend fun getChatsCreatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                ChatDbo::createdAt gt timestamp.toString(),
-                ChatDbo::isDeleted eq false
-            )
-        ).toList()
-    }
+    suspend fun getChatsCreatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> =
+        dbQuery {
+            table.selectAll()
+                .where {
+                    (table.userId eq userId) and
+                        (table.createdAt greater timestamp.toString()) and
+                        (table.isDeleted eq false)
+                }
+                .map { it.toChatDbo() }
+        }
 
-    suspend fun getChatsUpdatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> {
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                ChatDbo::createdAt lte timestamp.toString(),
-                ChatDbo::lastModifiedAt gt timestamp.toString(),
-                ChatDbo::isDeleted eq false
-            )
-        ).toList()
-    }
+    suspend fun getChatsUpdatedAfter(userId: String, timestamp: UtcTimestamp): List<ChatDbo> =
+        dbQuery {
+            val ts = timestamp.toString()
+            table.selectAll()
+                .where {
+                    (table.userId eq userId) and
+                        (table.createdAt lessEq ts) and
+                        (table.lastModifiedAt greater ts) and
+                        (table.isDeleted eq false)
+                }
+                .map { it.toChatDbo() }
+        }
 
-    suspend fun getDeletedChatIdsAfter(userId: String, timestamp: UtcTimestamp): List<String> {
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                ChatDbo::deletedAt gt timestamp.toString(),
-                ChatDbo::isDeleted eq true
-            )
-        ).toList().map { it.clientId }
-    }
+    suspend fun getDeletedChatIdsAfter(userId: String, timestamp: UtcTimestamp): List<String> =
+        dbQuery {
+            table.selectAll()
+                .where {
+                    (table.userId eq userId) and
+                        (table.deletedAt greater timestamp.toString()) and
+                        (table.isDeleted eq true)
+                }
+                .map { it[table.clientId] }
+        }
 
     suspend fun findChatByUserAndCharacter(
         userId: String,
         characterId: String,
-        includeDeleted: Boolean = false
-    ): ChatDbo? {
-        return collection.findOne(
-            and(
-                ChatDbo::userId eq userId,
-                if (includeDeleted) EMPTY_BSON else ChatDbo::isDeleted eq false,
-                ChatDbo::type eq ChatType.DIRECT,
-                ChatDbo::characterIds eq listOf(characterId)
-            )
-        )
+        includeDeleted: Boolean = false,
+    ): ChatDbo? = dbQuery {
+        table.selectAll()
+            .where {
+                var op: Op<Boolean> = (table.userId eq userId) and
+                    (table.type eq ChatType.DIRECT.name) and
+                    // Тет-а-тет: состав ровно из одного персонажа
+                    (table.characterIds eq encodeStringList(listOf(characterId)))
+                if (!includeDeleted) op = op and (table.isDeleted eq false)
+                op
+            }
+            .limit(1)
+            .firstOrNull()
+            ?.toChatDbo()
     }
 
     suspend fun findGroupChatByUserAndCharacters(
         userId: String,
-        characterIds: List<String>
+        characterIds: List<String>,
     ): ChatDbo? {
         val sortedCharacterIds = characterIds.sorted()
-        return collection.find(
-            and(
-                ChatDbo::userId eq userId,
-                ChatDbo::type eq ChatType.GROUP,
-                ChatDbo::isDeleted eq false
-            )
-        ).toList().find { chat ->
-            chat.characterIds.sorted() == sortedCharacterIds
+        val groupChats = dbQuery {
+            table.selectAll()
+                .where {
+                    (table.userId eq userId) and
+                        (table.type eq ChatType.GROUP.name) and
+                        (table.isDeleted eq false)
+                }
+                .map { it.toChatDbo() }
         }
+        // Сравниваем состав как множество: порядок участников значения не имеет
+        return groupChats.find { chat -> chat.characterIds.sorted() == sortedCharacterIds }
     }
 
     suspend fun doAllChatsBelongToUser(chatIds: List<String>, userId: String): Boolean {
         if (chatIds.isEmpty()) return true
-
-        val matchingCount = collection.countDocuments(
-            and(
-                ChatDbo::id.`in`(chatIds),
-                ChatDbo::userId eq userId
-            )
-        ).toInt()
-
-        return matchingCount == chatIds.size
+        val matching = dbQuery {
+            table.selectAll()
+                .where { (table.id inList chatIds) and (table.userId eq userId) }
+                .count()
+                .toInt()
+        }
+        return matching == chatIds.size
     }
 
     suspend fun getChatsByIds(chatIds: List<String>): List<ChatDbo> {
-        if (chatIds.isEmpty()) {
-            return emptyList()
+        if (chatIds.isEmpty()) return emptyList()
+        return dbQuery {
+            table.selectAll().where { table.id inList chatIds }.map { it.toChatDbo() }
         }
-        return collection.find(ChatDbo::id.`in`(chatIds)).toList()
     }
 
-    suspend fun getChatsByCharacterIds(session: ClientSession, characterIds: List<String>): List<ChatDbo> {
+    suspend fun getChatsByCharacterIds(
+        session: DbSession,
+        characterIds: List<String>,
+    ): List<ChatDbo> {
         if (characterIds.isEmpty()) return emptyList()
-
-        return collection.find(
-            session,
-            and(
-                ChatDbo::characterIds `in` characterIds,
-                ChatDbo::isDeleted eq false
-            )
-        ).toList()
+        return dbQuery {
+            table.selectAll()
+                .where { containsAnyCharacter(characterIds) and (table.isDeleted eq false) }
+                .map { it.toChatDbo() }
+        }
     }
 
-    suspend fun getChatsByCharacterId(session: ClientSession, characterId: String): List<ChatDbo> {
-        return collection.find(
-            session,
-            and(
-                ChatDbo::characterIds contains characterId,
-                ChatDbo::isDeleted eq false
-            )
-        ).toList()
-    }
+    suspend fun getChatsByCharacterId(session: DbSession, characterId: String): List<ChatDbo> =
+        dbQuery {
+            table.selectAll()
+                .where { containsCharacter(characterId) and (table.isDeleted eq false) }
+                .map { it.toChatDbo() }
+        }
 
-    suspend fun getAllNonDeletedChats(): List<ChatDbo> {
-        return collection.find(ChatDbo::isDeleted eq false).toList()
+    suspend fun getAllNonDeletedChats(): List<ChatDbo> = dbQuery {
+        table.selectAll().where { table.isDeleted eq false }.map { it.toChatDbo() }
     }
 
     suspend fun updateChat(
@@ -228,105 +201,70 @@ class ChatRepository(
         customName: String? = null,
         characterIds: List<String>? = null,
     ) {
-        collection.findOneById(chatId) ?: return
-        val updates = mutableListOf<Bson>()
-        isMuted?.let { updates.add(setValue(ChatDbo::isMuted, it)) }
-        customName?.let { updates.add(setValue(ChatDbo::customName, it)) }
-        characterIds?.let { updates.add(setValue(ChatDbo::characterIds, it)) }
-        if (updates.isEmpty()) return
-        collection.updateOneById(
-            chatId,
-            combine(
-                *updates.toTypedArray(),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
-            )
-        )
+        if (isMuted == null && customName == null && characterIds == null) return
+        dbQuery {
+            table.update({ table.id eq chatId }) { statement ->
+                isMuted?.let { statement[table.isMuted] = it }
+                customName?.let { statement[table.customName] = it }
+                characterIds?.let { statement[table.characterIds] = encodeStringList(it) }
+                statement[table.lastModifiedAt] = UtcTimestamp.now().toString()
+            }
+        }
     }
-
 
     suspend fun deleteChat(chatId: String) {
         deleteChatsByIds(listOf(chatId))
     }
 
-    suspend fun deleteChatsByIds(chatIds: List<String>) {
-        if (chatIds.isEmpty()) return
-        collection.updateMany(
-            ChatDbo::id `in` chatIds,
-            combine(
-                setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
-            )
-        )
+    /** Удаление всегда мягкое: клиенты узнают об этом синхронизацией по deletedAt. */
+    private suspend fun softDelete(where: () -> Op<Boolean>, touchLastModified: Boolean = true) {
+        val now = UtcTimestamp.now().toString()
+        dbQuery {
+            table.update({ where() }) {
+                it[table.isDeleted] = true
+                it[table.deletedAt] = now
+                if (touchLastModified) it[table.lastModifiedAt] = now
+            }
+        }
     }
 
+    suspend fun deleteChatsByIds(chatIds: List<String>) {
+        if (chatIds.isEmpty()) return
+        softDelete({ table.id inList chatIds })
+    }
 
-    suspend fun deleteAllChatsByCharacterId(session: ClientSession, characterId: String) {
-        collection.updateMany(
-            session,
-            and(
-                ChatDbo::characterIds contains characterId,
-                ChatDbo::isDeleted eq false
-            ),
-            combine(
-                setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
-            )
-        )
+    suspend fun deleteAllChatsByCharacterId(session: DbSession, characterId: String) {
+        softDelete({ containsCharacter(characterId) and (table.isDeleted eq false) })
     }
 
     /** Все чаты юзера (для каскада удаления аккаунта). */
-    suspend fun getChatIdsByUserId(session: ClientSession, userId: String): List<String> =
-        collection.find(session, ChatDbo::userId eq userId)
-            .toList().map { it.id }
+    suspend fun getChatIdsByUserId(session: DbSession, userId: String): List<String> = dbQuery {
+        table.selectAll().where { table.userId eq userId }.map { it[table.id] }
+    }
 
     /** Soft-delete всех чатов юзера; возвращает их id для каскада сообщений. */
-    suspend fun deleteAllChatsByUserId(session: ClientSession, userId: String): List<String> {
+    suspend fun deleteAllChatsByUserId(session: DbSession, userId: String): List<String> {
         val ids = getChatIdsByUserId(session, userId)
         if (ids.isEmpty()) return ids
-        collection.updateMany(
-            session,
-            ChatDbo::id `in` ids,
-            combine(
-                setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
-            ),
-        )
+        // lastModifiedAt здесь НЕ трогаем — как было в Mongo-версии
+        softDelete({ table.id inList ids }, touchLastModified = false)
         return ids
     }
 
-    suspend fun deleteAllChatsByCharacterIds(session: ClientSession, characterIds: List<String>) {
+    suspend fun deleteAllChatsByCharacterIds(session: DbSession, characterIds: List<String>) {
         if (characterIds.isEmpty()) return
-
-        collection.updateMany(
-            session,
-            and(
-                ChatDbo::characterIds `in` characterIds,
-                ChatDbo::isDeleted eq false
-            ),
-            combine(
-                setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
-            )
-        )
+        softDelete({ containsAnyCharacter(characterIds) and (table.isDeleted eq false) })
     }
 
-    suspend fun deleteChatsForWhoIsNotAuthor(session: ClientSession, characterId: String, authorId: String) {
-        collection.updateMany(
-            session,
-            and(
-                ChatDbo::characterIds contains characterId,
-                ChatDbo::userId ne authorId,
-                ChatDbo::isDeleted eq false
-            ),
-            combine(
-                setValue(ChatDbo::isDeleted, true),
-                setValue(ChatDbo::deletedAt, UtcTimestamp.now().toString()),
-                setValue(ChatDbo::lastModifiedAt, UtcTimestamp.now().toString())
-            )
-        )
+    suspend fun deleteChatsForWhoIsNotAuthor(
+        session: DbSession,
+        characterId: String,
+        authorId: String,
+    ) {
+        softDelete({
+            containsCharacter(characterId) and
+                (table.userId neq authorId) and
+                (table.isDeleted eq false)
+        })
     }
-
 }

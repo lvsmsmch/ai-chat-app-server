@@ -2,13 +2,19 @@ package com.lvsmsmch.aichat.auth.database.tokens.session_tokens
 
 import com.lvsmsmch.aichat.auth.database.tokens.TokenDbo
 import com.lvsmsmch.aichat.auth.database.tokens.TokenRepository
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toSessionDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
 import com.lvsmsmch.aichat.utils.generateToken
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
 @Serializable
 data class SessionDbo(
@@ -18,33 +24,30 @@ data class SessionDbo(
     override val expiresAt: String = UtcTimestamp.now().addDays(100_000).toString(),
     val userId: String,
     val ipAddress: String,
-): TokenDbo
+) : TokenDbo
 
-class SessionRepository(
-    override val collection: CoroutineCollection<SessionDbo>
-): TokenRepository<SessionDbo> {
+class SessionRepository : TokenRepository<SessionDbo> {
 
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(SessionDbo::token)
-        collection.ensureIndex(SessionDbo::userId)
-        collection.ensureIndex(SessionDbo::ipAddress)
+    override suspend fun get(token: String): SessionDbo? = dbQuery {
+        Tables.Sessions.selectAll()
+            .where { Tables.Sessions.token eq token }
+            .limit(1)
+            .firstOrNull()
+            ?.toSessionDbo()
     }
 
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
+    override suspend fun delete(token: String) {
+        dbQuery { Tables.Sessions.deleteWhere { Tables.Sessions.token eq token } }
+    }
 
     /** Все сессии юзера — под нож при удалении аккаунта (токены гаснут сразу). */
     suspend fun deleteAllByUserId(userId: String) {
-        collection.deleteMany(com.mongodb.client.model.Filters.eq("userId", userId))
+        dbQuery { Tables.Sessions.deleteWhere { Tables.Sessions.userId eq userId } }
     }
 
     suspend fun createSession(userId: String, ipAddress: String): SessionDbo {
-        val token = generateToken()
-        val obj = SessionDbo(token = token, userId = userId, ipAddress = ipAddress)
-        collection.insertOne(obj)
+        val obj = SessionDbo(token = generateToken(), userId = userId, ipAddress = ipAddress)
+        dbQuery { Tables.Sessions.insert { it.from(obj) } }
         return obj
     }
 }

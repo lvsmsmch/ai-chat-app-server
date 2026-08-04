@@ -1,5 +1,7 @@
 package com.lvsmsmch.aichat
 
+import com.lvsmsmch.aichat.db.Db
+import com.lvsmsmch.aichat.db.Tables
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.UsernameGenerator
 import com.lvsmsmch.aichat._common.database.DeletedIdsStatsDbo
@@ -44,8 +46,6 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.websocket.*
 import kotlinx.coroutines.*
-import org.litote.kmongo.coroutine.coroutine
-import org.litote.kmongo.reactivestreams.KMongo
 import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -104,106 +104,36 @@ fun Application.module() {
 
     val databaseScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val mongoClient = KMongo.createClient(
-        System.getenv("MONGODB_URI") ?: "mongodb://localhost:27017"
-    ).coroutine
+    // Postgres: пул, схема (таблицы + индексы создаются, если их ещё нет)
+    Db.connect()
+    Db.createSchema(Tables.all)
+    logger.info("Postgres connected, schema ensured: ${Tables.all.size} tables")
 
-    val database = mongoClient.getDatabase("ai_chat_app_database")
+    val transactionHelper = TransactionHelper()
 
-    val transactionHelper = TransactionHelper(mongoClient)
-
-    val sessionRepository = SessionRepository(
-        database.getCollection<SessionDbo>("sessions")
-    )
-    val deletedIdsStatsRepository = DeletedIdsStatsRepository(
-        database.getCollection<DeletedIdsStatsDbo>("entity_id_stats")
-    )
-    val categoryRecommendationsCacheRepository = CategoryRecommendationsCacheRepository(
-        database.getCollection<CategoryRecommendationsCacheDbo>("category_cache")
-    )
-    val userRecommendationsCacheRepository = UserRecommendationsCacheRepository(
-        database.getCollection<UserRecommendationsCacheDbo>("user_recommendations_cache")
-    )
-    val discoverSectionsRepository = com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository(
-        database.getCollection<com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheDbo>("discover_sections")
-    )
-    val defaultRecommendationsCacheRepository = DefaultRecommendationsCacheRepository(
-        database.getCollection<DefaultRecommendationsCacheDbo>("default_personalized_cache")
-    )
-    val deviceLimitCarryoverRepository = com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository(
-        database.getCollection<com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverDbo>("device_limit_carryover")
-    )
-    val searchSuggestionsRepository = SearchSuggestionsRepository(
-        database.getCollection<SearchSuggestionDbo>("search_suggestions")
-    )
-    val reviewLikeRepository = ReviewLikeRepository(
-        database.getCollection<ReviewLikeDbo>("review_likes")
-    )
-    val userRepository = UserRepository(
-        database.getCollection<UserDbo>("users")
-    )
-    val followRepository = FollowRepository(
-        database.getCollection<FollowDbo>("follows")
-    )
-    val reportRepository = ReportRepository(
-        database.getCollection<ReportDbo>("reports")
-    )
-    val characterRepository = CharacterRepository(
-        database.getCollection<CharacterDbo>("characters")
-    )
-    val chatRepository = ChatRepository(
-        database.getCollection<ChatDbo>("chats")
-    )
-    val messageRepository = MessageRepository(
-        database.getCollection<MessageDbo>("messages")
-    )
-    val reviewRepository = ReviewRepository(
-        database.getCollection<ReviewDbo>("reviews")
-    )
-    val commentRepository = CommentRepository(
-        database.getCollection<CommentDbo>("comments")
-    )
-    val commentLikeRepository = CommentLikeRepository(
-        database.getCollection<CommentLikeDbo>("comment_likes")
-    )
-    val characterLikeRepository = com.lvsmsmch.aichat.character.database.CharacterLikeRepository(
-        database.getCollection<com.lvsmsmch.aichat.character.database.CharacterLikeDbo>("character_likes")
-    )
-    val userNotificationRepository = com.lvsmsmch.aichat.notification.database.UserNotificationRepository(
-        database.getCollection<com.lvsmsmch.aichat.notification.database.UserNotificationDbo>("user_notifications")
-    )
-    val characterActivityLogRepository = CharacterActivityLogRepository(
-        database.getCollection<CharacterActivityLogDbo>("character_activity_logs")
-    )
-    val characterListCopyRepository = CharacterListCopyRepository(
-        database.getCollection<CharacterListCopyDbo>("character_list_copy_dbo")
-    )
-    val feedbackRepository = FeedbackRepository(
-        database.getCollection<FeedbackDbo>("feedbacks")
-    )
-
-    databaseScope.launch {
-        try {
-            sessionRepository.ensureIndexes()
-            userRepository.ensureIndexes()
-            followRepository.ensureIndexes()
-            reportRepository.ensureIndexes()
-            characterRepository.ensureIndexes()
-            searchSuggestionsRepository.ensureIndexes()
-            chatRepository.ensureIndexes()
-            messageRepository.ensureIndexes()
-            reviewRepository.ensureIndexes()
-            reviewLikeRepository.ensureIndexes()
-            commentRepository.ensureIndexes()
-            commentLikeRepository.ensureIndexes()
-            characterLikeRepository.ensureIndexes()
-            userNotificationRepository.ensureIndexes()
-            feedbackRepository.ensureIndexes()
-            logger.info("Database indexes ensured")
-        } catch (e: Exception) {
-            logger.error("Failed to ensure database indexes: ${e.message}", e)
-        }
-    }
+    val sessionRepository = SessionRepository()
+    val deletedIdsStatsRepository = DeletedIdsStatsRepository()
+    val categoryRecommendationsCacheRepository = CategoryRecommendationsCacheRepository()
+    val userRecommendationsCacheRepository = UserRecommendationsCacheRepository()
+    val discoverSectionsRepository = com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository()
+    val defaultRecommendationsCacheRepository = DefaultRecommendationsCacheRepository()
+    val deviceLimitCarryoverRepository = com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository()
+    val searchSuggestionsRepository = SearchSuggestionsRepository()
+    val reviewLikeRepository = ReviewLikeRepository()
+    val userRepository = UserRepository()
+    val followRepository = FollowRepository()
+    val reportRepository = ReportRepository()
+    val characterRepository = CharacterRepository()
+    val chatRepository = ChatRepository()
+    val messageRepository = MessageRepository()
+    val reviewRepository = ReviewRepository()
+    val commentRepository = CommentRepository()
+    val commentLikeRepository = CommentLikeRepository()
+    val characterLikeRepository = com.lvsmsmch.aichat.character.database.CharacterLikeRepository()
+    val userNotificationRepository = com.lvsmsmch.aichat.notification.database.UserNotificationRepository()
+    val characterActivityLogRepository = CharacterActivityLogRepository()
+    val characterListCopyRepository = CharacterListCopyRepository()
+    val feedbackRepository = FeedbackRepository()
 
     val cacheManager = CacheManager(
         characterRepository = characterRepository,

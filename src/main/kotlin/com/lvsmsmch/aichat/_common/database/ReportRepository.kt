@@ -1,14 +1,22 @@
 package com.lvsmsmch.aichat._common.database
 
-import com.lvsmsmch.aichat.utils.*
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toReportDbo
+import com.lvsmsmch.aichat.utils.UtcTimestamp
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
-
-@Serializable enum class ReportEntity(val code: String) {
+@Serializable
+enum class ReportEntity(val code: String) {
     User("user"), Character("character"), Review("review"), Message("message"), Comment("comment");
 }
 
@@ -23,102 +31,85 @@ data class ReportDbo(
     val text: String,
 )
 
-class ReportRepository(
-    private val collection: CoroutineCollection<ReportDbo>
-) {
+class ReportRepository {
 
-
-
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(ReportDbo::entityId))
-        collection.ensureIndex(ascending(ReportDbo::entityType))
-        collection.ensureIndex(ascending(ReportDbo::reportedBy))
-        collection.ensureIndex(ascending(ReportDbo::reportedAt))
-        collection.ensureIndex(ascending(ReportDbo::entityType, ReportDbo::entityId))
-    }
-
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
-
+    /** Повторная жалоба того же юзера на ту же сущность игнорируется. */
     suspend fun addReport(reportDbo: ReportDbo) {
-        val existingReport = collection.findOne(
-            and(
-                ReportDbo::reportedBy eq reportDbo.reportedBy,
-                ReportDbo::entityType eq reportDbo.entityType,
-                ReportDbo::entityId eq reportDbo.entityId
-            )
-        )
-
-        if (existingReport == null) {
-            collection.insertOne(reportDbo)
+        dbQuery {
+            val exists = Tables.Reports.selectAll()
+                .where {
+                    (Tables.Reports.reportedBy eq reportDbo.reportedBy) and
+                        (Tables.Reports.entityType eq reportDbo.entityType) and
+                        (Tables.Reports.entityId eq reportDbo.entityId)
+                }
+                .limit(1)
+                .any()
+            if (!exists) Tables.Reports.insert { it.from(reportDbo) }
         }
     }
 
-
-    suspend fun getReportsFor(entityId: String): List<ReportDbo> {
-        return collection.find(ReportDbo::entityId eq entityId)
-            .sort(descending(ReportDbo::reportedAt))
-            .toList()
+    suspend fun getReportsFor(entityId: String): List<ReportDbo> = dbQuery {
+        Tables.Reports.selectAll()
+            .where { Tables.Reports.entityId eq entityId }
+            .orderBy(Tables.Reports.reportedAt to SortOrder.DESC)
+            .map { it.toReportDbo() }
     }
 
     suspend fun getEntitiesWithTooManyReports(
         entityType: String,
-        minReports: Int
-    ): Map<String, List<ReportDbo>> {
-        val allReports = collection.find(ReportDbo::entityType eq entityType).toList()
-
-        return allReports
+        minReports: Int,
+    ): Map<String, List<ReportDbo>> = dbQuery {
+        Tables.Reports.selectAll()
+            .where { Tables.Reports.entityType eq entityType }
+            .map { it.toReportDbo() }
             .groupBy { it.entityId }
             .filterValues { reports -> reports.size >= minReports }
     }
 
-    suspend fun getReportsByUser(userId: String, page: Int = 1, size: Int = 10): List<ReportDbo> {
-        val skip = (page - 1) * size
-        return collection.find(ReportDbo::reportedBy eq userId)
-            .sort(descending(ReportDbo::reportedAt))
-            .skip(skip)
-            .limit(size)
-            .toList()
-    }
+    suspend fun getReportsByUser(userId: String, page: Int = 1, size: Int = 10): List<ReportDbo> =
+        dbQuery {
+            Tables.Reports.selectAll()
+                .where { Tables.Reports.reportedBy eq userId }
+                .orderBy(Tables.Reports.reportedAt to SortOrder.DESC)
+                .limit(size)
+                .offset(((page - 1) * size).toLong())
+                .map { it.toReportDbo() }
+        }
 
     suspend fun getReportsByEntityType(
         entityType: String,
         page: Int = 1,
-        size: Int = 10
-    ): List<ReportDbo> {
-        val skip = (page - 1) * size
-        return collection.find(ReportDbo::entityType eq entityType)
-            .sort(descending(ReportDbo::reportedAt))
-            .skip(skip)
+        size: Int = 10,
+    ): List<ReportDbo> = dbQuery {
+        Tables.Reports.selectAll()
+            .where { Tables.Reports.entityType eq entityType }
+            .orderBy(Tables.Reports.reportedAt to SortOrder.DESC)
             .limit(size)
-            .toList()
+            .offset(((page - 1) * size).toLong())
+            .map { it.toReportDbo() }
     }
 
-    suspend fun countReportsForEntity(entityId: String): Int {
-        return collection.countDocuments(ReportDbo::entityId eq entityId).toInt()
+    suspend fun countReportsForEntity(entityId: String): Int = dbQuery {
+        Tables.Reports.selectAll().where { Tables.Reports.entityId eq entityId }.count().toInt()
     }
 
-    suspend fun countReportsByUser(userId: String): Int {
-        return collection.countDocuments(ReportDbo::reportedBy eq userId).toInt()
+    suspend fun countReportsByUser(userId: String): Int = dbQuery {
+        Tables.Reports.selectAll().where { Tables.Reports.reportedBy eq userId }.count().toInt()
     }
-
-
 
     suspend fun removeReport(reportId: String) {
-        collection.deleteOne(ReportDbo::id eq reportId)
+        dbQuery { Tables.Reports.deleteWhere { Tables.Reports.id eq reportId } }
     }
 
     suspend fun removeAllReportsByUserId(userId: String) {
-        collection.deleteMany(ReportDbo::reportedBy eq userId)
+        dbQuery { Tables.Reports.deleteWhere { Tables.Reports.reportedBy eq userId } }
     }
 
     suspend fun removeAllReportsForEntity(entityId: String) {
-        collection.deleteMany(ReportDbo::entityId eq entityId)
+        dbQuery { Tables.Reports.deleteWhere { Tables.Reports.entityId eq entityId } }
     }
 
     suspend fun removeAllReportsForEntityType(entityType: String) {
-        collection.deleteMany(ReportDbo::entityType eq entityType)
+        dbQuery { Tables.Reports.deleteWhere { Tables.Reports.entityType eq entityType } }
     }
 }

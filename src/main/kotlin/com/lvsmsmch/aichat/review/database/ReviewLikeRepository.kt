@@ -1,95 +1,84 @@
 package com.lvsmsmch.aichat.review.database
 
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.reactivestreams.client.ClientSession
-import org.litote.kmongo.ascending
-import org.litote.kmongo.coroutine.CoroutineCollection
-import org.litote.kmongo.descending
-import org.litote.kmongo.eq
-import org.litote.kmongo.`in`
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.utils.DbSession
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
-class ReviewLikeRepository(
-    private val collection: CoroutineCollection<ReviewLikeDbo>
-) {
+class ReviewLikeRepository {
 
+    private fun likeId(userId: String, reviewId: String) = "${userId}_${reviewId}"
 
-    
-    suspend fun ensureIndexes() {
-        collection.ensureIndex(ascending(ReviewLikeDbo::userId))
-        collection.ensureIndex(ascending(ReviewLikeDbo::reviewId))
-        collection.ensureIndex(descending(ReviewLikeDbo::likedAt))
-    }
-
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
-
-
-
-    suspend fun likeReview(session: ClientSession, userId: String, reviewId: String) {
-        val likeId = "${userId}_${reviewId}"
-        val existing = collection.findOneById(likeId)
-        
-        if (existing == null) {
-            collection.insertOne(
-                session,
-                ReviewLikeDbo(
-                    id = likeId,
-                    userId = userId,
-                    reviewId = reviewId
-                )
-            )
+    suspend fun likeReview(session: DbSession, userId: String, reviewId: String) {
+        dbQuery {
+            val id = likeId(userId, reviewId)
+            val exists = Tables.ReviewLikes.selectAll()
+                .where { Tables.ReviewLikes.id eq id }
+                .limit(1)
+                .any()
+            if (!exists) {
+                Tables.ReviewLikes.insert {
+                    it.from(ReviewLikeDbo(id = id, userId = userId, reviewId = reviewId))
+                }
+            }
         }
     }
-    
 
-
-
-
-    suspend fun isReviewLikedByUser(userId: String, reviewId: String): Boolean {
-        val likeId = "${userId}_${reviewId}"
-        return collection.findOneById(likeId) != null
+    suspend fun isReviewLikedByUser(userId: String, reviewId: String): Boolean = dbQuery {
+        Tables.ReviewLikes.selectAll()
+            .where { Tables.ReviewLikes.id eq likeId(userId, reviewId) }
+            .limit(1)
+            .any()
     }
 
-
-    suspend fun getLikesCount(reviewId: String): Int {
-        return collection.countDocuments(ReviewLikeDbo::reviewId eq reviewId).toInt()
+    suspend fun getLikesCount(reviewId: String): Int = dbQuery {
+        Tables.ReviewLikes.selectAll()
+            .where { Tables.ReviewLikes.reviewId eq reviewId }
+            .count()
+            .toInt()
     }
-    
-    suspend fun getUsersWhoLiked(reviewId: String, limit: Int = 10): List<String> {
-        return collection.find(ReviewLikeDbo::reviewId eq reviewId)
-            .sort(descending(ReviewLikeDbo::likedAt))
+
+    suspend fun getUsersWhoLiked(reviewId: String, limit: Int = 10): List<String> = dbQuery {
+        Tables.ReviewLikes.selectAll()
+            .where { Tables.ReviewLikes.reviewId eq reviewId }
+            .orderBy(Tables.ReviewLikes.likedAt to SortOrder.DESC)
             .limit(limit)
-            .toList()
-            .map { it.userId }
+            .map { it[Tables.ReviewLikes.userId] }
     }
-    
+
     suspend fun checkMultipleLikes(userId: String, reviewIds: List<String>): Map<String, Boolean> {
-        val likeIds = reviewIds.map { "${userId}_${it}" }
-        val likes = collection.find(ReviewLikeDbo::id `in` likeIds).toList()
-        val likedSet = likes.map { it.reviewId }.toSet()
-        
-        return reviewIds.associateWith { it in likedSet }
+        if (reviewIds.isEmpty()) return emptyMap()
+        val liked = dbQuery {
+            Tables.ReviewLikes.selectAll()
+                .where {
+                    (Tables.ReviewLikes.userId eq userId) and
+                        (Tables.ReviewLikes.reviewId inList reviewIds)
+                }
+                .map { it[Tables.ReviewLikes.reviewId] }
+                .toSet()
+        }
+        return reviewIds.associateWith { it in liked }
     }
 
-
-
-
-    suspend fun unlikeReview(session: ClientSession, userId: String, reviewId: String) {
-        val likeId = "${userId}_${reviewId}"
-        collection.deleteOneById(session, likeId)
+    suspend fun unlikeReview(session: DbSession, userId: String, reviewId: String) {
+        dbQuery {
+            Tables.ReviewLikes.deleteWhere { Tables.ReviewLikes.id eq likeId(userId, reviewId) }
+        }
     }
 
-    suspend fun removeAllLikesForReview(session: ClientSession, reviewId: String) {
-        collection.deleteMany(session, ReviewLikeDbo::reviewId eq reviewId)
+    suspend fun removeAllLikesForReview(session: DbSession, reviewId: String) {
+        dbQuery { Tables.ReviewLikes.deleteWhere { Tables.ReviewLikes.reviewId eq reviewId } }
     }
 
-    suspend fun removeAllLikesForReviews(session: ClientSession, reviewIds: List<String>) {
+    suspend fun removeAllLikesForReviews(session: DbSession, reviewIds: List<String>) {
         if (reviewIds.isEmpty()) return
-
-        collection.deleteMany(
-            session,
-            ReviewLikeDbo::reviewId `in` reviewIds
-        )
+        dbQuery { Tables.ReviewLikes.deleteWhere { Tables.ReviewLikes.reviewId inList reviewIds } }
     }
 }

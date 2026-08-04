@@ -1,14 +1,19 @@
 package com.lvsmsmch.aichat.cache.database
 
 import com.lvsmsmch.aichat.character.database.CharacterCategory
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.db.toCategoryRecommendationsCacheDbo
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.client.model.ReplaceOptions
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.upsert
 
 @Serializable
 data class CategoryRecommendationsCacheDbo(
@@ -18,71 +23,58 @@ data class CategoryRecommendationsCacheDbo(
     val version: String = ObjectId().toString()
 )
 
-class CategoryRecommendationsCacheRepository(
-    private val collection: CoroutineCollection<CategoryRecommendationsCacheDbo>
-) {
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+class CategoryRecommendationsCacheRepository {
 
     suspend fun upsertCategoryCache(category: CharacterCategory, characterIds: List<String>) {
         val cache = CategoryRecommendationsCacheDbo(
             categoryCode = category.code,
-            characterIds = characterIds
+            characterIds = characterIds,
         )
-        
-        collection.replaceOneById(category.code, cache, ReplaceOptions().upsert(true))
+        dbQuery { Tables.CategoryRecommendationsCache.upsert { it.from(cache) } }
     }
 
-    suspend fun getCategoryCache(category: CharacterCategory): CategoryRecommendationsCacheDbo? {
-        return collection.findOneById(category.code)
-    }
-
-
-
-    suspend fun getCategoriesNeedingUpdate(ttlHours: Long = 3): List<CharacterCategory> {
-        return CharacterCategory.entries.toList()
-        val now = UtcTimestamp.now()
-        val cutoff = now.subtractHours(ttlHours)
-        
-        val needingUpdate = mutableListOf<CharacterCategory>()
-        
-        CharacterCategory.entries.forEach { category ->
-                val cache = getCategoryCache(category)
-                if (cache == null || UtcTimestamp.parse(cache.updatedAt).isBefore(cutoff)) {
-                    needingUpdate.add(category)
-            }
+    suspend fun getCategoryCache(category: CharacterCategory): CategoryRecommendationsCacheDbo? =
+        dbQuery {
+            Tables.CategoryRecommendationsCache.selectAll()
+                .where { Tables.CategoryRecommendationsCache.categoryCode eq category.code }
+                .limit(1)
+                .firstOrNull()
+                ?.toCategoryRecommendationsCacheDbo()
         }
 
-        return needingUpdate
-    }
-
+    /**
+     * Пересчитываем ВСЕ категории, а не только протухшие: расчёт дешёвый, а
+     * пропущенная категория висела бы со старым списком до следующего цикла.
+     */
+    suspend fun getCategoriesNeedingUpdate(ttlHours: Long = 3): List<CharacterCategory> =
+        CharacterCategory.entries.toList()
 
     suspend fun deleteAllCacheForCategory(category: CharacterCategory) {
-        collection.deleteMany(
-            CategoryRecommendationsCacheDbo::categoryCode eq category.code
-        )
+        dbQuery {
+            Tables.CategoryRecommendationsCache.deleteWhere {
+                Tables.CategoryRecommendationsCache.categoryCode eq category.code
+            }
+        }
     }
 
-    suspend fun getCacheStats(): CategoryCacheStats {
-        val totalCaches = collection.countDocuments()
+    suspend fun getCacheStats(): CategoryCacheStats = dbQuery {
         val now = UtcTimestamp.now()
-        
-        val freshCaches = collection.countDocuments(
-            CategoryRecommendationsCacheDbo::updatedAt gte now.subtractHours(3).toString()
-        )
-        
-        val cachesByCategory = mutableMapOf<String, Int>()
-        CharacterCategory.entries.forEach { category ->
-            val count = collection.countDocuments(
-                CategoryRecommendationsCacheDbo::categoryCode eq category.code
-            )
-            cachesByCategory[category.code] = count.toInt()
-        }
-        
-        return CategoryCacheStats(
-            totalCaches = totalCaches.toInt(),
-            freshCaches = freshCaches.toInt(),
-            cachesByCategory = cachesByCategory
+        val total = Tables.CategoryRecommendationsCache.selectAll().count()
+        val fresh = Tables.CategoryRecommendationsCache.selectAll()
+            .where {
+                Tables.CategoryRecommendationsCache.updatedAt greaterEq
+                    now.subtractHours(3).toString()
+            }
+            .count()
+        val present = Tables.CategoryRecommendationsCache.selectAll()
+            .map { it[Tables.CategoryRecommendationsCache.categoryCode] }
+            .toSet()
+        CategoryCacheStats(
+            totalCaches = total.toInt(),
+            freshCaches = fresh.toInt(),
+            cachesByCategory = CharacterCategory.entries.associate { category ->
+                category.code to if (category.code in present) 1 else 0
+            },
         )
     }
 }

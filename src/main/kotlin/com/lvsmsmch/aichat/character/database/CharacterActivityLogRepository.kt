@@ -1,15 +1,19 @@
 package com.lvsmsmch.aichat.character.database
 
+import com.lvsmsmch.aichat.db.Db.dbQuery
+import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.from
+import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
-import com.lvsmsmch.aichat.utils.createDatabaseEventsFlow
-import com.mongodb.client.model.Aggregates.count
-import com.mongodb.reactivestreams.client.ClientSession
 import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
-import org.litote.kmongo.*
-import org.litote.kmongo.coroutine.CoroutineCollection
-import org.litote.kmongo.coroutine.aggregate
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.countDistinct
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 
 @Serializable
 data class CharacterActivityLogDbo(
@@ -27,74 +31,57 @@ enum class ActivityType(val code: Int) {
     COMMENT_ADDED(3),
 }
 
-class CharacterActivityLogRepository(
-    private val collection: CoroutineCollection<CharacterActivityLogDbo>
-) {
-
-
-
-    val databaseEventsFlow = createDatabaseEventsFlow(collection)
+class CharacterActivityLogRepository {
 
     suspend fun logActivity(
-        session: ClientSession,
+        session: DbSession,
         activityType: ActivityType,
         characterId: String,
-        userId: String
+        userId: String,
     ) {
         val log = CharacterActivityLogDbo(
             characterId = characterId,
             activityType = activityType.code,
-            userId = userId
+            userId = userId,
         )
-        collection.insertOne(session, log)
+        dbQuery { Tables.CharacterActivityLogs.insert { it.from(log) } }
     }
-
-
-
 
     suspend fun getActivity(
         activityType: ActivityType,
         characterId: String,
-        since: UtcTimestamp
-    ): Int {
-        return collection.countDocuments(
-            and(
-                CharacterActivityLogDbo::characterId eq characterId,
-                CharacterActivityLogDbo::activityType eq activityType.code,
-                CharacterActivityLogDbo::timestamp gte since.toString()
-            )
-        ).toInt()
+        since: UtcTimestamp,
+    ): Int = dbQuery {
+        Tables.CharacterActivityLogs.selectAll()
+            .where {
+                (Tables.CharacterActivityLogs.characterId eq characterId) and
+                    (Tables.CharacterActivityLogs.activityType eq activityType.code) and
+                    (Tables.CharacterActivityLogs.timestamp greaterEq since.toString())
+            }
+            .count()
+            .toInt()
     }
 
+    /**
+     * Сколько РАЗНЫХ юзеров совершили действие. В Mongo это была агрегация
+     * group + count, в SQL — обычный COUNT(DISTINCT).
+     */
     suspend fun getUniqueUsersForActivity(
         activityType: ActivityType,
         characterId: String,
-        since: UtcTimestamp
-    ): Int {
-        val result = collection.aggregate<CountResult>(
-            match(
-                and(
-                    CharacterActivityLogDbo::characterId eq characterId,
-                    CharacterActivityLogDbo::activityType eq activityType.code,
-                    CharacterActivityLogDbo::timestamp gte since.toString()
-                )
-            ),
-            group(
-                CharacterActivityLogDbo::userId,
-                CountResult::count sum 1
-            ),
-            count()
-        ).first()
-
-        return result?.count ?: 0
+        since: UtcTimestamp,
+    ): Int = dbQuery {
+        val distinctUsers = Tables.CharacterActivityLogs.userId.countDistinct()
+        Tables.CharacterActivityLogs
+            .select(distinctUsers)
+            .where {
+                (Tables.CharacterActivityLogs.characterId eq characterId) and
+                    (Tables.CharacterActivityLogs.activityType eq activityType.code) and
+                    (Tables.CharacterActivityLogs.timestamp greaterEq since.toString())
+            }
+            .firstOrNull()
+            ?.get(distinctUsers)
+            ?.toInt()
+            ?: 0
     }
-
-    data class CountResult(
-        val count: Int
-    )
-
-
-
-
-
 }
