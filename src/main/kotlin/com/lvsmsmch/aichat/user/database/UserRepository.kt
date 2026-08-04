@@ -371,6 +371,28 @@ class UserRepository {
         }
     }
 
+    /** Подтверждение адреса: код пришёл именно на [email] (мог быть новым). */
+    suspend fun setEmailVerified(userId: String, email: String) {
+        updateById(userId) {
+            it[Tables.Users.email] = email
+            it[Tables.Users.emailVerified] = true
+        }
+    }
+
+    suspend fun setPassword(userId: String, hashedPassword: String) {
+        updateById(userId) { it[Tables.Users.hashedPassword] = hashedPassword }
+    }
+
+    /** Гость завёл почту с паролем: аккаунт тот же, тип становится обычным. */
+    suspend fun attachEmailPassword(userId: String, email: String, hashedPassword: String) {
+        updateById(userId) {
+            it[Tables.Users.email] = email
+            it[Tables.Users.emailVerified] = false
+            it[Tables.Users.hashedPassword] = hashedPassword
+            it[Tables.Users.accountType] = AccountType.REGISTERED.name
+        }
+    }
+
     suspend fun setCharacterLanguage(userId: String, lang: String) {
         updateById(userId) { it[Tables.Users.characterLanguage] = lang }
     }

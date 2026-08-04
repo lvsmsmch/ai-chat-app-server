@@ -50,5 +50,7 @@ data class UserDbo(
     val lastWinbackPushAt: String? = null,
     val color: String = AvatarColors.random(),
     // Бесплатный триал одноразовый: выставляется при первой подписке
-    val trialUsed: Boolean = false
+    val trialUsed: Boolean = false,
+    /** Почта подтверждена кодом из письма (у аккаунтов Google — сразу true). */
+    val emailVerified: Boolean = false
 )

@@ -36,6 +36,7 @@ import com.lvsmsmch.aichat.utils.*
 import com.lvsmsmch.aichat.utils.updaters.*
 import com.lvsmsmch.aichat.utils.workers.fillDefaultSuggestions
 import com.lvsmsmch.aichat.utils.workers.fillInitialData
+import io.ktor.client.HttpClient
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
@@ -134,6 +135,16 @@ fun Application.module() {
     val characterActivityLogRepository = CharacterActivityLogRepository()
     val characterListCopyRepository = CharacterListCopyRepository()
     val feedbackRepository = FeedbackRepository()
+    val authCodeRepository = com.lvsmsmch.aichat.auth.database.AuthCodeRepository()
+    val authLockoutRepository = com.lvsmsmch.aichat.auth.database.AuthLockoutRepository()
+    // Отправщик писем: Resend, если задан ключ; иначе письма идут в лог
+    val mailSender = com.lvsmsmch.aichat.mail.MailSenderFactory.create(
+        HttpClient {
+            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                json(defaultJson)
+            }
+        }
+    )
 
     val cacheManager = CacheManager(
         characterRepository = characterRepository,
@@ -269,6 +280,11 @@ fun Application.module() {
         updateIntervalMinutes = 60
     )
 
+    val authCodesCleanupJob = configureAuthCodesCleanupUpdater(
+        databaseScope = databaseScope,
+        authCodeRepository = authCodeRepository,
+    )
+
     val stuckMessagesUpdaterJob = configureStuckMessagesUpdater(
         databaseScope = databaseScope,
         messageRepository = messageRepository
@@ -332,6 +348,9 @@ fun Application.module() {
         userNotificationRepository = userNotificationRepository,
         discoverSectionsRepository = discoverSectionsRepository,
         characterLikeRepository = characterLikeRepository,
+        authCodeRepository = authCodeRepository,
+        authLockoutRepository = authLockoutRepository,
+        mailSender = mailSender,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {
@@ -344,6 +363,7 @@ fun Application.module() {
             categoryCacheUpdaterJob.cancelAndJoin()
             defaultPersonalizedUpdaterJob.cancelAndJoin()
             stuckMessagesUpdaterJob.cancelAndJoin()
+            authCodesCleanupJob.cancelAndJoin()
             hourlyCounterUpdaterJob.cancelAndJoin()
             dailyCounterUpdaterJob.cancelAndJoin()
             fillDefaultSuggestionsJob.cancelAndJoin()

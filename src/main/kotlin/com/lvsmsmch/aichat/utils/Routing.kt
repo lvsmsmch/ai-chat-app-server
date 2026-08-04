@@ -6,6 +6,7 @@ import com.lvsmsmch.aichat._common.database.ReportRepository
 import com.lvsmsmch.aichat.app_data.network.configureAppDataRouting
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.auth.network.configureAuthRouting
+import com.lvsmsmch.aichat.auth.network.configureEmailAuthRouting
 import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.character.database.CharacterRepository
 import com.lvsmsmch.aichat.character.database.SearchSuggestionsRepository
@@ -57,6 +58,9 @@ fun Application.configureRouting(
     deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
+    authCodeRepository: com.lvsmsmch.aichat.auth.database.AuthCodeRepository,
+    authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository,
+    mailSender: com.lvsmsmch.aichat.mail.MailSender,
 ) {
     routing {
         get("/test") {
@@ -77,6 +81,19 @@ fun Application.configureRouting(
                 usernameGenerator = usernameGenerator,
                 mapper = mapper,
                 complexQueryHelper = complexQueryHelper,
+                discoverSectionsRepository = discoverSectionsRepository,
+            )
+
+            configureEmailAuthRouting(
+                userRepository = userRepository,
+                sessionRepository = sessionRepository,
+                authCodeRepository = authCodeRepository,
+                authLockoutRepository = authLockoutRepository,
+                mailSender = mailSender,
+                idGenerator = idGenerator,
+                usernameGenerator = usernameGenerator,
+                complexQueryHelper = complexQueryHelper,
+                mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
             )
 

@@ -57,6 +57,11 @@ object Tables {
         val lastWinbackPushAt = text("last_winback_push_at").nullable()
         val color = text("color")
         val trialUsed = bool("trial_used")
+        /**
+         * Почта подтверждена кодом из письма. У аккаунтов Google — сразу true:
+         * адрес подтверждён самим Google.
+         */
+        val emailVerified = bool("email_verified").default(false)
 
         override val primaryKey = PrimaryKey(id)
 
@@ -68,6 +73,49 @@ object Tables {
             index(false, lastActiveAt)
             index(false, deviceId)
         }
+    }
+
+    /**
+     * Коды из писем: подтверждение почты и сброс пароля.
+     *
+     * Сам код не хранится — только его bcrypt-хеш: утечка таблицы не даёт
+     * войти в чужой аккаунт. Код короткий (6 цифр), поэтому живёт минуты,
+     * одноразовый и с ограничением на число попыток.
+     */
+    object AuthCodes : Table("auth_codes") {
+        val id = text("id")
+        val userId = text("user_id")
+        /** EMAIL_VERIFY либо PASSWORD_RESET. */
+        val purpose = text("purpose")
+        val codeHash = text("code_hash")
+        /** Адрес, на который код отправлен: у смены почты он не равен текущему. */
+        val email = text("email")
+        val createdAt = text("created_at")
+        val expiresAt = text("expires_at")
+        /** Сколько раз вводили неверно — защита от подбора шести цифр. */
+        val attempts = integer("attempts").default(0)
+        /** Использован: повторно тем же кодом войти нельзя. */
+        val consumedAt = text("consumed_at").nullable()
+
+        override val primaryKey = PrimaryKey(id)
+
+        init {
+            index(false, userId, purpose)
+            index(false, expiresAt)
+        }
+    }
+
+    /**
+     * Блокировка перебора пароля. Ключ — почта в нижнем регистре: лимит по IP
+     * (rate-limit Ktor) сам по себе не спасает, атака идёт из многих адресов.
+     */
+    object AuthLockouts : Table("auth_lockouts") {
+        val loginKey = text("login_key")
+        val failedCount = integer("failed_count").default(0)
+        val lockedUntil = text("locked_until").nullable()
+        val lastFailedAt = text("last_failed_at")
+
+        override val primaryKey = PrimaryKey(loginKey)
     }
 
     object Characters : Table("characters") {
@@ -494,7 +542,7 @@ object Tables {
 
     /** Все таблицы — для создания схемы и для сверки после переливки. */
     val all: List<Table> = listOf(
-        Users, Characters, Chats, Messages, Sessions,
+        Users, AuthCodes, AuthLockouts, Characters, Chats, Messages, Sessions,
         Comments, CommentLikes, Reviews, ReviewLikes, CharacterLikes,
         Follows, Reports, Feedbacks, SearchSuggestions, UserNotifications,
         CharacterActivityLogs, Recommendations, UserRecommendationsCache,

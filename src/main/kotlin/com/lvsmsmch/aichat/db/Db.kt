@@ -55,8 +55,25 @@ object Db {
 
     /** Создание отсутствующих таблиц и индексов при старте. */
     fun createSchema(tables: List<Table>) {
-        transaction(database) { SchemaUtils.createMissingTablesAndColumns(*tables.toTypedArray()) }
+        transaction(database) {
+            SchemaUtils.createMissingTablesAndColumns(*tables.toTypedArray())
+            extraDdl.forEach { exec(it) }
+        }
     }
+
+    /**
+     * То, что схемой Exposed не описывается.
+     *
+     * Уникальность почты — функциональный частичный индекс: сравнение идёт по
+     * lower(email), иначе «A@x.com» и «a@x.com» стали бы двумя аккаунтами, а
+     * условие NOT NULL оставляет право быть без почты любому числу гостей.
+     */
+    private val extraDdl = listOf(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique
+        ON users (lower(email)) WHERE email IS NOT NULL
+        """.trimIndent(),
+    )
 
     /**
      * Запрос вне главного потока. Пул JDBC блокирующий, поэтому IO —

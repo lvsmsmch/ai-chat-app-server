@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -43,6 +45,18 @@ class SessionRepository : TokenRepository<SessionDbo> {
     /** Все сессии юзера — под нож при удалении аккаунта (токены гаснут сразу). */
     suspend fun deleteAllByUserId(userId: String) {
         dbQuery { Tables.Sessions.deleteWhere { Tables.Sessions.userId eq userId } }
+    }
+
+    /**
+     * Все сессии кроме текущей — при смене пароля: остальные устройства должны
+     * разлогиниться, а тот, кто меняет пароль, остаться в приложении.
+     */
+    suspend fun deleteAllByUserIdExcept(userId: String, keepToken: String) {
+        dbQuery {
+            Tables.Sessions.deleteWhere {
+                (Tables.Sessions.userId eq userId) and (Tables.Sessions.token neq keepToken)
+            }
+        }
     }
 
     suspend fun createSession(userId: String, ipAddress: String): SessionDbo {

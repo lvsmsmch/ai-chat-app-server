@@ -99,6 +99,7 @@ fun ResultRow.toUserDbo(): UserDbo = with(Tables.Users) {
         lastWinbackPushAt = this@toUserDbo[lastWinbackPushAt],
         color = this@toUserDbo[color],
         trialUsed = this@toUserDbo[trialUsed],
+        emailVerified = this@toUserDbo[emailVerified],
     )
 }
 
@@ -138,6 +139,7 @@ fun UpdateBuilder<*>.from(dbo: UserDbo) = with(Tables.Users) {
     this@from[lastWinbackPushAt] = dbo.lastWinbackPushAt
     this@from[color] = dbo.color
     this@from[trialUsed] = dbo.trialUsed
+    this@from[emailVerified] = dbo.emailVerified
 }
 
 // ---- characters ----

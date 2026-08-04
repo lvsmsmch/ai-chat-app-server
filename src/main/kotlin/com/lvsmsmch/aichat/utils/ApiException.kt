@@ -134,6 +134,65 @@ class GoogleAccountAlreadyInUseException(
     errorMessage = errorMessage
 )
 
+class EmailAlreadyInUseException(
+    errorMessage: String = "This email is already registered."
+) : ApiException(
+    httpStatus = HttpStatusCode.Conflict,
+    errorCode = "email_already_in_use",
+    errorMessage = errorMessage
+)
+
+/**
+ * Единая ошибка на «нет такого адреса» и «неверный пароль». Разные сообщения
+ * подсказали бы, какие адреса зарегистрированы.
+ */
+class InvalidCredentialsException(
+    errorMessage: String = "Invalid email or password."
+) : ApiException(
+    httpStatus = HttpStatusCode.Unauthorized,
+    errorCode = "invalid_credentials",
+    errorMessage = errorMessage
+)
+
+/** Перебор пароля: аккаунт временно закрыт, в сообщении — сколько ждать. */
+class AccountLockedException(
+    val retryAfterSeconds: Long,
+    errorMessage: String = "Too many attempts. Try again in $retryAfterSeconds seconds."
+) : ApiException(
+    httpStatus = HttpStatusCode.TooManyRequests,
+    errorCode = "account_locked",
+    errorMessage = errorMessage
+)
+
+/** Код из письма неверный, истёк или исчерпал попытки. */
+class InvalidCodeException(
+    errorCode: String = "invalid_code",
+    errorMessage: String = "Invalid or expired code."
+) : ApiException(
+    httpStatus = HttpStatusCode.BadRequest,
+    errorCode = errorCode,
+    errorMessage = errorMessage
+)
+
+/** Повторную отправку письма просят слишком часто. */
+class CodeRequestedTooSoonException(
+    val retryAfterSeconds: Long,
+    errorMessage: String = "Code already sent. Try again in $retryAfterSeconds seconds."
+) : ApiException(
+    httpStatus = HttpStatusCode.TooManyRequests,
+    errorCode = "code_requested_too_soon",
+    errorMessage = errorMessage
+)
+
+/** Вход по почте выключен на сервере (нет HTTPS — нет и пароля в открытую). */
+class EmailAuthDisabledException(
+    errorMessage: String = "Email sign-in is not available yet."
+) : ApiException(
+    httpStatus = HttpStatusCode.ServiceUnavailable,
+    errorCode = "email_auth_disabled",
+    errorMessage = errorMessage
+)
+
 class InternalServerErrorException(
     errorMessage: String = "An unexpected error occurred"
 ) : ApiException(

@@ -45,6 +45,51 @@ data class GuestAuthRequest(
     @SerialName("deviceId") val deviceId: String
 )
 
+// ---- Вход по почте и паролю ----
+
+@Serializable
+data class EmailRegisterRequest(
+    @SerialName("email") val email: String,
+    @SerialName("password") val password: String,
+    @SerialName("deviceId") val deviceId: String,
+)
+
+@Serializable
+data class EmailLoginRequest(
+    @SerialName("email") val email: String,
+    @SerialName("password") val password: String,
+    @SerialName("deviceId") val deviceId: String,
+)
+
+@Serializable
+data class EmailVerifyRequest(
+    @SerialName("code") val code: String,
+)
+
+@Serializable
+data class ForgotPasswordRequest(
+    @SerialName("email") val email: String,
+)
+
+@Serializable
+data class ResetPasswordRequest(
+    @SerialName("email") val email: String,
+    @SerialName("code") val code: String,
+    @SerialName("newPassword") val newPassword: String,
+)
+
+@Serializable
+data class ChangePasswordRequest(
+    @SerialName("currentPassword") val currentPassword: String,
+    @SerialName("newPassword") val newPassword: String,
+)
+
+@Serializable
+data class LinkEmailRequest(
+    @SerialName("email") val email: String,
+    @SerialName("password") val password: String,
+)
+
 @Serializable
 data class SubscriptionStatusRequest(
     @SerialName("hasSubscription") val hasSubscription: Boolean
