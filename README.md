@@ -2,7 +2,7 @@
 
 Backend server for an AI character chat application. It handles user accounts, authentication, character profiles, chats, messages, reviews, feedback, recommendations, and image uploads.
 
-The project is built around a Kotlin/Ktor API with MongoDB persistence. It supports AI message generation through external model providers and includes background jobs for recommendation and activity updates.
+The project is built around a Kotlin/Ktor API with PostgreSQL persistence (Exposed). It supports AI message generation through external model providers and includes background jobs for recommendation and activity updates.
 
 ## Main Features
 
@@ -18,7 +18,7 @@ The project is built around a Kotlin/Ktor API with MongoDB persistence. It suppo
 
 - Kotlin
 - Ktor
-- MongoDB with KMongo
+- PostgreSQL with Exposed and HikariCP
 - kotlinx.serialization
 - Kotlin coroutines
 - AWS S3 SDK
