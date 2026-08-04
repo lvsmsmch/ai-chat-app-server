@@ -27,7 +27,6 @@ fun Route.configureAuthRouting(
     sessionRepository: SessionRepository,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
-    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     userService: com.lvsmsmch.aichat.user.UserService,

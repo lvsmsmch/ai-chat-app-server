@@ -33,8 +33,8 @@ fun Route.configureChatRouting(
     userRepository: UserRepository,
     idGenerator: IdGenerator,
     messageFinisher: MessageFinisher,
-    complexQueryHelper: ComplexQueryHelper,
-    mapper: Mapper
+    mapper: Mapper,
+    chatService: com.lvsmsmch.aichat.chat.ChatService,
 ) {
 
     route("/chats") {
@@ -183,7 +183,7 @@ fun Route.configureChatRouting(
                 isFirstChatWithThisCharacter = isFirstChat
             )
 
-            complexQueryHelper.addChat(chatDbo)
+            chatService.addChat(chatDbo)
 
             val shouldAddInitMessage = userRepository.getLimits(userId).limitUntil == null
 
@@ -202,7 +202,7 @@ fun Route.configureChatRouting(
                     text = "",
                     status = MessageStatus.STREAMING.value,
                 ).also {
-                    complexQueryHelper.addMessage(it)
+                    chatService.addMessage(it)
                     messageFinisher.finishMessageAsync(it.id)
                 }
             }
@@ -461,7 +461,7 @@ fun Route.configureChatRouting(
                         status = MessageStatus.COMPLETED.value,
                         chatClientId = chat.clientId,
                     ).also {
-                        complexQueryHelper.addMessage(it)
+                        chatService.addMessage(it)
                     }
                 }
             }
@@ -480,7 +480,7 @@ fun Route.configureChatRouting(
                         status = MessageStatus.STREAMING.value,
                         chatClientId = chat.clientId,
                     ).also {
-                        complexQueryHelper.addMessage(it)
+                        chatService.addMessage(it)
                         messageFinisher.finishMessageAsync(it.id)
                     }
                     // Ретрай: плейсхолдер уже есть, но генерация не идёт — перезапускаем
@@ -644,7 +644,7 @@ fun Route.configureChatRouting(
                         text = "",
                         status = MessageStatus.STREAMING.value,
                     ).also {
-                        complexQueryHelper.addMessage(it)
+                        chatService.addMessage(it)
                         messageFinisher.finishMessageAsync(it.id)
                     }
                 }
@@ -686,7 +686,7 @@ fun Route.configureChatRouting(
                         text = "",
                         status = MessageStatus.STREAMING.value,
                     ).also {
-                        complexQueryHelper.addMessage(it)
+                        chatService.addMessage(it)
                         messageFinisher.finishMessageAsync(it.id)
                     }
                 }
@@ -737,7 +737,7 @@ fun Route.configureChatRouting(
                     status = MessageStatus.STREAMING.value,
                     chatClientId = chat.clientId,
                 ).also {
-                    complexQueryHelper.addMessage(it)
+                    chatService.addMessage(it)
                     messageFinisher.finishMessageAsync(it.id)
                 }
                 existing.status != MessageStatus.COMPLETED.value &&

@@ -241,25 +241,23 @@ fun Application.module() {
     )
 
 
-    val complexQueryHelper = ComplexQueryHelper(
-        transactionHelper = transactionHelper,
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        reviewRepository = reviewRepository,
+    val chatService = com.lvsmsmch.aichat.chat.ChatService(
         chatRepository = chatRepository,
         messageRepository = messageRepository,
-        sessionRepository = sessionRepository,
-        userNotificationRepository = userNotificationRepository,
-        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
-        followRepository = followRepository,
-        searchSuggestionsRepository = searchSuggestionsRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        commentRepository = commentRepository,
-        commentLikeRepository = commentLikeRepository,
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        characterRepository = characterRepository,
+        userRepository = userRepository,
         characterActivityLogRepository = characterActivityLogRepository,
         notificationService = notificationService,
-        characterLikeRepository = characterLikeRepository,
+        transactionHelper = transactionHelper,
+    )
+
+    val reviewService = com.lvsmsmch.aichat.review.ReviewService(
+        reviewRepository = reviewRepository,
+        reviewLikeRepository = reviewLikeRepository,
+        characterRepository = characterRepository,
+        characterActivityLogRepository = characterActivityLogRepository,
+        deletedIdsStatsRepository = deletedIdsStatsRepository,
+        transactionHelper = transactionHelper,
     )
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
@@ -370,7 +368,7 @@ fun Application.module() {
         userRepository = userRepository,
         idGenerator = idGenerator,
         usernameGenerator = usernameGenerator,
-        complexQueryHelper = complexQueryHelper
+        userService = userService
     )
 
     configureRouting(
@@ -393,7 +391,6 @@ fun Application.module() {
         usernameGenerator = usernameGenerator,
         cacheManager = cacheManager,
         messageFinisher = messageFinisher,
-        complexQueryHelper = complexQueryHelper,
         notificationService = notificationService,
         userNotificationRepository = userNotificationRepository,
         discoverSectionsRepository = discoverSectionsRepository,
@@ -405,6 +402,7 @@ fun Application.module() {
         commentService = commentService,
         characterService = characterService,
         userService = userService,
+        chatService = chatService,
     )
 
     environment.monitor.subscribe(ApplicationStopping) {

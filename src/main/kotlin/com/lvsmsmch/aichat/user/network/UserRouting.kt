@@ -21,7 +21,6 @@ fun Route.configureUserRouting(
     followRepository: FollowRepository,
     characterRepository: CharacterRepository,
     reportRepository: ReportRepository,
-    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     userService: com.lvsmsmch.aichat.user.UserService,

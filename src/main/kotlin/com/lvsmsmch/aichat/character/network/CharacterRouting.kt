@@ -23,7 +23,6 @@ fun Route.configureCharacterRouting(
     searchSuggestionsRepository: SearchSuggestionsRepository,
     idGenerator: IdGenerator,
     cacheManager: CacheManager,
-    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,

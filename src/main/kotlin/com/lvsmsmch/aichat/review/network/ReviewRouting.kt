@@ -28,7 +28,7 @@ fun Route.configureReviewRouting(
     reportRepository: ReportRepository,
     userRepository: UserRepository,
     idGenerator: IdGenerator,
-    complexQueryHelper: ComplexQueryHelper,
+    reviewService: com.lvsmsmch.aichat.review.ReviewService,
     mapper: Mapper
 ) {
     route("/reviews") {
@@ -57,7 +57,7 @@ fun Route.configureReviewRouting(
                 text = request.text
             )
 
-            complexQueryHelper.addReview(reviewDbo)
+            reviewService.addReview(reviewDbo)
 
             call.respondSuccess(data = reviewDbo.toReviewDto(mapper))
         }
@@ -116,7 +116,7 @@ fun Route.configureReviewRouting(
             val oldRating = reviewDbo.rating
             val newRating = request.rating
 
-            val updatedReview = complexQueryHelper.updateReview(
+            val updatedReview = reviewService.updateReview(
                 reviewId = reviewId,
                 characterId = reviewDbo.characterId,
                 rating = newRating,
@@ -140,7 +140,7 @@ fun Route.configureReviewRouting(
             }
 
 
-            complexQueryHelper.deleteReview(reviewId)
+            reviewService.deleteReview(reviewId)
 
             call.respondSuccess()
         }
@@ -177,7 +177,7 @@ fun Route.configureReviewRouting(
                 throw ForbiddenException("You already liked this review")
             }
 
-            complexQueryHelper.likeReview(reviewId, sessionDbo.userId)
+            reviewService.likeReview(reviewId, sessionDbo.userId)
 
             call.respondSuccess()
         }
@@ -194,7 +194,7 @@ fun Route.configureReviewRouting(
                 throw ForbiddenException("You don't have a like on this review")
             }
 
-            complexQueryHelper.unlikeReview(reviewId, sessionDbo.userId)
+            reviewService.unlikeReview(reviewId, sessionDbo.userId)
 
             call.respondSuccess()
         }

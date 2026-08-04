@@ -53,7 +53,6 @@ fun Application.configureRouting(
     usernameGenerator: UsernameGenerator,
     cacheManager: CacheManager,
     messageFinisher: MessageFinisher,
-    complexQueryHelper: ComplexQueryHelper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
     deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
@@ -66,6 +65,7 @@ fun Application.configureRouting(
     commentService: com.lvsmsmch.aichat.comment.CommentService,
     characterService: com.lvsmsmch.aichat.character.CharacterService,
     userService: com.lvsmsmch.aichat.user.UserService,
+    chatService: com.lvsmsmch.aichat.chat.ChatService,
 ) {
     routing {
         get("/test") {
@@ -85,7 +85,6 @@ fun Application.configureRouting(
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper,
                 discoverSectionsRepository = discoverSectionsRepository,
                 userService = userService,
             )
@@ -98,7 +97,6 @@ fun Application.configureRouting(
                 mailSender = mailSender,
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
-                complexQueryHelper = complexQueryHelper,
                 mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
                 userService = userService,
@@ -110,7 +108,6 @@ fun Application.configureRouting(
                 appleVerifier = appleVerifier,
                 idGenerator = idGenerator,
                 usernameGenerator = usernameGenerator,
-                complexQueryHelper = complexQueryHelper,
                 mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
                 userService = userService,
@@ -126,7 +123,6 @@ fun Application.configureRouting(
                 characterRepository = characterRepository,
                 reportRepository = reportRepository,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper,
                 notificationService = notificationService,
                 userService = userService,
             )
@@ -140,7 +136,6 @@ fun Application.configureRouting(
                 idGenerator = idGenerator,
                 cacheManager = cacheManager,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper,
                 notificationService = notificationService,
                 discoverSectionsRepository = discoverSectionsRepository,
                 characterLikeRepository = characterLikeRepository,
@@ -171,8 +166,8 @@ fun Application.configureRouting(
                 messageFinisher = messageFinisher,
                 reportRepository = reportRepository,
                 mapper = mapper,
-                complexQueryHelper = complexQueryHelper,
-                userRepository = userRepository
+                userRepository = userRepository,
+                chatService = chatService,
             )
 
             configureFeedbackRouting(

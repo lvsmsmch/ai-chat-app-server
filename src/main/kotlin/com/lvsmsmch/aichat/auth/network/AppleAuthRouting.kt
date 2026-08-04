@@ -34,7 +34,6 @@ fun Route.configureAppleAuthRouting(
     appleVerifier: AppleIdentityTokenVerifier,
     idGenerator: IdGenerator,
     usernameGenerator: UsernameGenerator,
-    complexQueryHelper: ComplexQueryHelper,
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     userService: com.lvsmsmch.aichat.user.UserService,
