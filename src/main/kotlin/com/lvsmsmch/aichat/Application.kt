@@ -1,5 +1,20 @@
 package com.lvsmsmch.aichat
 
+import com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier
+import com.lvsmsmch.aichat.auth.database.AuthCodeRepository
+import com.lvsmsmch.aichat.auth.database.AuthLockoutRepository
+import com.lvsmsmch.aichat.character.CharacterService
+import com.lvsmsmch.aichat.chat.ChatService
+import com.lvsmsmch.aichat.comment.CommentService
+import com.lvsmsmch.aichat.mail.MailSender
+import com.lvsmsmch.aichat.review.ReviewService
+import com.lvsmsmch.aichat.user.UserService
+import com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository
+import com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository
+import com.lvsmsmch.aichat.character.database.CharacterLikeRepository
+import com.lvsmsmch.aichat.notification.NotificationService
+import com.lvsmsmch.aichat.notification.database.UserNotificationRepository
+import org.koin.ktor.ext.inject
 import com.lvsmsmch.aichat.db.Db
 import com.lvsmsmch.aichat.db.Tables
 import com.lvsmsmch.aichat._common.IdGenerator
@@ -100,6 +115,11 @@ fun Application.module() {
         }
     }
 
+    install(org.koin.ktor.plugin.Koin) {
+        org.koin.logger.SLF4JLogger()
+        modules(com.lvsmsmch.aichat.di.appModule)
+    }
+
     install(CorrelationIdPlugin)
     configureErrorHandling()
 
@@ -110,155 +130,43 @@ fun Application.module() {
     Db.createSchema(Tables.all)
     logger.info("Postgres connected, schema ensured: ${Tables.all.size} tables")
 
-    val transactionHelper = TransactionHelper()
-
-    val sessionRepository = SessionRepository()
-    val deletedIdsStatsRepository = DeletedIdsStatsRepository()
-    val categoryRecommendationsCacheRepository = CategoryRecommendationsCacheRepository()
-    val userRecommendationsCacheRepository = UserRecommendationsCacheRepository()
-    val discoverSectionsRepository = com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository()
-    val defaultRecommendationsCacheRepository = DefaultRecommendationsCacheRepository()
-    val deviceLimitCarryoverRepository = com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository()
-    val searchSuggestionsRepository = SearchSuggestionsRepository()
-    val reviewLikeRepository = ReviewLikeRepository()
-    val userRepository = UserRepository()
-    val followRepository = FollowRepository()
-    val reportRepository = ReportRepository()
-    val characterRepository = CharacterRepository()
-    val chatRepository = ChatRepository()
-    val messageRepository = MessageRepository()
-    val reviewRepository = ReviewRepository()
-    val commentRepository = CommentRepository()
-    val commentLikeRepository = CommentLikeRepository()
-    val characterLikeRepository = com.lvsmsmch.aichat.character.database.CharacterLikeRepository()
-    val userNotificationRepository = com.lvsmsmch.aichat.notification.database.UserNotificationRepository()
-    val characterActivityLogRepository = CharacterActivityLogRepository()
-    val characterListCopyRepository = CharacterListCopyRepository()
-    val feedbackRepository = FeedbackRepository()
-    val authCodeRepository = com.lvsmsmch.aichat.auth.database.AuthCodeRepository()
-    val authLockoutRepository = com.lvsmsmch.aichat.auth.database.AuthLockoutRepository()
-    // Отправщик писем: Resend, если задан ключ; иначе письма идут в лог
-    val mailSender = com.lvsmsmch.aichat.mail.MailSenderFactory.create(
-        HttpClient {
-            install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                json(defaultJson)
-            }
-        }
-    )
-
-    // Проверка токенов Apple: тем же HTTP-клиентом, что и письма
-    val appleVerifier = com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier(
-        HttpClient()
-    )
-
-    val cacheManager = CacheManager(
-        characterRepository = characterRepository,
-        userRecommendationsCacheRepository = userRecommendationsCacheRepository,
-        categoryRecommendationsCacheRepository = categoryRecommendationsCacheRepository,
-        defaultRecommendationsCacheRepository = defaultRecommendationsCacheRepository,
-        characterListCopyRepository = characterListCopyRepository
-    )
-
-    val messageFinisher = MessageFinisher(
-        messageRepository = messageRepository,
-        characterRepository = characterRepository,
-        chatRepository = chatRepository,
-        userRepository = userRepository
-    )
-
-    val idGenerator = IdGenerator(
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        chatRepository = chatRepository,
-        messageRepository = messageRepository,
-        reviewRepository = reviewRepository,
-        commentRepository = commentRepository,
-    )
-
-    val usernameGenerator = UsernameGenerator(userRepository)
-
-    val mapper = Mapper(
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        chatRepository = chatRepository,
-        messageRepository = messageRepository,
-        reviewRepository = reviewRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        followRepository = followRepository,
-        characterLikeRepository = characterLikeRepository,
-    )
-
-    val notificationService = com.lvsmsmch.aichat.notification.NotificationService(
-        notifications = userNotificationRepository,
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        followRepository = followRepository,
-    )
-
-    val characterService = com.lvsmsmch.aichat.character.CharacterService(
-        characterRepository = characterRepository,
-        userRepository = userRepository,
-        chatRepository = chatRepository,
-        reviewRepository = reviewRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        commentRepository = commentRepository,
-        commentLikeRepository = commentLikeRepository,
-        characterLikeRepository = characterLikeRepository,
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
-        transactionHelper = transactionHelper,
-    )
-
-    val userService = com.lvsmsmch.aichat.user.UserService(
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        chatRepository = chatRepository,
-        messageRepository = messageRepository,
-        reviewRepository = reviewRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        commentRepository = commentRepository,
-        commentLikeRepository = commentLikeRepository,
-        characterLikeRepository = characterLikeRepository,
-        followRepository = followRepository,
-        sessionRepository = sessionRepository,
-        userNotificationRepository = userNotificationRepository,
-        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
-        transactionHelper = transactionHelper,
-    )
-
-    val commentService = com.lvsmsmch.aichat.comment.CommentService(
-        commentRepository = commentRepository,
-        commentLikeRepository = commentLikeRepository,
-        characterRepository = characterRepository,
-        characterActivityLogRepository = characterActivityLogRepository,
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
-        userRepository = userRepository,
-        notificationService = notificationService,
-        transactionHelper = transactionHelper,
-        idGenerator = idGenerator,
-        mapper = mapper,
-    )
-
-
-    val chatService = com.lvsmsmch.aichat.chat.ChatService(
-        chatRepository = chatRepository,
-        messageRepository = messageRepository,
-        characterRepository = characterRepository,
-        userRepository = userRepository,
-        characterActivityLogRepository = characterActivityLogRepository,
-        notificationService = notificationService,
-        transactionHelper = transactionHelper,
-    )
-
-    val reviewService = com.lvsmsmch.aichat.review.ReviewService(
-        reviewRepository = reviewRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        characterRepository = characterRepository,
-        characterActivityLogRepository = characterActivityLogRepository,
-        deletedIdsStatsRepository = deletedIdsStatsRepository,
-        transactionHelper = transactionHelper,
-    )
+    // Граф зависимостей собирает Koin (см. di/AppModule.kt). Здесь остаются
+    // только те объекты, которые нужны фоновым задачам ниже
+    val appleVerifier by inject<AppleIdentityTokenVerifier>()
+    val authCodeRepository by inject<AuthCodeRepository>()
+    val authLockoutRepository by inject<AuthLockoutRepository>()
+    val cacheManager by inject<CacheManager>()
+    val categoryRecommendationsCacheRepository by inject<CategoryRecommendationsCacheRepository>()
+    val characterActivityLogRepository by inject<CharacterActivityLogRepository>()
+    val characterLikeRepository by inject<CharacterLikeRepository>()
+    val characterRepository by inject<CharacterRepository>()
+    val characterService by inject<CharacterService>()
+    val chatRepository by inject<ChatRepository>()
+    val chatService by inject<ChatService>()
+    val commentLikeRepository by inject<CommentLikeRepository>()
+    val commentRepository by inject<CommentRepository>()
+    val commentService by inject<CommentService>()
+    val defaultRecommendationsCacheRepository by inject<DefaultRecommendationsCacheRepository>()
+    val deviceLimitCarryoverRepository by inject<DeviceLimitCarryoverRepository>()
+    val discoverSectionsRepository by inject<DiscoverSectionsCacheRepository>()
+    val feedbackRepository by inject<FeedbackRepository>()
+    val followRepository by inject<FollowRepository>()
+    val idGenerator by inject<IdGenerator>()
+    val mailSender by inject<MailSender>()
+    val mapper by inject<Mapper>()
+    val messageFinisher by inject<MessageFinisher>()
+    val messageRepository by inject<MessageRepository>()
+    val notificationService by inject<NotificationService>()
+    val reportRepository by inject<ReportRepository>()
+    val reviewLikeRepository by inject<ReviewLikeRepository>()
+    val reviewRepository by inject<ReviewRepository>()
+    val searchSuggestionsRepository by inject<SearchSuggestionsRepository>()
+    val sessionRepository by inject<SessionRepository>()
+    val userNotificationRepository by inject<UserNotificationRepository>()
+    val userRecommendationsCacheRepository by inject<UserRecommendationsCacheRepository>()
+    val userRepository by inject<UserRepository>()
+    val userService by inject<UserService>()
+    val usernameGenerator by inject<UsernameGenerator>()
 
     val characterTrendingScoreUpdaterJob = configureCharacterTrendingScoreUpdater(
         databaseScope = databaseScope,
@@ -371,39 +279,7 @@ fun Application.module() {
         userService = userService
     )
 
-    configureRouting(
-        deviceLimitCarryoverRepository = deviceLimitCarryoverRepository,
-        mapper = mapper,
-        userRepository = userRepository,
-        characterRepository = characterRepository,
-        chatRepository = chatRepository,
-        messageRepository = messageRepository,
-        reviewRepository = reviewRepository,
-        sessionRepository = sessionRepository,
-        followRepository = followRepository,
-        reportRepository = reportRepository,
-        reviewLikeRepository = reviewLikeRepository,
-        commentRepository = commentRepository,
-        commentLikeRepository = commentLikeRepository,
-        searchSuggestionsRepository = searchSuggestionsRepository,
-        feedbackRepository = feedbackRepository,
-        idGenerator = idGenerator,
-        usernameGenerator = usernameGenerator,
-        cacheManager = cacheManager,
-        messageFinisher = messageFinisher,
-        notificationService = notificationService,
-        userNotificationRepository = userNotificationRepository,
-        discoverSectionsRepository = discoverSectionsRepository,
-        characterLikeRepository = characterLikeRepository,
-        authCodeRepository = authCodeRepository,
-        authLockoutRepository = authLockoutRepository,
-        mailSender = mailSender,
-        appleVerifier = appleVerifier,
-        commentService = commentService,
-        characterService = characterService,
-        userService = userService,
-        chatService = chatService,
-    )
+    configureRouting()
 
     environment.monitor.subscribe(ApplicationStopping) {
         runBlocking {

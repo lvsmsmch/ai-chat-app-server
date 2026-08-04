@@ -35,40 +35,43 @@ import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.response.*
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.routing.*
+import org.koin.ktor.ext.inject
 
-fun Application.configureRouting(
-    mapper: Mapper,
-    userRepository: UserRepository,
-    characterRepository: CharacterRepository,
-    chatRepository: ChatRepository,
-    messageRepository: MessageRepository,
-    reviewRepository: ReviewRepository,
-    sessionRepository: SessionRepository,
-    followRepository: FollowRepository,
-    reportRepository: ReportRepository,
-    reviewLikeRepository: ReviewLikeRepository,
-    commentRepository: CommentRepository,
-    commentLikeRepository: CommentLikeRepository,
-    searchSuggestionsRepository: SearchSuggestionsRepository,
-    feedbackRepository: FeedbackRepository,
-    idGenerator: IdGenerator,
-    usernameGenerator: UsernameGenerator,
-    cacheManager: CacheManager,
-    messageFinisher: MessageFinisher,
-    notificationService: com.lvsmsmch.aichat.notification.NotificationService,
-    userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
-    deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository,
-    discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
-    characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
-    authCodeRepository: com.lvsmsmch.aichat.auth.database.AuthCodeRepository,
-    authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository,
-    mailSender: com.lvsmsmch.aichat.mail.MailSender,
-    appleVerifier: com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier,
-    commentService: com.lvsmsmch.aichat.comment.CommentService,
-    characterService: com.lvsmsmch.aichat.character.CharacterService,
-    userService: com.lvsmsmch.aichat.user.UserService,
-    chatService: com.lvsmsmch.aichat.chat.ChatService,
-) {
+fun Application.configureRouting() {
+    // Зависимости берутся из Koin: список параметров тут не нужен, добавление
+    // новой зависимости правится только в модуле di/AppModule.kt
+    val mapper: Mapper by inject()
+    val userRepository: UserRepository by inject()
+    val characterRepository: CharacterRepository by inject()
+    val chatRepository: ChatRepository by inject()
+    val messageRepository: MessageRepository by inject()
+    val reviewRepository: ReviewRepository by inject()
+    val sessionRepository: SessionRepository by inject()
+    val followRepository: FollowRepository by inject()
+    val reportRepository: ReportRepository by inject()
+    val reviewLikeRepository: ReviewLikeRepository by inject()
+    val commentRepository: CommentRepository by inject()
+    val commentLikeRepository: CommentLikeRepository by inject()
+    val searchSuggestionsRepository: SearchSuggestionsRepository by inject()
+    val feedbackRepository: FeedbackRepository by inject()
+    val idGenerator: IdGenerator by inject()
+    val usernameGenerator: UsernameGenerator by inject()
+    val cacheManager: CacheManager by inject()
+    val messageFinisher: MessageFinisher by inject()
+    val notificationService: com.lvsmsmch.aichat.notification.NotificationService by inject()
+    val userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository by inject()
+    val deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository by inject()
+    val discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository by inject()
+    val characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository by inject()
+    val authCodeRepository: com.lvsmsmch.aichat.auth.database.AuthCodeRepository by inject()
+    val authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository by inject()
+    val mailSender: com.lvsmsmch.aichat.mail.MailSender by inject()
+    val appleVerifier: com.lvsmsmch.aichat.auth.AppleIdentityTokenVerifier by inject()
+    val commentService: com.lvsmsmch.aichat.comment.CommentService by inject()
+    val characterService: com.lvsmsmch.aichat.character.CharacterService by inject()
+    val userService: com.lvsmsmch.aichat.user.UserService by inject()
+    val chatService: com.lvsmsmch.aichat.chat.ChatService by inject()
+
     routing {
         get("/test") {
             logger.info("\"test\" called!")

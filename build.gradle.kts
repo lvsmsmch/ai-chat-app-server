@@ -62,6 +62,10 @@ dependencies {
     // ошибка в самодельной проверке означала бы приём поддельных токенов
     implementation("com.auth0:java-jwt:4.4.0")
 
+    // DI: до этого всё связывалось руками в Application.kt
+    implementation("io.insert-koin:koin-ktor:3.5.6")
+    implementation("io.insert-koin:koin-logger-slf4j:3.5.6")
+
     testImplementation("org.jetbrains.kotlin:kotlin-test:2.0.20")
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("io.mockk:mockk:1.13.7")
