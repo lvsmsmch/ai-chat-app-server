@@ -16,6 +16,8 @@ import com.lvsmsmch.aichat.chat.MessageFinisher
 import com.lvsmsmch.aichat.chat.database.ChatRepository
 import com.lvsmsmch.aichat.chat.database.MessageRepository
 import com.lvsmsmch.aichat.chat.network.configureChatRouting
+import com.lvsmsmch.aichat.chat.network.configureGenerationRouting
+import com.lvsmsmch.aichat.chat.network.configureMessageRouting
 import com.lvsmsmch.aichat.feedback.database.FeedbackRepository
 import com.lvsmsmch.aichat.feedback.network.configureFeedbackRouting
 import com.lvsmsmch.aichat.review.database.ReviewLikeRepository
@@ -158,6 +160,32 @@ fun Application.configureRouting(
             )
 
             configureChatRouting(
+                chatRepository = chatRepository,
+                messageRepository = messageRepository,
+                characterRepository = characterRepository,
+                sessionRepository = sessionRepository,
+                idGenerator = idGenerator,
+                messageFinisher = messageFinisher,
+                reportRepository = reportRepository,
+                mapper = mapper,
+                userRepository = userRepository,
+                chatService = chatService,
+            )
+
+            configureMessageRouting(
+                chatRepository = chatRepository,
+                messageRepository = messageRepository,
+                characterRepository = characterRepository,
+                sessionRepository = sessionRepository,
+                idGenerator = idGenerator,
+                messageFinisher = messageFinisher,
+                reportRepository = reportRepository,
+                mapper = mapper,
+                userRepository = userRepository,
+                chatService = chatService,
+            )
+
+            configureGenerationRouting(
                 chatRepository = chatRepository,
                 messageRepository = messageRepository,
                 characterRepository = characterRepository,
