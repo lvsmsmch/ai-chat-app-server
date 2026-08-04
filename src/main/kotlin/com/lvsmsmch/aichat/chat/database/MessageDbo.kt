@@ -27,6 +27,10 @@ data class MessageDbo(
     // Причина FAILED: "censored" (фильтр контента) или "error" (сбой генерации/сервера)
     val failReason: String? = null,
     val nsfw: Boolean = false,
+    /** Варианты ответа: [0] — исходный, дальше ретраи. Пусто = вариантов нет. */
+    val variants: List<String> = emptyList(),
+    /** Какой вариант выбрал юзер; [text] всегда равен `variants[selectedVariant]`. */
+    val selectedVariant: Int = 0,
     val isDeleted: Boolean = false,
     val deletedAt: String = UtcTimestamp.now().toString(),
 )

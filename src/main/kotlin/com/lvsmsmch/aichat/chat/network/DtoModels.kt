@@ -36,7 +36,11 @@ data class MessageDto(
     @SerialName("nsfw") val nsfw: Boolean,
     @SerialName("imageUrl") val imageUrl: String? = null,
     @SerialName("isImage") val isImage: Boolean = false,
-    @SerialName("imageDebugInfo") val imageDebugInfo: String? = null
+    @SerialName("imageDebugInfo") val imageDebugInfo: String? = null,
+    /** Сколько вариантов ответа сохранено (1 и меньше — переключать нечего). */
+    @SerialName("variantsCount") val variantsCount: Int = 0,
+    /** Индекс показанного варианта, 0-based. */
+    @SerialName("selectedVariant") val selectedVariant: Int = 0,
 )
 
 
@@ -229,6 +233,12 @@ data class GetMessagesResponse(
 )
 
 
+
+/** Какой из сохранённых вариантов ответа юзер оставил на экране. */
+@Serializable
+data class SelectVariantRequest(
+    @SerialName("index") val index: Int,
+)
 
 @Serializable
 data class ReportMessageRequest(

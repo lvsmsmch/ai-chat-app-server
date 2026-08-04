@@ -297,6 +297,11 @@ suspend fun MessageDbo.toMessageDto(mapper: Mapper): MessageDto {
         nsfw = nsfw,
         imageUrl = imageUrl,
         isImage = isImage,
-        imageDebugInfo = imageDebugInfo
+        imageDebugInfo = imageDebugInfo,
+        // Клиенту нужен только счётчик и позиция: сами тексты он показывает
+        // из `text` по мере переключения, гонять весь список в каждом синке
+        // ради «2/3» под сообщением незачем
+        variantsCount = variants.size,
+        selectedVariant = selectedVariant,
     )
 }

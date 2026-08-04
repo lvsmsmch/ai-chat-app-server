@@ -271,6 +271,8 @@ fun ResultRow.toMessageDbo(): MessageDbo = with(Tables.Messages) {
         status = this@toMessageDbo[status],
         failReason = this@toMessageDbo[failReason],
         nsfw = this@toMessageDbo[nsfw],
+        variants = this@toMessageDbo[variants].toStringList(),
+        selectedVariant = this@toMessageDbo[selectedVariant],
         isDeleted = this@toMessageDbo[isDeleted],
         deletedAt = this@toMessageDbo[deletedAt],
     )
@@ -293,6 +295,8 @@ fun UpdateBuilder<*>.from(dbo: MessageDbo) = with(Tables.Messages) {
     this@from[status] = dbo.status
     this@from[failReason] = dbo.failReason
     this@from[nsfw] = dbo.nsfw
+    this@from[variants] = dbo.variants.toJson()
+    this@from[selectedVariant] = dbo.selectedVariant
     this@from[isDeleted] = dbo.isDeleted
     this@from[deletedAt] = dbo.deletedAt
 }

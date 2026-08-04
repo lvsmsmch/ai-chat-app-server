@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.chat.database
 import com.lvsmsmch.aichat.db.Db.dbQuery
 import com.lvsmsmch.aichat.db.EntityEvents
 import com.lvsmsmch.aichat.db.Tables
+import com.lvsmsmch.aichat.db.encodeStringList
 import com.lvsmsmch.aichat.db.from
 import com.lvsmsmch.aichat.db.toMessageDbo
 import com.lvsmsmch.aichat.utils.DatabaseEvent
@@ -281,6 +282,61 @@ class MessageRepository {
         return dbQuery {
             table.selectAll().where { table.clientId inList clientIds }.map { it.toMessageDbo() }
         }
+    }
+
+    /**
+     * Дописать сгенерированный вариант ответа и сделать его выбранным.
+     *
+     * Первый вариант заводится лениво из текущего [MessageDbo.text]: у
+     * сообщений, созданных до появления вариантов, список пуст, и без этого
+     * первый же ретрай потерял бы исходный ответ.
+     */
+    suspend fun addVariant(messageId: String, text: String): Int {
+        val current = getMessageById(messageId) ?: return 0
+        val base = current.variants.ifEmpty { listOf(current.text) }
+        val updated = base + text
+        val index = updated.lastIndex
+        dbQuery {
+            table.update({ table.id eq messageId }) {
+                it[table.variants] = encodeStringList(updated)
+                it[table.selectedVariant] = index
+                it[table.text] = text
+                it[table.lastModifiedAt] = UtcTimestamp.now().toString()
+            }
+        }
+        getMessageById(messageId)?.let { events.updated(current, it) }
+        return index
+    }
+
+    /** Завести список вариантов из текущего текста, если его ещё нет. */
+    suspend fun ensureVariantsInitialized(messageId: String) {
+        val current = getMessageById(messageId) ?: return
+        if (current.variants.isNotEmpty()) return
+        dbQuery {
+            table.update({ table.id eq messageId }) {
+                it[table.variants] = encodeStringList(listOf(current.text))
+                it[table.selectedVariant] = 0
+            }
+        }
+    }
+
+    /**
+     * Переключить выбранный вариант. [text] переписывается на выбранный —
+     * именно поэтому история для модели собирается сама, без спец-логики.
+     */
+    suspend fun selectVariant(messageId: String, index: Int): Boolean {
+        val current = getMessageById(messageId) ?: return false
+        val variants = current.variants
+        if (index !in variants.indices) return false
+        dbQuery {
+            table.update({ table.id eq messageId }) {
+                it[table.selectedVariant] = index
+                it[table.text] = variants[index]
+                it[table.lastModifiedAt] = UtcTimestamp.now().toString()
+            }
+        }
+        getMessageById(messageId)?.let { events.updated(current, it) }
+        return true
     }
 
     suspend fun updateMessage(

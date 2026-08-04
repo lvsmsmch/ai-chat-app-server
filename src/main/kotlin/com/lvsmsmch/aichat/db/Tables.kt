@@ -218,6 +218,17 @@ object Tables {
         val status = text("status")
         val failReason = text("fail_reason").nullable()
         val nsfw = bool("nsfw")
+        /**
+         * Все сгенерированные варианты ответа персонажа, JSON-массив строк.
+         * Первый элемент — исходный ответ, дальше добавляются ретраи.
+         */
+        val variants = text("variants").default("[]")
+        /**
+         * Индекс варианта, который выбрал юзер. Колонка [text] всегда держит
+         * ЕГО текст — поэтому вся остальная логика (история для модели, синк,
+         * превью в списке чатов) работает без изменений.
+         */
+        val selectedVariant = integer("selected_variant").default(0)
         val isDeleted = bool("is_deleted")
         val deletedAt = text("deleted_at")
 

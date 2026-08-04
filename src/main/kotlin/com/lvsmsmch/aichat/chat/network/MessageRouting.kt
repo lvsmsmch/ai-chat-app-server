@@ -178,6 +178,111 @@ fun Route.configureMessageRouting(
             )
         }
 
+        /**
+         * Перегенерировать ответ персонажа. Новый вариант дописывается к
+         * сообщению и становится выбранным; предыдущие остаются, между ними
+         * можно переключаться.
+         *
+         * Лимит [MAX_VARIANTS] считается по числу уже сохранённых вариантов,
+         * а не отдельным счётчиком: счётчик пришлось бы держать в согласии со
+         * списком, и однажды они разошлись бы.
+         */
+        post("/{chatId}/messages/{messageId}/retry") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatClientId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val messageClientId = call.parameters["messageId"]
+                ?: throw BadRequestException("Message ID is required")
+
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
+            if (chat.userId != userId) throw ForbiddenException("Access denied to this chat")
+
+            val message = messageRepository.findByClientId(messageClientId)
+                ?: throw BadRequestException("Message not found")
+            if (message.chatId != chat.id) {
+                throw BadRequestException("Message does not belong to this chat")
+            }
+            if (message.isSentByUser) {
+                throw BadRequestException("Only character messages can be retried")
+            }
+
+            val stored = message.variants.ifEmpty { listOf(message.text) }
+            if (stored.size >= MAX_VARIANTS) {
+                throw ForbiddenException(errorMessage = "retry_limit_reached")
+            }
+
+            val limits = userRepository.getLimits(userId)
+            if (limits.limitUntil != null) {
+                return@post call.respondSuccess(
+                    SendMessageResponse(
+                        isSuccess = false,
+                        limitsResponse = limits,
+                        chatSyncResponse = generateChatSyncResponse(
+                            chat = chat,
+                            chatSyncRequest = ChatSyncRequest(chat.clientId),
+                            chatRepository = chatRepository,
+                            messageRepository = messageRepository,
+                            mapper = mapper,
+                        ),
+                    )
+                )
+            }
+
+            // Исходный вариант фиксируем ДО генерации: иначе стриминг затрёт
+            // текст, и вернуться к первому ответу будет некуда
+            messageRepository.ensureVariantsInitialized(message.id)
+            messageRepository.updateMessage(
+                messageId = message.id,
+                text = "",
+                status = MessageStatus.STREAMING.value,
+            )
+            messageFinisher.finishMessageAsync(message.id)
+
+            call.respondSuccess(
+                SendMessageResponse(
+                    isSuccess = true,
+                    limitsResponse = userRepository.getLimits(userId),
+                    chatSyncResponse = generateChatSyncResponse(
+                        chat = chat,
+                        chatSyncRequest = ChatSyncRequest(chat.clientId),
+                        chatRepository = chatRepository,
+                        messageRepository = messageRepository,
+                        mapper = mapper,
+                    ),
+                )
+            )
+        }
+
+        /**
+         * Переключить активный вариант ответа. Меняется и `text` сообщения —
+         * поэтому следующая генерация увидит в истории именно тот ответ,
+         * который юзер оставил на экране.
+         */
+        post("/{chatId}/messages/{messageId}/variant") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatClientId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val messageClientId = call.parameters["messageId"]
+                ?: throw BadRequestException("Message ID is required")
+            val request = call.receive<SelectVariantRequest>()
+
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
+            if (chat.userId != userId) throw ForbiddenException("Access denied to this chat")
+
+            val message = messageRepository.findByClientId(messageClientId)
+                ?: throw BadRequestException("Message not found")
+            if (message.chatId != chat.id) {
+                throw BadRequestException("Message does not belong to this chat")
+            }
+
+            if (!messageRepository.selectVariant(message.id, request.index)) {
+                throw BadRequestException("Unknown variant index")
+            }
+            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+        }
+
         post("/messages/{messageId}/report") {
             val currentUserId = sessionRepository.verifyToken(call).userId
             val messageClientId = call.parameters["messageId"]
@@ -374,3 +479,6 @@ fun Route.configureMessageRouting(
          */
     }
 }
+
+/** Исходный ответ + три ретрая. */
+private const val MAX_VARIANTS = 4

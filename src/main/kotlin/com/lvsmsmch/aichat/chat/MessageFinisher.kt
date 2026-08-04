@@ -117,12 +117,25 @@ class MessageFinisher(
                         onFinished = {
                             logger.debug("finishMessageAsync onFinished, upd msg")
                             ensureActive()
-                            messageRepository.updateMessage(
-                                messageId = messageId,
-                                text = it,
-                                status = MessageStatus.COMPLETED.value,
-                                imageDebugInfo = textDebugInfo,
-                            )
+                            // Непустой список вариантов = это ретрай: дописываем
+                            // очередной ответ и делаем его выбранным. Обычная
+                            // первая генерация просто заполняет text
+                            val existing = messageRepository.getMessageById(messageId)
+                            if (existing != null && existing.variants.isNotEmpty()) {
+                                messageRepository.addVariant(messageId, it)
+                                messageRepository.updateMessage(
+                                    messageId = messageId,
+                                    status = MessageStatus.COMPLETED.value,
+                                    imageDebugInfo = textDebugInfo,
+                                )
+                            } else {
+                                messageRepository.updateMessage(
+                                    messageId = messageId,
+                                    text = it,
+                                    status = MessageStatus.COMPLETED.value,
+                                    imageDebugInfo = textDebugInfo,
+                                )
+                            }
                         },
                         onError = { reason ->
                             logger.debug("finishMessageAsync onError, upd msg (${reason})")
