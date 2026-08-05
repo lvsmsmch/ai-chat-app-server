@@ -280,7 +280,15 @@ fun Route.configureMessageRouting(
             if (!messageRepository.selectVariant(message.id, request.index)) {
                 throw BadRequestException("Unknown variant index")
             }
-            call.respondSuccess(IsSuccessResponse(isSuccess = true))
+            val updated = messageRepository.findByClientId(messageClientId)
+            call.respondSuccess(
+                SelectVariantResponse(
+                    isSuccess = true,
+                    text = updated?.text.orEmpty(),
+                    variantsCount = updated?.variants?.size ?: 0,
+                    selectedVariant = updated?.selectedVariant ?: request.index,
+                )
+            )
         }
 
         post("/messages/{messageId}/report") {

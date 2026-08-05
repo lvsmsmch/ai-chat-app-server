@@ -48,6 +48,7 @@ fun Application.configureRouting() {
     val reviewRepository: ReviewRepository by inject()
     val sessionRepository: SessionRepository by inject()
     val followRepository: FollowRepository by inject()
+    val userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository by inject()
     val reportRepository: ReportRepository by inject()
     val reviewLikeRepository: ReviewLikeRepository by inject()
     val commentRepository: CommentRepository by inject()
@@ -130,6 +131,7 @@ fun Application.configureRouting() {
                 mapper = mapper,
                 notificationService = notificationService,
                 userService = userService,
+                userBlockRepository = userBlockRepository,
             )
 
             configureCharacterRouting(
@@ -146,6 +148,7 @@ fun Application.configureRouting() {
                 characterLikeRepository = characterLikeRepository,
                 characterService = characterService,
                 chatRepository = chatRepository,
+                userBlockRepository = userBlockRepository,
             )
 
             configureCommentRouting(

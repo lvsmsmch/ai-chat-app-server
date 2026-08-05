@@ -367,6 +367,26 @@ object Tables {
         }
     }
 
+    /**
+     * Кто кого заблокировал. Читается на каждый список персонажей, поэтому
+     * индекс по blocker_id обязателен, а пара — уникальная: блокировать
+     * дважды нечего.
+     */
+    object UserBlocks : Table("user_blocks") {
+        val id = text("id")
+        val blockedAt = text("blocked_at")
+        val blockerId = text("blocker_id")
+        val blockedId = text("blocked_id")
+
+        override val primaryKey = PrimaryKey(id)
+
+        init {
+            index(false, blockerId)
+            index(false, blockedId)
+            index(true, blockerId, blockedId)
+        }
+    }
+
     object Reports : Table("reports") {
         val id = text("id")
         val reportedAt = text("reported_at")
@@ -541,7 +561,7 @@ object Tables {
     val all: List<Table> = listOf(
         Users, AuthCodes, AuthLockouts, Characters, Chats, Messages, Sessions,
         Comments, CommentLikes, Reviews, ReviewLikes, CharacterLikes,
-        Follows, Reports, Feedbacks, SearchSuggestions, UserNotifications,
+        Follows, UserBlocks, Reports, Feedbacks, SearchSuggestions, UserNotifications,
         CharacterActivityLogs, UserRecommendationsCache,
         CategoryRecommendationsCache, DefaultRecommendationsCache,
         DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers,

@@ -31,6 +31,7 @@ class Mapper(
     val reviewLikeRepository: ReviewLikeRepository,
     val followRepository: FollowRepository,
     val characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
+    val userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository,
 ) {
     /** Кэш языка персонажей по юзеру (инвалидируется при смене языка). */
     val userLanguageCache = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -64,6 +65,8 @@ suspend fun Mapper.charactersDtoByIds(
     lang: String? = null,
     likedIds: Set<String>? = null,
     publicOnly: Boolean = false,
+    /** Авторы, которых смотрящий заблокировал: их персонажи выпадают из списка. */
+    blockedAuthorIds: Set<String> = emptySet(),
 ): List<CharacterDto> {
     if (ids.isEmpty()) return emptyList()
     val dbos = characterRepository.getByIds(ids)
@@ -74,6 +77,9 @@ suspend fun Mapper.charactersDtoByIds(
                 list
             }
         }
+        // Фильтруем ДО сбора авторов: заблокированного автора незачем даже
+        // доставать из базы
+        .filterNot { it.authorId in blockedAuthorIds }
     val authors = authorsOf(dbos)
     val byId = dbos.associateBy { it.id }
     return ids.mapNotNull { id ->
@@ -120,6 +126,7 @@ suspend fun UserDbo.toUserDetailsDto(
         totalChatsCount = if (demanderId == id) totalChatsCount else 0,
         totalMessagesCount = if (demanderId == id) totalMessagesCount else 0,
         isFollowing = mapper.followRepository.doesConnectionExist(demanderId, id),
+        isBlocked = demanderId != id && mapper.userBlockRepository.isBlocked(demanderId, id),
         profilePicUrl = profilePictureUrl
     )
 }
@@ -200,15 +207,21 @@ suspend fun CachedCharactersResult.toDto(
     mapper: Mapper,
     lang: String? = null,
     likerId: String? = null,
+    /** Авторы, которых смотрящий заблокировал: их персонажи выпадают из страницы. */
+    blockedAuthorIds: Set<String> = emptySet(),
 ): CachedCharactersResultDto {
+    // Страница может стать короче запрошенной — это нормально: курсор ведёт
+    // кэш списка, а не число отданных элементов, так что пагинация не рвётся
+    val visible = if (blockedAuthorIds.isEmpty()) items
+    else items.filterNot { it.authorId in blockedAuthorIds }
     // Лайки списка — ОДНИМ батч-запросом, а не по персонажу
     val liked = likerId?.let {
-        mapper.characterLikeRepository.getLikedIds(it, items.map { c -> c.id })
+        mapper.characterLikeRepository.getLikedIds(it, visible.map { c -> c.id })
     }
-    val authors = mapper.authorsOf(items)
+    val authors = mapper.authorsOf(visible)
     return CachedCharactersResultDto(
         refreshed = refreshed,
-        items = items.map { it.toCharacterDto(mapper, lang, likedIds = liked, authors = authors) },
+        items = visible.map { it.toCharacterDto(mapper, lang, likedIds = liked, authors = authors) },
         nextCursor = nextCursor?.toString(),
         totalFound = totalFound,
     )

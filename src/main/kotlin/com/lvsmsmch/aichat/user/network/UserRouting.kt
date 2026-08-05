@@ -24,6 +24,7 @@ fun Route.configureUserRouting(
     mapper: Mapper,
     notificationService: com.lvsmsmch.aichat.notification.NotificationService,
     userService: com.lvsmsmch.aichat.user.UserService,
+    userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository,
 ) {
     route("/users") {
 
@@ -459,6 +460,63 @@ fun Route.configureUserRouting(
             userService.deleteUser(sessionDbo.userId)
 
             call.respondSuccess()
+        }
+
+        /**
+         * Заблокировать пользователя: его персонажи пропадают из ленты,
+         * поиска, подборок и пикера групп.
+         *
+         * Заодно рвём подписки в обе стороны — оставлять «подписан на того,
+         * кого заблокировал» бессмысленно, а его лента иначе продолжала бы
+         * приносить уведомления о новых персонажах.
+         */
+        post("/{userId}/block") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+
+            val targetUserId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+
+            userRepository.getUserById(targetUserId) ?: throw UserNotFoundException(id = targetUserId)
+
+            if (currentUserId == targetUserId) {
+                throw BadRequestException("Cannot block yourself")
+            }
+
+            userBlockRepository.block(currentUserId, targetUserId)
+
+            if (followRepository.doesConnectionExist(currentUserId, targetUserId)) {
+                userService.unfollowUser(currentUserId = currentUserId, targetUserId = targetUserId)
+            }
+            if (followRepository.doesConnectionExist(targetUserId, currentUserId)) {
+                userService.unfollowUser(currentUserId = targetUserId, targetUserId = currentUserId)
+            }
+
+            call.respondSuccess()
+        }
+
+        post("/{userId}/unblock") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+
+            val targetUserId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+
+            userBlockRepository.unblock(currentUserId, targetUserId)
+
+            call.respondSuccess()
+        }
+
+        /** Свой список блокировок — чтобы было где разблокировать. */
+        get("/me/blocked") {
+            val currentUserId = sessionRepository.verifyToken(call).userId
+
+            val blocked = userBlockRepository.getBlocked(currentUserId)
+            val users = userRepository.getUsersByIds(blocked.map { it.blockedId }.toSet())
+                .associateBy { it.id }
+            call.respondSuccess(
+                data = BlockedUsersResponse(
+                    users = blocked.mapNotNull { users[it.blockedId]?.toUserDto(mapper) },
+                )
+            )
         }
 
         post("/{userId}/report") {

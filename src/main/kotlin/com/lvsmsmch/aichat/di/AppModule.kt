@@ -80,6 +80,7 @@ val appModule = module {
     single { ReviewLikeRepository() }
     single { UserRepository() }
     single { FollowRepository() }
+    single { com.lvsmsmch.aichat.user.database.UserBlockRepository() }
     single { ReportRepository() }
     single { CharacterRepository() }
     single { ChatRepository() }
@@ -118,6 +119,7 @@ val appModule = module {
             reviewLikeRepository = get(),
             followRepository = get(),
             characterLikeRepository = get(),
+            userBlockRepository = get(),
         )
     }
     single {
@@ -207,6 +209,7 @@ val appModule = module {
             commentLikeRepository = get(),
             characterLikeRepository = get(),
             followRepository = get(),
+            userBlockRepository = get(),
             sessionRepository = get(),
             userNotificationRepository = get(),
             deviceLimitCarryoverRepository = get(),

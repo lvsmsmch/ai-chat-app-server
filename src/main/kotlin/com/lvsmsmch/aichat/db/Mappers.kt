@@ -26,6 +26,7 @@ import com.lvsmsmch.aichat.review.database.ReviewLikeDbo
 import com.lvsmsmch.aichat.user.database.AccountType
 import com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverDbo
 import com.lvsmsmch.aichat.user.database.FollowDbo
+import com.lvsmsmch.aichat.user.database.UserBlockDbo
 import com.lvsmsmch.aichat.user.database.UserDbo
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -451,6 +452,24 @@ fun UpdateBuilder<*>.from(dbo: FollowDbo) = with(Tables.Follows) {
     this@from[followedAt] = dbo.followedAt
     this@from[followerId] = dbo.followerId
     this@from[followeeId] = dbo.followeeId
+}
+
+// ---- user blocks ----
+
+fun ResultRow.toUserBlockDbo(): UserBlockDbo = with(Tables.UserBlocks) {
+    UserBlockDbo(
+        id = this@toUserBlockDbo[id],
+        blockedAt = this@toUserBlockDbo[blockedAt],
+        blockerId = this@toUserBlockDbo[blockerId],
+        blockedId = this@toUserBlockDbo[blockedId],
+    )
+}
+
+fun UpdateBuilder<*>.from(dbo: UserBlockDbo) = with(Tables.UserBlocks) {
+    this@from[id] = dbo.id
+    this@from[blockedAt] = dbo.blockedAt
+    this@from[blockerId] = dbo.blockerId
+    this@from[blockedId] = dbo.blockedId
 }
 
 // ---- reports ----

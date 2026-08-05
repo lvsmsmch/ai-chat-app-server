@@ -29,6 +29,7 @@ fun Route.configureCharacterRouting(
     characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository,
     characterService: com.lvsmsmch.aichat.character.CharacterService,
     chatRepository: com.lvsmsmch.aichat.chat.database.ChatRepository,
+    userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository,
 ) {
 
     route("/characters") {
@@ -172,14 +173,21 @@ fun Route.configureCharacterRouting(
             )
             val sectionsRaw = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
+            // Заблокированные авторы: кэш секций общий и о блокировках не знает,
+            // поэтому чистим на выдаче
+            val blocked = userBlockRepository.getBlockedIds(currentUserId)
             val byId = mapper.charactersDtoByIds(
                 sectionsRaw.flatMap { it.characterIds }.distinct(), lang, sectionLiked,
+                blockedAuthorIds = blocked,
             ).associateBy { it.id }
             val sections = sectionsRaw.map { s ->
+                val characters = s.characterIds.mapNotNull { byId[it] }
                 DiscoverSectionDto(
                     key = s.key.removePrefix(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX),
-                    characters = s.characterIds.mapNotNull { byId[it] },
-                    total = s.characterIds.size,
+                    characters = characters,
+                    // Счётчик — по тому, что реально осталось видно: иначе
+                    // «23 characters» обещало бы больше, чем откроется
+                    total = if (blocked.isEmpty()) s.characterIds.size else characters.size,
                 )
             }
             call.respondSuccess(DiscoverSectionsResponse(sections))
@@ -227,7 +235,12 @@ fun Route.configureCharacterRouting(
                 cursorPosition = cursor
             )
 
-            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId))
+            call.respondSuccess(
+                data = result.toDto(
+                    mapper, mapper.languageOf(currentUserId), likerId = currentUserId,
+                    blockedAuthorIds = userBlockRepository.getBlockedIds(currentUserId),
+                )
+            )
         }
 
         /**
@@ -273,7 +286,10 @@ fun Route.configureCharacterRouting(
             val lang = mapper.languageOf(userId)
             val pageLiked = characterLikeRepository.getLikedIds(userId, pageIds)
             val characters = mapper
-                .charactersDtoByIds(pageIds, lang, pageLiked, publicOnly = false)
+                .charactersDtoByIds(
+                    pageIds, lang, pageLiked, publicOnly = false,
+                    blockedAuthorIds = userBlockRepository.getBlockedIds(userId),
+                )
                 // Приватные чужие сюда попасть не должны: свои — можно, с ними
                 // юзер и переписывается
                 .filter { it.visibility == CharacterVisibility.PUBLIC.code || it.author.id == userId }
@@ -281,7 +297,10 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(
                 data = CachedCharactersResultDto(
                     items = characters,
-                    nextCursor = if (characters.size < pageSize) null else (page + 1).toString(),
+                    // Конец списка определяем по СТРАНИЦЕ id, а не по тому, что
+                    // осталось после фильтров: иначе одна заблокированная плитка
+                    // обрывала бы пагинацию на середине
+                    nextCursor = if (pageIds.size < pageSize) null else (page + 1).toString(),
                 )
             )
         }
@@ -338,7 +357,10 @@ fun Route.configureCharacterRouting(
                     ?.sections?.firstOrNull { it.key == category }?.characterIds.orEmpty()
                 val page = ids.drop(cursor).take(request.size)
                 val likedIds = characterLikeRepository.getLikedIds(currentUserId, page)
-                val characters = mapper.charactersDtoByIds(page, lang, likedIds)
+                val characters = mapper.charactersDtoByIds(
+                    page, lang, likedIds,
+                    blockedAuthorIds = userBlockRepository.getBlockedIds(currentUserId),
+                )
                 val next = (cursor + page.size).takeIf { it < ids.size }?.toString()
                 return@get call.respondSuccess(
                     CachedCharactersResultDto(
@@ -373,7 +395,12 @@ fun Route.configureCharacterRouting(
                 )
             }
 
-            call.respondSuccess(data = result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId))
+            call.respondSuccess(
+                data = result.toDto(
+                    mapper, mapper.languageOf(currentUserId), likerId = currentUserId,
+                    blockedAuthorIds = userBlockRepository.getBlockedIds(currentUserId),
+                )
+            )
         }
 
         get("/{id}") {
@@ -457,6 +484,7 @@ fun Route.configureCharacterRouting(
                 lang = mapper.languageOf(currentUserId),
                 likedIds = similarLiked,
                 publicOnly = true,
+                blockedAuthorIds = userBlockRepository.getBlockedIds(currentUserId),
             )
 
             call.respondSuccess(data = SimilarCharactersResponse(characters = similarCharacterDtos))

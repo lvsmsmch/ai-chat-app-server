@@ -27,7 +27,15 @@ data class UserDetailsDto(
     @SerialName("totalChatsCount") val totalChatsCount: Int = 0,
     @SerialName("totalMessagesCount") val totalMessagesCount: Int = 0,
     @SerialName("isFollowing") val isFollowing: Boolean = false,
+    /** Текущий пользователь заблокировал этого — кнопка в меню меняет подпись. */
+    @SerialName("isBlocked") val isBlocked: Boolean = false,
     @SerialName("profilePicUrl") val profilePicUrl: String? = null
+)
+
+/** Свой список заблокированных: экран «Blocked users» в настройках. */
+@Serializable
+data class BlockedUsersResponse(
+    @SerialName("users") val users: List<UserDto> = emptyList(),
 )
 
 @Serializable

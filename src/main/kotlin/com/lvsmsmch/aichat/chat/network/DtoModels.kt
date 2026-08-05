@@ -240,6 +240,18 @@ data class SelectVariantRequest(
     @SerialName("index") val index: Int,
 )
 
+/**
+ * Ответ на переключение варианта: сразу отдаём его текст. Иначе клиенту
+ * пришлось бы ждать синка, чтобы показать то, на что человек уже нажал.
+ */
+@Serializable
+data class SelectVariantResponse(
+    @SerialName("isSuccess") val isSuccess: Boolean = true,
+    @SerialName("text") val text: String = "",
+    @SerialName("variantsCount") val variantsCount: Int = 0,
+    @SerialName("selectedVariant") val selectedVariant: Int = 0,
+)
+
 @Serializable
 data class ReportMessageRequest(
     @SerialName("reason") val reason: String,

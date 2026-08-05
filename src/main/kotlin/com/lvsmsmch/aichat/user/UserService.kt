@@ -35,6 +35,7 @@ class UserService(
     private val commentLikeRepository: CommentLikeRepository,
     private val characterLikeRepository: CharacterLikeRepository,
     private val followRepository: FollowRepository,
+    private val userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository,
     private val sessionRepository: SessionRepository,
     private val userNotificationRepository: com.lvsmsmch.aichat.notification.database.UserNotificationRepository,
     private val deviceLimitCarryoverRepository: DeviceLimitCarryoverRepository,
@@ -161,8 +162,10 @@ class UserService(
 
             userRepository.deleteUser(session, userId = userId)
         }
-        // Вне транзакции (не критично к атомарности): сессии и уведомления
+        // Вне транзакции (не критично к атомарности): сессии, уведомления и
+        // блокировки — и его собственные, и чужие на него
         sessionRepository.deleteAllByUserId(userId)
         userNotificationRepository.deleteAllForUser(userId)
+        runCatching { userBlockRepository.removeAllContaining(userId) }
     }
 }
