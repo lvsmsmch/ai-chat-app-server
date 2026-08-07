@@ -298,10 +298,13 @@ fun Route.configureChatRouting(
                 }
             }
 
+            request.cover?.let { validateChatCover(it) }
+
             chatRepository.updateChat(
                 chatId = chat.id,
                 customName = request.customName?.takeIf { it.isNotBlank() },
                 characterIds = request.characterIds?.distinct(),
+                cover = request.cover,
             )
 
             val updatedChat = chatRepository.getChatById(chat.id)!!

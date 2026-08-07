@@ -17,6 +17,8 @@ data class CharacterDto(
     @SerialName("tags") val tags: List<String>,
     @SerialName("picUrl") val picUrl: String? = null,
     @SerialName("picUrlThumbnail") val picUrlThumbnail: String? = null,
+    /** Обложка чата с персонажем: код встроенной или URL своей. */
+    @SerialName("cover") val cover: String? = null,
     @SerialName("totalChats") val totalChats: Int,
     @SerialName("totalMessages") val totalMessages: Int,
     @SerialName("totalReviews") val totalReviews: Int,

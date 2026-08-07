@@ -10,6 +10,8 @@ data class ChatDto(
     @SerialName("id") val id: String,
     @SerialName("chatType") val chatType: String,
     @SerialName("customName") val customName: String? = null,
+    /** Обложка чата; null — клиент берёт обложку персонажа. */
+    @SerialName("cover") val cover: String? = null,
     @SerialName("characters") val characters: List<CharacterDto>,
     @SerialName("createdAt") val createdAt: String,
     @SerialName("color") val color: String = "",
@@ -120,6 +122,8 @@ data class CreateChatResponse(
 @Serializable
 data class UpdateChatRequest(
     @SerialName("customName") val customName: String? = null,
+    /** Новая обложка чата: код, URL или пустая строка — сбросить к персонажу. */
+    @SerialName("cover") val cover: String? = null,
     /** Новый состав группового чата (2–25 персонажей); null — не менять. */
     @SerialName("characterIds") val characterIds: List<String>? = null,
     @SerialName("chatSyncRequest") val chatSyncRequest: ChatSyncRequest

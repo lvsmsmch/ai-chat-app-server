@@ -17,6 +17,8 @@ data class CharacterDbo(
     val initialMessage: String,
     val picUrl: String? = null,
     val picUrlThumbnail: String? = null,
+    /** Обложка чата: код встроенной или URL своей. */
+    val cover: String? = null,
     val visibility: Int,
     val category: String,
     val tags: List<String>,

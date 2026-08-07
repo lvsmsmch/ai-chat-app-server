@@ -239,11 +239,12 @@ class CharacterRepository {
         removePicture: Boolean? = null,
         category: CharacterCategory? = null,
         tags: List<CharacterTag>? = null,
+        cover: String? = null,
     ) {
         val nothingToDo = name == null && description == null && prompt == null &&
             initialMessage == null && visibility == null && pictureUrl == null &&
             pictureUrlThumbnail == null && category == null && tags == null &&
-            removePicture != true
+            cover == null && removePicture != true
         if (nothingToDo) return
 
         updateById(characterId) { statement ->
@@ -258,11 +259,29 @@ class CharacterRepository {
                 statement[table.picUrl] = null
                 statement[table.picUrlThumbnail] = null
             }
+            cover?.let { statement[table.cover] = it }
             category?.let { statement[table.category] = it.code }
             tags?.let { list ->
                 statement[table.tags] = encodeStringList(list.map { tag -> tag.code })
             }
         }
+    }
+
+    /**
+     * Проставляет обложку персонажам, у которых её нет: одна разовая пробежка
+     * на старте. Обложка выводится из id, поэтому повторный запуск ничего не
+     * перетасует, а новые персонажи получают её сразу при создании.
+     */
+    suspend fun backfillCovers(): Int = dbQuery {
+        val ids = table.select(table.id)
+            .where { table.cover.isNull() }
+            .map { it[table.id] }
+        ids.forEach { id ->
+            table.update({ table.id eq id }) {
+                it[table.cover] = com.lvsmsmch.aichat.character.ChatCovers.defaultFor(id)
+            }
+        }
+        ids.size
     }
 
     suspend fun updateAvgRating(session: DbSession, characterId: String, newRating: Float) {

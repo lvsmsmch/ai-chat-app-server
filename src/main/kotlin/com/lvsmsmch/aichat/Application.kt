@@ -89,6 +89,15 @@ fun Application.module() {
     val backgroundJobs by inject<BackgroundJobs>()
     backgroundJobs.start()
 
+    // Обложки чатов: персонажам без обложки проставляем дефолтную. Разовая
+    // операция, повторные старты ничего не меняют — она идемпотентна
+    val charactersRepo by inject<com.lvsmsmch.aichat.character.database.CharacterRepository>()
+    launch {
+        runCatching { charactersRepo.backfillCovers() }
+            .onSuccess { if (it > 0) logger.info("Chat covers assigned: $it characters") }
+            .onFailure { logger.warn("Cover backfill failed: ${it.message}") }
+    }
+
     configureRouting()
 
     environment.monitor.subscribe(ApplicationStopping) {

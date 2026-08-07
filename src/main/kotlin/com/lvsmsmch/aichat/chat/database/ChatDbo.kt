@@ -18,6 +18,8 @@ data class ChatDbo(
     val characterIds: List<String> = listOf(),
     val isMuted: Boolean = false,
     val customName: String? = null,
+    /** Обложка чата; null — берётся обложка персонажа. */
+    val cover: String? = null,
     val isFirstChatWithThisCharacter: Boolean = false,
     val isDeleted: Boolean = false,
     val deletedAt: String = UtcTimestamp.now().toString(),

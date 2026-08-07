@@ -200,13 +200,16 @@ class ChatRepository {
         isMuted: Boolean? = null,
         customName: String? = null,
         characterIds: List<String>? = null,
+        /** Пустая строка — сброс к обложке персонажа, null — не менять. */
+        cover: String? = null,
     ) {
-        if (isMuted == null && customName == null && characterIds == null) return
+        if (isMuted == null && customName == null && characterIds == null && cover == null) return
         dbQuery {
             table.update({ table.id eq chatId }) { statement ->
                 isMuted?.let { statement[table.isMuted] = it }
                 customName?.let { statement[table.customName] = it }
                 characterIds?.let { statement[table.characterIds] = encodeStringList(it) }
+                cover?.let { statement[table.cover] = it.takeIf { c -> c.isNotBlank() } }
                 statement[table.lastModifiedAt] = UtcTimestamp.now().toString()
             }
         }

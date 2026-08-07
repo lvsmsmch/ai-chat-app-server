@@ -129,6 +129,11 @@ object Tables {
         val initialMessage = text("initial_message")
         val picUrl = text("pic_url").nullable()
         val picUrlThumbnail = text("pic_url_thumbnail").nullable()
+        /**
+         * Обложка чатов с персонажем: код встроенной («space», «neon_bar») или
+         * URL своей картинки. Новым персонажам проставляется случайной.
+         */
+        val cover = text("cover").nullable()
         val visibility = integer("visibility")
         val category = text("category")
         /** JSON-массив кодов тегов. */
@@ -183,6 +188,8 @@ object Tables {
         val characterIds = text("character_ids")
         val isMuted = bool("is_muted")
         val customName = text("custom_name").nullable()
+        /** Обложка КОНКРЕТНОГО чата; null — берётся обложка персонажа. */
+        val cover = text("cover").nullable()
         val isFirstChatWithThisCharacter = bool("is_first_chat_with_this_character")
         val isDeleted = bool("is_deleted")
         val deletedAt = text("deleted_at")

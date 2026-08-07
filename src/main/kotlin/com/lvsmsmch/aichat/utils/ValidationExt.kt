@@ -183,12 +183,39 @@ fun validateCustomChatName(customName: String) {
     }
 }
 
+/**
+ * Обложка чата: либо код встроенной (латиница, цифры и подчёркивание), либо
+ * URL нашей же картинки. Произвольные ссылки не принимаем — иначе приложение
+ * пойдёт грузить что угодно с чужого домена.
+ */
+fun validateChatCover(cover: String) {
+    if (cover.isBlank()) return
+    val isCode = cover.length <= 32 && cover.all { it.isLetterOrDigit() || it == '_' }
+    val isOurUrl = cover.startsWith("http") && cover.contains("/images/")
+    if (!isCode && !isOurUrl) throw ValidationException("Invalid cover")
+}
+
+/**
+ * Своя обложка: вертикальная картинка, до 4МБ. Пропорции не проверяем жёстко —
+ * фон всё равно кадрируется по центру, но совсем горизонтальные заворачиваем.
+ */
+fun validateCoverPicture(pictureFile: File) {
+    validatePicture(
+        pictureFile = pictureFile,
+        maxSizeBytes = 4 * 1024 * 1024,
+        minDimensionsPixels = 400 to 600,
+        maxDimensionsPixels = 4000 to 6000,
+        aspectRatio = null,
+    )
+}
+
 private fun validatePicture(
     pictureFile: File,
     maxSizeBytes: Int,
     minDimensionsPixels: Pair<Int, Int>,
     maxDimensionsPixels: Pair<Int, Int>,
-    aspectRatio: Float
+    /** null — пропорции не проверяем (обложки кадрируются по центру). */
+    aspectRatio: Float?
 ) {
     if (pictureFile.length() > maxSizeBytes) {
         throw ValidationException("Picture must be smaller than $maxSizeBytes bytes")
@@ -219,7 +246,7 @@ private fun validatePicture(
             throw ValidationException("Image dimensions must not exceed ${maxWidth}x${maxHeight} pixels")
         }
 
-        if ((width.toFloat() / height.toFloat()) != aspectRatio) {
+        if (aspectRatio != null && (width.toFloat() / height.toFloat()) != aspectRatio) {
             throw ValidationException("Image aspect ratio should be $aspectRatio")
         }
     } catch (e: IOException) {

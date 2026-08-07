@@ -50,6 +50,8 @@ fun Route.configureCharacterRouting(
             var category: String? = null
             var tags: String? = null
             var pictureFile: File? = null
+            var cover: String? = null
+            var coverFile: File? = null
 
             call.receiveMultipart().forEachPart { part ->
                 when (part) {
@@ -62,10 +64,18 @@ fun Route.configureCharacterRouting(
                             "visibility" -> visibility = part.value.toIntOrNull()
                             "category" -> category = part.value
                             "tags" -> tags = part.value
+                            "cover" -> cover = part.value
                         }
                     }
 
                     is PartData.FileItem -> {
+                        if (part.name == "coverImage") {
+                            val file = File.createTempFile("cover_", ".tmp")
+                            part.streamProvider().use { input ->
+                                file.outputStream().buffered().use { output -> input.copyTo(output) }
+                            }
+                            coverFile = file
+                        }
                         if (part.name == "picture") {
                             val file = File.createTempFile("upload_", ".tmp")
                             part.streamProvider().use { input ->
@@ -98,6 +108,8 @@ fun Route.configureCharacterRouting(
             validateCharacterTags(tags!!)
 
             pictureFile?.let { validateCharacterPicture(it) }
+            coverFile?.let { validateCoverPicture(it) }
+            cover?.let { validateChatCover(it) }
 
             val existingCharactersCount = characterRepository.getCharactersByUserId(
                 userId = sessionDbo.userId, includePrivate = true
@@ -108,11 +120,14 @@ fun Route.configureCharacterRouting(
             }
 
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
+            // Своя обложка перевешивает выбранную встроенную
+            val coverImages = coverFile?.let { ImageServer.uploadImageOnServer(it) }
 
             val userId = sessionDbo.userId
 
+            val characterId = idGenerator.generateId(EntityType.CHARACTER)
             val characterDbo = CharacterDbo(
-                id = idGenerator.generateId(EntityType.CHARACTER),
+                id = characterId,
                 authorId = userId,
                 name = name!!,
                 description = collapseExcessLineBreaks(description!!),
@@ -123,6 +138,11 @@ fun Route.configureCharacterRouting(
                 category = category!!,
                 tags = CharacterTag.fromString(tags!!).map { it.code },
                 initialMessage = initialMessage!!,
+                // Ничего не выбрали — обложка назначается сама, чтобы у чата
+                // не было пустого фона
+                cover = coverImages?.originalUrl
+                    ?: cover?.takeIf { it.isNotBlank() }
+                    ?: com.lvsmsmch.aichat.character.ChatCovers.defaultFor(characterId),
             )
 
             characterService.addCharacter(characterDbo)
