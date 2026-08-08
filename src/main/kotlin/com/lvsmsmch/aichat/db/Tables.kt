@@ -253,6 +253,61 @@ object Tables {
         }
     }
 
+    /**
+     * Оценки ответов ИИ («палец вверх/вниз») — материал для статистики
+     * качества генерации.
+     *
+     * Живут ОТДЕЛЬНО от сообщений и переживают удаление чата, сообщения и
+     * даже персонажа: поэтому здесь не ссылки, а снимок всего, что нужно для
+     * разбора, — текст ответа (или ссылка на картинку), модель, персонаж,
+     * автор персонажа, подписка юзера на момент оценки.
+     *
+     * Одна строка на «сообщение + вариант + юзер»: у 1/2 может стоять лайк,
+     * у 2/2 дизлайк. Снятая оценка не удаляет строку, а ставит [rating] = 0 —
+     * «поставил и передумал» тоже сигнал.
+     */
+    object MessageRatings : Table("message_ratings") {
+        val id = text("id")
+        val createdAt = text("created_at")
+        val updatedAt = text("updated_at")
+        /** 1 — палец вверх, -1 — вниз, 0 — оценку сняли. */
+        val rating = integer("rating")
+        val userId = text("user_id")
+        val userHasSubscription = bool("user_has_subscription").default(false)
+        /** Серверный и клиентский id сообщения: строка переживёт его удаление. */
+        val messageId = text("message_id")
+        val messageClientId = text("message_client_id")
+        val chatId = text("chat_id")
+        val chatType = text("chat_type")
+        val characterId = text("character_id")
+        val characterName = text("character_name").nullable()
+        val characterAuthorId = text("character_author_id").nullable()
+        val characterCategory = text("character_category").nullable()
+        val isImage = bool("is_image").default(false)
+        /** Копия оценённого варианта ответа — сообщение может быть удалено. */
+        val messageText = text("message_text").default("")
+        val imageUrl = text("image_url").nullable()
+        val variantIndex = integer("variant_index").default(0)
+        val variantsCount = integer("variants_count").default(0)
+        /** Модель генерации, вытащенная из дебаг-строки, и сама строка целиком. */
+        val model = text("model").nullable()
+        val generationInfo = text("generation_info").nullable()
+        val nsfw = bool("nsfw").default(false)
+        val language = text("language").nullable()
+        val messageCreatedAt = text("message_created_at").nullable()
+
+        override val primaryKey = PrimaryKey(id)
+
+        init {
+            index(false, userId)
+            index(false, characterId)
+            index(false, model)
+            index(false, rating)
+            index(false, createdAt)
+            uniqueIndex(messageId, variantIndex, userId)
+        }
+    }
+
     object Sessions : Table("sessions") {
         val id = text("id")
         val token = text("token")
@@ -572,6 +627,6 @@ object Tables {
         CharacterActivityLogs, UserRecommendationsCache,
         CategoryRecommendationsCache, DefaultRecommendationsCache,
         DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers,
-        DeletedIdsStats,
+        DeletedIdsStats, MessageRatings,
     )
 }

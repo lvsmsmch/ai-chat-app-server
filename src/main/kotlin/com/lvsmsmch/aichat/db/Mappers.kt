@@ -17,6 +17,7 @@ import com.lvsmsmch.aichat.character.database.SearchSuggestionDbo
 import com.lvsmsmch.aichat.chat.database.ChatDbo
 import com.lvsmsmch.aichat.chat.database.ChatType
 import com.lvsmsmch.aichat.chat.database.MessageDbo
+import com.lvsmsmch.aichat.chat.database.MessageRatingDbo
 import com.lvsmsmch.aichat.comment.database.CommentDbo
 import com.lvsmsmch.aichat.comment.database.CommentLikeDbo
 import com.lvsmsmch.aichat.feedback.database.FeedbackDbo
@@ -498,6 +499,64 @@ fun UpdateBuilder<*>.from(dbo: ReportDbo) = with(Tables.Reports) {
     this@from[entityId] = dbo.entityId
     this@from[reason] = dbo.reason
     this@from[text] = dbo.text
+}
+
+// ---- message ratings ----
+
+fun ResultRow.toMessageRatingDbo(): MessageRatingDbo = with(Tables.MessageRatings) {
+    MessageRatingDbo(
+        id = this@toMessageRatingDbo[id],
+        createdAt = this@toMessageRatingDbo[createdAt],
+        updatedAt = this@toMessageRatingDbo[updatedAt],
+        rating = this@toMessageRatingDbo[rating],
+        userId = this@toMessageRatingDbo[userId],
+        userHasSubscription = this@toMessageRatingDbo[userHasSubscription],
+        messageId = this@toMessageRatingDbo[messageId],
+        messageClientId = this@toMessageRatingDbo[messageClientId],
+        chatId = this@toMessageRatingDbo[chatId],
+        chatType = this@toMessageRatingDbo[chatType],
+        characterId = this@toMessageRatingDbo[characterId],
+        characterName = this@toMessageRatingDbo[characterName],
+        characterAuthorId = this@toMessageRatingDbo[characterAuthorId],
+        characterCategory = this@toMessageRatingDbo[characterCategory],
+        isImage = this@toMessageRatingDbo[isImage],
+        messageText = this@toMessageRatingDbo[messageText],
+        imageUrl = this@toMessageRatingDbo[imageUrl],
+        variantIndex = this@toMessageRatingDbo[variantIndex],
+        variantsCount = this@toMessageRatingDbo[variantsCount],
+        model = this@toMessageRatingDbo[model],
+        generationInfo = this@toMessageRatingDbo[generationInfo],
+        nsfw = this@toMessageRatingDbo[nsfw],
+        language = this@toMessageRatingDbo[language],
+        messageCreatedAt = this@toMessageRatingDbo[messageCreatedAt],
+    )
+}
+
+fun UpdateBuilder<*>.from(dbo: MessageRatingDbo) = with(Tables.MessageRatings) {
+    this@from[id] = dbo.id
+    this@from[createdAt] = dbo.createdAt
+    this@from[updatedAt] = dbo.updatedAt
+    this@from[rating] = dbo.rating
+    this@from[userId] = dbo.userId
+    this@from[userHasSubscription] = dbo.userHasSubscription
+    this@from[messageId] = dbo.messageId
+    this@from[messageClientId] = dbo.messageClientId
+    this@from[chatId] = dbo.chatId
+    this@from[chatType] = dbo.chatType
+    this@from[characterId] = dbo.characterId
+    this@from[characterName] = dbo.characterName
+    this@from[characterAuthorId] = dbo.characterAuthorId
+    this@from[characterCategory] = dbo.characterCategory
+    this@from[isImage] = dbo.isImage
+    this@from[messageText] = dbo.messageText
+    this@from[imageUrl] = dbo.imageUrl
+    this@from[variantIndex] = dbo.variantIndex
+    this@from[variantsCount] = dbo.variantsCount
+    this@from[model] = dbo.model
+    this@from[generationInfo] = dbo.generationInfo
+    this@from[nsfw] = dbo.nsfw
+    this@from[language] = dbo.language
+    this@from[messageCreatedAt] = dbo.messageCreatedAt
 }
 
 // ---- feedbacks ----

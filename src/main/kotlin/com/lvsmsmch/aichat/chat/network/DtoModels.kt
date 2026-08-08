@@ -239,6 +239,14 @@ data class GetMessagesResponse(
 
 
 /** Какой из сохранённых вариантов ответа юзер оставил на экране. */
+/** Оценка ответа: 1 — палец вверх, -1 — вниз, 0 — снять. */
+@Serializable
+data class RateMessageRequest(
+    @SerialName("rating") val rating: Int,
+    /** Какой вариант оценили; null — тот, что сейчас выбран. */
+    @SerialName("variant") val variant: Int? = null,
+)
+
 @Serializable
 data class SelectVariantRequest(
     @SerialName("index") val index: Int,

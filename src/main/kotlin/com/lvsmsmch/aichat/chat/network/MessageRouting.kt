@@ -30,6 +30,7 @@ import kotlinx.serialization.encodeToString
 fun Route.configureMessageRouting(
     chatRepository: ChatRepository,
     messageRepository: MessageRepository,
+    messageRatingRepository: MessageRatingRepository,
     characterRepository: CharacterRepository,
     sessionRepository: SessionRepository,
     reportRepository: ReportRepository,
@@ -289,6 +290,67 @@ fun Route.configureMessageRouting(
                     selectedVariant = updated?.selectedVariant ?: request.index,
                 )
             )
+        }
+
+        /**
+         * Оценка ответа персонажа. В базу уходит СНИМОК: текст варианта,
+         * модель, персонаж, подписка — чтобы статистика пережила удаление
+         * чата, сообщения и персонажа.
+         */
+        post("/{chatId}/messages/{messageId}/rating") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val chatClientId = call.parameters["chatId"]
+                ?: throw BadRequestException("Chat ID is required")
+            val messageClientId = call.parameters["messageId"]
+                ?: throw BadRequestException("Message ID is required")
+            val request = call.receive<RateMessageRequest>()
+            if (request.rating !in -1..1) throw BadRequestException("Unknown rating")
+
+            val chat = chatRepository.getChatByClientId(chatClientId)
+                ?: throw ChatNotFoundException(chatClientId)
+            if (chat.userId != userId) throw ForbiddenException("Access denied to this chat")
+
+            val message = messageRepository.findByClientId(messageClientId)
+                ?: throw BadRequestException("Message not found")
+            if (message.chatId != chat.id) {
+                throw BadRequestException("Message does not belong to this chat")
+            }
+            // Оценивают ответ ИИ; своё сообщение оценить нельзя
+            if (message.isSentByUser) throw BadRequestException("Cannot rate own message")
+
+            val variant = request.variant ?: message.selectedVariant
+            val character = characterRepository.getCharacter(message.senderId)
+            val user = userRepository.getUserById(userId)
+
+            messageRatingRepository.rate(
+                MessageRatingDbo(
+                    rating = request.rating,
+                    userId = userId,
+                    userHasSubscription = user?.hasSubscription ?: false,
+                    messageId = message.id,
+                    messageClientId = message.clientId,
+                    chatId = chat.id,
+                    chatType = chat.type.name,
+                    characterId = message.senderId,
+                    characterName = character?.name,
+                    characterAuthorId = character?.authorId,
+                    characterCategory = character?.category,
+                    isImage = message.isImage,
+                    // Текст именно того варианта, который оценили
+                    messageText = message.variants.getOrNull(variant) ?: message.text,
+                    imageUrl = message.imageUrl,
+                    variantIndex = variant,
+                    variantsCount = message.variants.size,
+                    // Дебаг-строка генерации выглядит как «model · in N tok · …»
+                    model = message.imageDebugInfo?.substringBefore(" · ")?.trim()?.ifBlank { null },
+                    generationInfo = message.imageDebugInfo,
+                    nsfw = message.nsfw,
+                    language = user?.characterLanguage,
+                    messageCreatedAt = message.createdAt,
+                )
+            )
+
+            call.respondSuccess()
         }
 
         post("/messages/{messageId}/report") {

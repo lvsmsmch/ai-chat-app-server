@@ -45,6 +45,7 @@ fun Application.configureRouting() {
     val characterRepository: CharacterRepository by inject()
     val chatRepository: ChatRepository by inject()
     val messageRepository: MessageRepository by inject()
+    val messageRatingRepository: com.lvsmsmch.aichat.chat.database.MessageRatingRepository by inject()
     val reviewRepository: ReviewRepository by inject()
     val sessionRepository: SessionRepository by inject()
     val followRepository: FollowRepository by inject()
@@ -182,6 +183,7 @@ fun Application.configureRouting() {
             configureMessageRouting(
                 chatRepository = chatRepository,
                 messageRepository = messageRepository,
+                messageRatingRepository = messageRatingRepository,
                 characterRepository = characterRepository,
                 sessionRepository = sessionRepository,
                 idGenerator = idGenerator,

@@ -85,6 +85,7 @@ val appModule = module {
     single { CharacterRepository() }
     single { ChatRepository() }
     single { MessageRepository() }
+    single { com.lvsmsmch.aichat.chat.database.MessageRatingRepository() }
     single { ReviewRepository() }
     single { CommentRepository() }
     single { CommentLikeRepository() }
