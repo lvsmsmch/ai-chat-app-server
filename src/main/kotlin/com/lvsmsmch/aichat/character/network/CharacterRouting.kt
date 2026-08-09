@@ -12,6 +12,7 @@ import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.routing.*
 import java.io.File
 
@@ -336,6 +337,33 @@ fun Route.configureCharacterRouting(
             val suggestions = searchSuggestionsRepository.getSuggestions(request.query, request.size)
 
             call.respondSuccess(data = SearchSuggestionsResponse(suggestions = suggestions))
+        }
+
+        rateLimit(RateLimitName("ai-search")) {
+            post("/search/personality") {
+                val currentUserId = sessionRepository.verifyToken(call).userId
+                val query = call.receive<PersonalitySearchRequest>().query.trim()
+                require(query.length in 3..500) {
+                    "Personality description must be between 3 and 500 characters"
+                }
+
+                val blockedAuthors = userBlockRepository.getBlockedIds(currentUserId)
+                val language = mapper.languageOf(currentUserId)
+                val candidates = characterRepository.getAllPublicCharacters()
+                    .filterNot { it.authorId in blockedAuthors }
+                    .map { it.localized(language) }
+                val ids = PersonalitySearchUtil.findCharacterIds(query, candidates)
+                val likedIds = characterLikeRepository.getLikedIds(currentUserId, ids)
+                val characters = mapper.charactersDtoByIds(
+                    ids = ids,
+                    lang = language,
+                    likedIds = likedIds,
+                    publicOnly = true,
+                    blockedAuthorIds = blockedAuthors,
+                )
+
+                call.respondSuccess(PersonalitySearchResponse(characters))
+            }
         }
 
         get("/category/{category}") {

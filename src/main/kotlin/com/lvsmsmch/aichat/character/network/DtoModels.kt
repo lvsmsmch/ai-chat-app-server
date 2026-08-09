@@ -87,6 +87,16 @@ data class SimilarCharactersResponse(
     @SerialName("characters") val characters: List<CharacterDto>
 )
 
+@Serializable
+data class PersonalitySearchRequest(
+    @SerialName("query") val query: String,
+)
+
+@Serializable
+data class PersonalitySearchResponse(
+    @SerialName("characters") val characters: List<CharacterDto>,
+)
+
 @kotlinx.serialization.Serializable
 data class DiscoverSectionDto(
     /** "for_you" | "trending" | "most_popular" | код категории. */

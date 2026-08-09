@@ -69,6 +69,13 @@ fun Application.module() {
                 call.request.headers["Authorization"] ?: call.request.origin.remoteHost
             }
         }
+
+        register(RateLimitName("ai-search")) {
+            rateLimiter(limit = 10, refillPeriod = 1.minutes)
+            requestKey { call ->
+                call.request.headers["Authorization"] ?: call.request.origin.remoteHost
+            }
+        }
     }
 
     install(Koin) {
