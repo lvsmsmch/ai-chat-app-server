@@ -97,6 +97,29 @@ data class PersonalitySearchResponse(
     @SerialName("characters") val characters: List<CharacterDto>,
 )
 
+@Serializable
+data class GenerateAvatarRequest(
+    @SerialName("description") val description: String,
+)
+
+@Serializable
+data class AvatarGenerationLimitsDto(
+    @SerialName("hourlyUsed") val hourlyUsed: Int,
+    @SerialName("hourlyLimit") val hourlyLimit: Int,
+    @SerialName("dailyUsed") val dailyUsed: Int,
+    @SerialName("dailyLimit") val dailyLimit: Int,
+    @SerialName("hourlyResetAfterSeconds") val hourlyResetAfterSeconds: Long,
+    @SerialName("dailyResetAfterSeconds") val dailyResetAfterSeconds: Long,
+)
+
+@Serializable
+data class GenerateAvatarResponse(
+    @SerialName("imageUrl") val imageUrl: String? = null,
+    @SerialName("limits") val limits: AvatarGenerationLimitsDto,
+    /** null | hourly | daily */
+    @SerialName("limitReason") val limitReason: String? = null,
+)
+
 @kotlinx.serialization.Serializable
 data class DiscoverSectionDto(
     /** "for_you" | "trending" | "most_popular" | код категории. */

@@ -609,6 +609,17 @@ object Tables {
         override val primaryKey = PrimaryKey(deviceId)
     }
 
+    /** Rolling-окна генерации аватаров: одна блокируемая строка на пользователя. */
+    object AvatarGenerationLimits : Table("avatar_generation_limits") {
+        val userId = text("user_id")
+        val hourlyWindowStartedAt = long("hourly_window_started_at")
+        val hourlyCount = integer("hourly_count")
+        val dailyWindowStartedAt = long("daily_window_started_at")
+        val dailyCount = integer("daily_count")
+
+        override val primaryKey = PrimaryKey(userId)
+    }
+
     object DeletedIdsStats : Table("entity_id_stats") {
         val entityType = text("entity_type")
         /** JSON-массив удалённых id. */
@@ -626,7 +637,7 @@ object Tables {
         Follows, UserBlocks, Reports, Feedbacks, SearchSuggestions, UserNotifications,
         CharacterActivityLogs, UserRecommendationsCache,
         CategoryRecommendationsCache, DefaultRecommendationsCache,
-        DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers,
+        DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers, AvatarGenerationLimits,
         DeletedIdsStats, MessageRatings,
     )
 }

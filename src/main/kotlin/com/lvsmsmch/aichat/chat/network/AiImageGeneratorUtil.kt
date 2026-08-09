@@ -86,6 +86,27 @@ object AiImageGeneratorUtil {
         }
     }
 
+    /** Топовая Seedream-генерация квадратного аватара для мастера персонажа. */
+    suspend fun generateAvatar(description: String): ImageGenResult {
+        val prompt = buildString {
+            append("Create one polished square character avatar from this description:\n")
+            append(description)
+            append(
+                "\nStrict composition: exactly one character, centered head-and-shoulders or " +
+                    "upper-body portrait, face clearly visible, balanced 1:1 framing, clean " +
+                    "unobtrusive background. High quality digital art suitable for a profile " +
+                    "avatar. No text, captions, logos, borders, split panels, collages, duplicate " +
+                    "people, extra faces, or cropped-off head."
+            )
+        }
+        return generateViaFal(
+            model = "seedream-4.5",
+            prompt = prompt,
+            refFile = null,
+            imageSize = "square_hd",
+        )
+    }
+
     private suspend fun generateImageInner(
         characterDbo: CharacterDbo,
         messagesHistory: List<MessageDbo>,
@@ -424,7 +445,12 @@ object AiImageGeneratorUtil {
      * edit-эндпоинта; без референса — text-to-image. Safety checker выключен:
      * цензуру нам честнее показывает сама модель.
      */
-    private suspend fun generateViaFal(model: String, prompt: String, refFile: File?): ImageGenResult {
+    private suspend fun generateViaFal(
+        model: String,
+        prompt: String,
+        refFile: File?,
+        imageSize: String = FAL_PORTRAIT_IMAGE_SIZE,
+    ): ImageGenResult {
         val isFlux = model.startsWith("flux")
         val falModelId = when {
             isFlux && refFile != null -> "fal-ai/flux-2-pro/edit"
@@ -434,7 +460,7 @@ object AiImageGeneratorUtil {
         }
         val requestBody = buildJsonObject {
             put("prompt", prompt)
-            put("image_size", FAL_PORTRAIT_IMAGE_SIZE)
+            put("image_size", imageSize)
             if (refFile != null) {
                 putJsonArray("image_urls") {
                     add(JsonPrimitive("data:image/jpeg;base64," +

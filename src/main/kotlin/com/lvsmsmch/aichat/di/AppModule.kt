@@ -83,6 +83,7 @@ val appModule = module {
     single { com.lvsmsmch.aichat.user.database.UserBlockRepository() }
     single { ReportRepository() }
     single { CharacterRepository() }
+    single { com.lvsmsmch.aichat.character.database.AvatarGenerationLimitRepository() }
     single { ChatRepository() }
     single { MessageRepository() }
     single { com.lvsmsmch.aichat.chat.database.MessageRatingRepository() }

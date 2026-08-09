@@ -65,6 +65,7 @@ fun Application.configureRouting() {
     val deviceLimitCarryoverRepository: com.lvsmsmch.aichat.user.database.DeviceLimitCarryoverRepository by inject()
     val discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository by inject()
     val characterLikeRepository: com.lvsmsmch.aichat.character.database.CharacterLikeRepository by inject()
+    val avatarGenerationLimitRepository: com.lvsmsmch.aichat.character.database.AvatarGenerationLimitRepository by inject()
     val authCodeRepository: com.lvsmsmch.aichat.auth.database.AuthCodeRepository by inject()
     val authLockoutRepository: com.lvsmsmch.aichat.auth.database.AuthLockoutRepository by inject()
     val mailSender: com.lvsmsmch.aichat.mail.MailSender by inject()
@@ -150,6 +151,7 @@ fun Application.configureRouting() {
                 characterService = characterService,
                 chatRepository = chatRepository,
                 userBlockRepository = userBlockRepository,
+                avatarGenerationLimitRepository = avatarGenerationLimitRepository,
             )
 
             configureCommentRouting(

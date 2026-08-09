@@ -31,6 +31,7 @@ fun Route.configureCharacterRouting(
     characterService: com.lvsmsmch.aichat.character.CharacterService,
     chatRepository: com.lvsmsmch.aichat.chat.database.ChatRepository,
     userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository,
+    avatarGenerationLimitRepository: AvatarGenerationLimitRepository,
 ) {
 
     route("/characters") {
@@ -366,6 +367,44 @@ fun Route.configureCharacterRouting(
             }
         }
 
+        get("/avatar-generation/limits") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val quota = avatarGenerationLimitRepository.current(userId)
+            call.respondSuccess(quota.toAvatarLimitsDto())
+        }
+
+        post("/avatar-generation/generate") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val description = call.receive<GenerateAvatarRequest>().description.trim()
+            require(description.length in 3..500) {
+                "Avatar description must be between 3 and 500 characters"
+            }
+
+            val reservation = avatarGenerationLimitRepository.reserve(userId)
+            if (!reservation.allowed) {
+                return@post call.respondSuccess(
+                    GenerateAvatarResponse(
+                        limits = reservation.toAvatarLimitsDto(),
+                        limitReason = reservation.limitReason,
+                    )
+                )
+            }
+
+            try {
+                val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil
+                    .generateAvatar(description)
+                call.respondSuccess(
+                    GenerateAvatarResponse(
+                        imageUrl = result.url,
+                        limits = reservation.toAvatarLimitsDto(),
+                    )
+                )
+            } catch (e: Exception) {
+                avatarGenerationLimitRepository.release(userId, reservation)
+                throw e
+            }
+        }
+
         get("/category/{category}") {
             val currentUserId = sessionRepository.verifyToken(call).userId
 
@@ -689,3 +728,12 @@ fun Route.configureCharacterRouting(
         }
     }
 }
+
+private fun AvatarGenerationQuota.toAvatarLimitsDto() = AvatarGenerationLimitsDto(
+    hourlyUsed = hourlyUsed,
+    hourlyLimit = hourlyLimit,
+    dailyUsed = dailyUsed,
+    dailyLimit = dailyLimit,
+    hourlyResetAfterSeconds = hourlyResetAfterSeconds,
+    dailyResetAfterSeconds = dailyResetAfterSeconds,
+)
