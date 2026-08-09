@@ -24,6 +24,9 @@ import java.util.*
  */
 object AiImageGeneratorUtil {
 
+    private const val GENERATED_IMAGE_ASPECT_RATIO = "3:4"
+    private const val FAL_PORTRAIT_IMAGE_SIZE = "portrait_4_3"
+
     private val geminiApiUrl
         get() = System.getenv("GEMINI_API_URL") ?: "https://generativelanguage.googleapis.com/v1beta/models"
     private val geminiApiKey
@@ -158,6 +161,10 @@ object AiImageGeneratorUtil {
                     "add any extra people, bystanders, crowds or background characters. " +
                     "No text or captions in the image."
             )
+            append(
+                "\nComposition: portrait orientation with a 3:4 aspect ratio. Frame the scene " +
+                    "vertically, with the image taller than it is wide."
+            )
         }
 
         if (goXai) return generateViaXai(prompt, refFile)
@@ -226,6 +233,11 @@ object AiImageGeneratorUtil {
                 putJsonArray("responseModalities") {
                     add(JsonPrimitive("TEXT"))
                     add(JsonPrimitive("IMAGE"))
+                }
+                putJsonObject("responseFormat") {
+                    putJsonObject("image") {
+                        put("aspectRatio", GENERATED_IMAGE_ASPECT_RATIO)
+                    }
                 }
             }
         }
@@ -358,6 +370,7 @@ object AiImageGeneratorUtil {
             put("model", xaiImageModel)
             put("prompt", prompt)
             put("response_format", "b64_json")
+            put("aspect_ratio", GENERATED_IMAGE_ASPECT_RATIO)
             if (refFile != null) {
                 putJsonObject("image") {
                     put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFile.readBytes()))
@@ -421,6 +434,7 @@ object AiImageGeneratorUtil {
         }
         val requestBody = buildJsonObject {
             put("prompt", prompt)
+            put("image_size", FAL_PORTRAIT_IMAGE_SIZE)
             if (refFile != null) {
                 putJsonArray("image_urls") {
                     add(JsonPrimitive("data:image/jpeg;base64," +
