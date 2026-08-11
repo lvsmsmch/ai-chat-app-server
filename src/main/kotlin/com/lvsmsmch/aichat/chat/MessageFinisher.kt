@@ -65,6 +65,7 @@ class MessageFinisher(
                             val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil.generateImage(
                                 characterDbo = characterDbo.localized(lang),
                                 messagesHistory = messageHistory,
+                                ownerDbo = owner,
                                 useTopModel = useTop,
                             )
                             messageRepository.updateMessage(

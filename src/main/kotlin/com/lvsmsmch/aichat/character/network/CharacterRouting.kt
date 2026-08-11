@@ -14,7 +14,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
 fun Route.configureCharacterRouting(
     characterRepository: CharacterRepository,
@@ -373,34 +376,78 @@ fun Route.configureCharacterRouting(
             call.respondSuccess(quota.toAvatarLimitsDto())
         }
 
+        get("/avatar-generation/{requestId}") {
+            val userId = sessionRepository.verifyToken(call).userId
+            val requestId = call.parameters["requestId"].orEmpty()
+            require(requestId.length in 8..100) { "Invalid avatar generation request id" }
+            val result = avatarGenerationLimitRepository.result(userId, requestId)
+            val quota = avatarGenerationLimitRepository.current(userId)
+            call.respondSuccess(
+                GenerateAvatarResponse(
+                    requestId = requestId,
+                    generationStatus = result?.status ?: "failed",
+                    imageUrl = result?.imageUrl,
+                    limits = quota.toAvatarLimitsDto(),
+                )
+            )
+        }
+
         post("/avatar-generation/generate") {
             val userId = sessionRepository.verifyToken(call).userId
-            val description = call.receive<GenerateAvatarRequest>().description.trim()
+            val request = call.receive<GenerateAvatarRequest>()
+            val description = request.description.trim()
+            // Старые клиенты не присылают id: для них сохраняем прежнее
+            // поведение, а новые получают идемпотентное восстановление.
+            val requestId = call.request.headers["X-Avatar-Request-Id"]
+                ?: UUID.randomUUID().toString()
             require(description.length in 3..500) {
                 "Avatar description must be between 3 and 500 characters"
             }
+            require(requestId.length in 8..100) {
+                "Invalid avatar generation request id"
+            }
 
-            val reservation = avatarGenerationLimitRepository.reserve(userId)
-            if (!reservation.allowed) {
+            val attempt = avatarGenerationLimitRepository.reserve(userId, requestId)
+            if (attempt.status != "pending" || !attempt.shouldGenerate) {
                 return@post call.respondSuccess(
                     GenerateAvatarResponse(
-                        limits = reservation.toAvatarLimitsDto(),
-                        limitReason = reservation.limitReason,
+                        requestId = attempt.requestId,
+                        generationStatus = attempt.status,
+                        imageUrl = attempt.imageUrl,
+                        limits = attempt.quota.toAvatarLimitsDto(),
+                        limitReason = attempt.quota.limitReason,
                     )
                 )
             }
 
             try {
-                val result = com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil
-                    .generateAvatar(description)
+                // Отвязано от жизни клиентского сокета: если приложение уйдёт в
+                // фон и соединение оборвётся, генерация завершится и сохранит URL.
+                val result = withContext(NonCancellable) {
+                    try {
+                        com.lvsmsmch.aichat.chat.network.AiImageGeneratorUtil
+                            .generateAvatar(description)
+                            .also {
+                                avatarGenerationLimitRepository.complete(
+                                    userId = userId,
+                                    requestId = attempt.requestId,
+                                    imageUrl = it.url,
+                                )
+                            }
+                    } catch (e: Exception) {
+                        avatarGenerationLimitRepository.fail(userId, attempt.requestId, attempt.quota)
+                        throw e
+                    }
+                }
                 call.respondSuccess(
                     GenerateAvatarResponse(
+                        requestId = attempt.requestId,
+                        generationStatus = "completed",
                         imageUrl = result.url,
-                        limits = reservation.toAvatarLimitsDto(),
+                        limits = attempt.quota.toAvatarLimitsDto(),
                     )
                 )
             } catch (e: Exception) {
-                avatarGenerationLimitRepository.release(userId, reservation)
                 throw e
             }
         }

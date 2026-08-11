@@ -10,6 +10,7 @@ import com.lvsmsmch.aichat.db.toCharacterDbo
 import com.lvsmsmch.aichat.utils.DbSession
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import org.jetbrains.exposed.sql.Column
+import org.jetbrains.exposed.sql.Case
 import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -20,6 +21,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.intLiteral
 import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
@@ -59,7 +61,7 @@ class CharacterRepository {
             else -> table.createdAt to SortOrder.DESC
         }
 
-        table.selectAll()
+        val query = table.selectAll()
             .where {
                 var op: Op<Boolean> = (table.visibility eq CharacterVisibility.PUBLIC.code) and
                     (table.category inList categories.map { it.code })
@@ -68,24 +70,54 @@ class CharacterRepository {
                 if (visibilityFilter != null) op = op and (table.visibility eq visibilityFilter)
                 op
             }
-            .orderBy(order)
+
+        // В поиске сначала идёт релевантность, и только внутри одного уровня —
+        // выбранная сортировка. Иначе популярный персонаж со словом "extremely"
+        // в описании оказывался выше персонажа с точным именем "Rem".
+        if (searchQuery.isNotBlank()) {
+            query.orderBy(searchRank(searchQuery) to SortOrder.ASC, order)
+        } else {
+            query.orderBy(order)
+        }
+
+        query
             .limit(size)
             .offset(((page - 1).toLong() * size))
             .map { it.toCharacterDbo() }
     }
 
     /**
-     * Поиск по подстроке без учёта регистра: имя, категория, теги, описание и
-     * ВСЕ локализации (они лежат JSON-строкой, поэтому проверяются как текст).
-     * Так «Наруто» находится и когда приложение на английском.
+     * Короткие запросы ищем только в структурированных полях и именах переводов:
+     * подстрока из трёх букв в свободном описании даёт сотни ложных совпадений
+     * (например, `rem` в `extremely`). С четырёх символов подключаем описание.
      */
     private fun searchOp(searchQuery: String): Op<Boolean> {
-        val needle = "%${escapeLike(searchQuery.lowercase())}%"
-        return (table.name.lowerCase() like needle) or
+        val normalized = escapeLike(searchQuery.trim().lowercase())
+        val needle = "%$normalized%"
+        val translatedName = "%\"name\":\"$normalized%"
+        var op = (table.name.lowerCase() like needle) or
             (table.category.lowerCase() like needle) or
             (table.tags.lowerCase() like needle) or
-            (table.description.lowerCase() like needle) or
-            (table.translations.lowerCase() like needle)
+            (table.translations.lowerCase() like translatedName)
+        if (searchQuery.trim().length >= 4) {
+            op = op or (table.description.lowerCase() like needle) or
+                (table.translations.lowerCase() like needle)
+        }
+        return op
+    }
+
+    /** Точное имя → начало имени → имя содержит запрос → остальные поля. */
+    private fun searchRank(searchQuery: String) = with(searchQuery.trim().lowercase()) {
+        val escaped = escapeLike(this)
+        Case()
+            .When(table.name.lowerCase() eq this, intLiteral(0))
+            .When(table.name.lowerCase() like "$escaped%", intLiteral(1))
+            .When(table.name.lowerCase() like "%$escaped%", intLiteral(2))
+            .When(table.translations.lowerCase() like "%\"name\":\"$escaped\"%", intLiteral(3))
+            .When(table.translations.lowerCase() like "%\"name\":\"$escaped%", intLiteral(4))
+            .When(table.tags.lowerCase() like "%$escaped%", intLiteral(5))
+            .When(table.category.lowerCase() like "%$escaped%", intLiteral(6))
+            .Else(intLiteral(7))
     }
 
     /** Спецсимволы LIKE в пользовательском вводе не должны работать как шаблон. */

@@ -616,6 +616,11 @@ object Tables {
         val hourlyCount = integer("hourly_count")
         val dailyWindowStartedAt = long("daily_window_started_at")
         val dailyCount = integer("daily_count")
+        /** Последняя генерация нужна для восстановления после обрыва клиента в фоне. */
+        val generationRequestId = text("generation_request_id").nullable()
+        val generationStatus = text("generation_status").nullable()
+        val generatedImageUrl = text("generated_image_url").nullable()
+        val generationStartedAt = long("generation_started_at").nullable()
 
         override val primaryKey = PrimaryKey(userId)
     }

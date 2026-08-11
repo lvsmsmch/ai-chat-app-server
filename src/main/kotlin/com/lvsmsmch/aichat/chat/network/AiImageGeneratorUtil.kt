@@ -2,6 +2,7 @@ package com.lvsmsmch.aichat.chat.network
 
 import com.lvsmsmch.aichat.character.database.CharacterDbo
 import com.lvsmsmch.aichat.chat.database.MessageDbo
+import com.lvsmsmch.aichat.user.database.UserDbo
 import com.lvsmsmch.aichat.utils.ImageServer
 import com.lvsmsmch.aichat.utils.defaultJson
 import com.lvsmsmch.aichat.utils.logger
@@ -75,13 +76,14 @@ object AiImageGeneratorUtil {
     suspend fun generateImage(
         characterDbo: CharacterDbo,
         messagesHistory: List<MessageDbo>,
+        ownerDbo: UserDbo? = null,
         useTopModel: Boolean = true,
     ): ImageGenResult {
         // Замер полного времени (генерация + докачка + даунскейл) — уточняет
         // ожидаемое время для прогресс-кружка на клиенте
         val etaKey = ImageGenEta.providerKey(useTopModel)
         val startedAt = System.currentTimeMillis()
-        return generateImageInner(characterDbo, messagesHistory, useTopModel).also {
+        return generateImageInner(characterDbo, messagesHistory, ownerDbo, useTopModel).also {
             ImageGenEta.record(etaKey, System.currentTimeMillis() - startedAt)
         }
     }
@@ -102,7 +104,7 @@ object AiImageGeneratorUtil {
         return generateViaFal(
             model = "seedream-4.5",
             prompt = prompt,
-            refFile = null,
+            refFiles = emptyList(),
             imageSize = "square_hd",
         )
     }
@@ -110,6 +112,7 @@ object AiImageGeneratorUtil {
     private suspend fun generateImageInner(
         characterDbo: CharacterDbo,
         messagesHistory: List<MessageDbo>,
+        ownerDbo: UserDbo?,
         useTopModel: Boolean,
     ): ImageGenResult {
         // [DEBUG] Оверрайд из настроек приложения бьёт и гибрид, и тиры
@@ -123,7 +126,7 @@ object AiImageGeneratorUtil {
         val last8 = meaningful.takeLast(8)
         val opening = meaningful.firstOrNull()?.takeIf { it !in last8 }
         fun line(m: MessageDbo) =
-            (if (m.isSentByUser) "User: " else "${characterDbo.name}: ") + m.text.take(200)
+            (if (m.isSentByUser) "User: " else "${characterDbo.name}: ") + m.text
         val recent = buildString {
             opening?.let { append(line(it)); append("\n[...]\n") }
             append(last8.joinToString("\n") { line(it) })
@@ -139,14 +142,31 @@ object AiImageGeneratorUtil {
             debugModel.startsWith("flux") || debugModel.startsWith("seedream")
         } else useTopModel
 
-        // Референс внешности/стиля: последняя сгенерированная картинка этого чата
-        // (держим дизайн, стиль и ОБОИХ участников сцены — юзер иначе рисуется
-        // каждый раз по-новому), для первой генерации — аватарка персонажа
+        // Референс внешности/стиля персонажа: последняя сгенерированная картинка
+        // этого чата, для первой генерации — аватарка персонажа. Прошлая сцена
+        // больше не считается доказательством, что любой второй человек должен
+        // остаться: состав кадра каждый раз решается по текущему взаимодействию.
         val lastGenFile = ImageServer.localFileForUrl(
             messagesHistory.lastOrNull { it.isImage && it.imageUrl != null }?.imageUrl
         )
-        val avatarFile = if (lastGenFile == null) ImageServer.localFileForUrl(characterDbo.picUrl) else null
-        val refFile = lastGenFile ?: avatarFile
+        val characterAvatarFile = if (lastGenFile == null) {
+            ImageServer.localFileForUrl(characterDbo.picUrl)
+        } else null
+        val characterRefFile = lastGenFile ?: characterAvatarFile
+
+        // Когда пользователь физически участвует в сцене, его собственная ава —
+        // единственный надёжный источник внешности. Seedream и Grok умеют несколько
+        // references: персонаж и пользователь больше не конкурируют за один слот.
+        val userRefFile = listOfNotNull(
+            ownerDbo?.profilePictureUrl,
+            ownerDbo?.profilePictureUrlThumbnail,
+        ).firstNotNullOfOrNull(ImageServer::localFileForUrl)
+            ?.takeIf { it.absolutePath != characterRefFile?.absolutePath }
+        val refFiles = listOfNotNull(characterRefFile, userRefFile)
+            .distinctBy { it.absolutePath }
+        val userDisplayName = ownerDbo?.name?.takeIf { it.isNotBlank() }
+            ?: ownerDbo?.username?.takeIf { it.isNotBlank() }
+            ?: "the user"
 
         val prompt = buildString {
             append("Create a single vivid illustration of the character ")
@@ -159,28 +179,50 @@ object AiImageGeneratorUtil {
             }
             when {
                 lastGenFile != null -> append(
-                    "\nThe attached image is the previous scene of this chat. Keep the SAME " +
-                        "character design and art style; staying in the same location is fine " +
-                        "if the conversation continues there, but you MUST render a completely " +
-                        "new shot: a clearly DIFFERENT camera angle, different distance and " +
-                        "framing, updated poses and details for the current moment. Returning " +
-                        "the same or nearly the same composition as the reference is a failure."
+                    "\nReference image 1 is the previous scene of this chat. Keep the SAME " +
+                        "design of ${characterDbo.name} and the same art style. Do NOT automatically " +
+                        "keep any other person from that image: an unrelated or visually incorrect " +
+                        "conversation partner must be removed or corrected according to the scene " +
+                        "cast rules below. Staying in the same location is fine if the conversation " +
+                        "continues there, but render a completely new shot: a clearly DIFFERENT " +
+                        "camera angle, distance, framing and updated poses. Returning the same or " +
+                        "nearly the same composition is a failure."
                 )
-                avatarFile != null -> append(
-                    "\nThe attached image is ONLY a face/appearance reference for the character. " +
+                characterAvatarFile != null -> append(
+                    "\nReference image 1 is ONLY a face/appearance reference for ${characterDbo.name}. " +
                         "Do NOT reproduce, crop, zoom or restyle that exact picture and do NOT " +
                         "reuse its framing or visual effects. Paint a completely different " +
                         "image: a new scene from the conversation, a different camera angle " +
                         "and distance, a full composition with a background."
                 )
             }
+            if (userRefFile != null) {
+                val index = if (characterRefFile != null) 2 else 1
+                append(
+                    "\nReference image $index is the authoritative appearance reference for the " +
+                        "conversation user, $userDisplayName. When the user is visible, adapt this " +
+                        "same person to the illustration style; do not replace them with a generic " +
+                        "or unrelated person. Do not copy the reference background or framing."
+                )
+            }
             append(
                 "\nStyle: high quality digital art. Correct anatomy is critical: every person " +
                     "has exactly two arms and two hands, no extra, missing or deformed limbs. " +
-                    "STRICT: depict ONLY the people who are actually part of this conversation " +
-                    "and scene - the character and, if present in the scene, the user. Do NOT " +
-                    "add any extra people, bystanders, crowds or background characters. " +
                     "No text or captions in the image."
+            )
+            append(
+                "\nSTRICT SCENE CAST RULES: Always show ${characterDbo.name}. Treat $userDisplayName " +
+                    "as the conversation user, never as a bystander. If the CURRENT scene contains " +
+                    "active direct interaction with the user - for example protecting them, touching, " +
+                    "hugging, carrying, fighting with or against them, standing together in a shared " +
+                    "action, or otherwise physically acting on/with them - show the user in the same " +
+                    "frame next to ${characterDbo.name}. In that case show exactly these two people. " +
+                    "If the conversation identifies the user by a specific name or role (for example " +
+                    "Okarun), that identity belongs to the user: use its recognizable appearance when " +
+                    "there is no user reference, never invent an unrelated generic person. If there is " +
+                    "no active direct interaction, show only ${characterDbo.name} and keep the user " +
+                    "off-camera; merely speaking to or looking toward the user is not enough to add a " +
+                    "second person. Never add extra people, bystanders, crowds or background characters."
             )
             append(
                 "\nComposition: portrait orientation with a 3:4 aspect ratio. Frame the scene " +
@@ -188,16 +230,16 @@ object AiImageGeneratorUtil {
             )
         }
 
-        if (goXai) return generateViaXai(prompt, refFile)
-        if (goFal) return generateViaFal(debugModel ?: "seedream-4.5", prompt, refFile)
+        if (goXai) return generateViaXai(prompt, refFiles)
+        if (goFal) return generateViaFal(debugModel ?: "seedream-4.5", prompt, refFiles)
 
         // Gemini: генерация + QA-проверка анатомии дешёвой vision-моделью.
         // Каша с конечностями — главный провал модели; ловим и перегенерируем один раз
-        var attempt = generateViaGeminiOnce(prompt, refFile, imageModel)
+        var attempt = generateViaGeminiOnce(prompt, refFiles, imageModel)
         if (runCatching { hasAnatomyDefects(attempt.first) }.getOrDefault(false)) {
             logger.info("Image QA: anatomy defects detected, regenerating once")
             // Вторая попытка тоже может уйти в цензуру/ошибку — тогда оставляем первую
-            runCatching { generateViaGeminiOnce(prompt, refFile, imageModel) }.getOrNull()?.let {
+            runCatching { generateViaGeminiOnce(prompt, refFiles, imageModel) }.getOrNull()?.let {
                 attempt = it.copy(second = it.second + " · QA retry")
             }
         }
@@ -230,7 +272,7 @@ object AiImageGeneratorUtil {
     /** Один заход в Gemini: картинка (байты) + дебаг-строка. */
     private suspend fun generateViaGeminiOnce(
         prompt: String,
-        refFile: File?,
+        refFiles: List<File>,
         imageModel: String,
     ): Pair<ByteArray, String> {
         val requestBody = buildJsonObject {
@@ -239,7 +281,7 @@ object AiImageGeneratorUtil {
                     put("role", "user")
                     putJsonArray("parts") {
                         addJsonObject { put("text", prompt) }
-                        if (refFile != null) {
+                        refFiles.forEach { refFile ->
                             addJsonObject {
                                 putJsonObject("inlineData") {
                                     put("mimeType", "image/jpeg")
@@ -378,11 +420,11 @@ object AiImageGeneratorUtil {
     }
 
     /**
-     * Grok Imagine (xAI): без референса — /images/generations, с референсом
-     * (аватарка или прошлая сцена) — /images/edits с data-URL картинкой.
+     * Grok Imagine (xAI): без референса — /images/generations, с референсами
+     * (прошлая сцена/персонаж + пользователь) — multi-image /images/edits.
      */
-    private suspend fun generateViaXai(prompt: String, refFile: File?): ImageGenResult {
-        val endpoint = if (refFile != null) {
+    private suspend fun generateViaXai(prompt: String, refFiles: List<File>): ImageGenResult {
+        val endpoint = if (refFiles.isNotEmpty()) {
             "https://api.x.ai/v1/images/edits"
         } else {
             "https://api.x.ai/v1/images/generations"
@@ -392,10 +434,19 @@ object AiImageGeneratorUtil {
             put("prompt", prompt)
             put("response_format", "b64_json")
             put("aspect_ratio", GENERATED_IMAGE_ASPECT_RATIO)
-            if (refFile != null) {
+            if (refFiles.size == 1) {
                 putJsonObject("image") {
-                    put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFile.readBytes()))
+                    put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFiles.first().readBytes()))
                     put("type", "image_url")
+                }
+            } else if (refFiles.isNotEmpty()) {
+                putJsonArray("images") {
+                    refFiles.take(3).forEach { refFile ->
+                        addJsonObject {
+                            put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFile.readBytes()))
+                            put("type", "image_url")
+                        }
+                    }
                 }
             }
         }
@@ -441,30 +492,32 @@ object AiImageGeneratorUtil {
         get() = System.getenv("FAL_API_KEY") ?: throw Exception("Missing FAL_API_KEY key")
 
     /**
-     * Синхронный вызов fal.run. Референс (аватар) уходит как data-URI в image_urls
-     * edit-эндпоинта; без референса — text-to-image. Safety checker выключен:
+     * Синхронный вызов fal.run. Референсы уходят как data-URI в image_urls
+     * edit-эндпоинта; без референсов — text-to-image. Safety checker выключен:
      * цензуру нам честнее показывает сама модель.
      */
     private suspend fun generateViaFal(
         model: String,
         prompt: String,
-        refFile: File?,
+        refFiles: List<File>,
         imageSize: String = FAL_PORTRAIT_IMAGE_SIZE,
     ): ImageGenResult {
         val isFlux = model.startsWith("flux")
         val falModelId = when {
-            isFlux && refFile != null -> "fal-ai/flux-2-pro/edit"
+            isFlux && refFiles.isNotEmpty() -> "fal-ai/flux-2-pro/edit"
             isFlux -> "fal-ai/flux-2-pro"
-            refFile != null -> "fal-ai/bytedance/seedream/v4.5/edit"
+            refFiles.isNotEmpty() -> "fal-ai/bytedance/seedream/v4.5/edit"
             else -> "fal-ai/bytedance/seedream/v4.5/text-to-image"
         }
         val requestBody = buildJsonObject {
             put("prompt", prompt)
             put("image_size", imageSize)
-            if (refFile != null) {
+            if (refFiles.isNotEmpty()) {
                 putJsonArray("image_urls") {
-                    add(JsonPrimitive("data:image/jpeg;base64," +
-                        Base64.getEncoder().encodeToString(refFile.readBytes())))
+                    refFiles.take(10).forEach { refFile ->
+                        add(JsonPrimitive("data:image/jpeg;base64," +
+                            Base64.getEncoder().encodeToString(refFile.readBytes())))
+                    }
                 }
             }
             put("enable_safety_checker", false)

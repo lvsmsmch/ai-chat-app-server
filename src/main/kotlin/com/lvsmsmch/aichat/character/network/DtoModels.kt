@@ -114,6 +114,9 @@ data class AvatarGenerationLimitsDto(
 
 @Serializable
 data class GenerateAvatarResponse(
+    @SerialName("requestId") val requestId: String? = null,
+    /** pending | completed | failed | limited */
+    @SerialName("generationStatus") val generationStatus: String,
     @SerialName("imageUrl") val imageUrl: String? = null,
     @SerialName("limits") val limits: AvatarGenerationLimitsDto,
     /** null | hourly | daily */
