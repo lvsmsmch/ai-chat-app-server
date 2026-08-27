@@ -100,11 +100,9 @@ fun Application.module() {
     // операция, повторные старты ничего не меняют — она идемпотентна
     val charactersRepo by inject<com.lvsmsmch.aichat.character.database.CharacterRepository>()
     launch {
-        // Набор обложек вырос — раскидываем персонажей по всему списку,
-        // потом доставляем дефолтные тем, у кого обложки нет вовсе
-        runCatching { charactersRepo.redistributeCovers() }
-            .onSuccess { if (it > 0) logger.info("Chat covers redistributed: $it characters") }
-            .onFailure { logger.warn("Cover redistribute failed: ${it.message}") }
+        // Раскидки по хэшу здесь БОЛЬШЕ НЕТ: обложки подобраны персонажам по
+        // смыслу, и перетасовка на старте затёрла бы этот подбор. Осталось
+        // только доставить дефолтную тем, у кого обложки нет вовсе
         runCatching { charactersRepo.backfillCovers() }
             .onSuccess { if (it > 0) logger.info("Chat covers assigned: $it characters") }
             .onFailure { logger.warn("Cover backfill failed: ${it.message}") }
