@@ -317,13 +317,26 @@ class CharacterRepository {
     }
 
     /**
-     * Разовый перевод обложек со смысловых кодов на номера. Идемпотентна:
-     * ищет только те значения, которых в новом наборе быть не может.
+     * Раскидывает персонажей по ВСЕМУ набору обложек. Набор вырос с 15 до 45,
+     * и без этого все, кто был заведён раньше, остались бы на первых
+     * пятнадцати. Трогает только дефолтные номерные обложки: свои картинки
+     * (ссылки) и пустые значения остаются как есть.
+     *
+     * Считается тем же хэшем от id, что и defaultFor, поэтому повторный запуск
+     * ничего не меняет.
      */
-    suspend fun migrateLegacyCovers(): Int = dbQuery {
+    suspend fun redistributeCovers(): Int = dbQuery {
+        val rows = table.select(table.id, table.cover)
+            .where { table.cover.isNotNull() }
+            .map { it[table.id] to it[table.cover] }
         var changed = 0
-        com.lvsmsmch.aichat.character.ChatCovers.legacyIds.forEach { (old, id) ->
-            changed += table.update({ table.cover eq old }) { it[table.cover] = id }
+        rows.forEach { (id, cover) ->
+            if (cover == null || cover.toIntOrNull() == null) return@forEach
+            val want = com.lvsmsmch.aichat.character.ChatCovers.defaultFor(id)
+            if (want != cover) {
+                table.update({ table.id eq id }) { it[table.cover] = want }
+                changed++
+            }
         }
         changed
     }

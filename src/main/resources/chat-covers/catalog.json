@@ -1,0 +1,410 @@
+{
+ "version": 2,
+ "items": [
+  {
+   "id": "1",
+   "title": "Classroom morning",
+   "style": "anime",
+   "time": "morning",
+   "setting": "school",
+   "description": "Empty anime classroom at sunrise, desks and blackboard. Fits students, classmates, teachers, slice-of-life.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime school classroom early in the morning, low sun through tall windows, rows of empty desks, chalkboard at the far end, dust in the light, morning light."
+  },
+  {
+   "id": "2",
+   "title": "School rooftop",
+   "style": "anime",
+   "time": "day",
+   "setting": "school",
+   "description": "School rooftop under a bright midday sky. Fits students, confessions, friends, slice-of-life.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime school rooftop at midday, bright blue sky with big soft clouds, chain-link fence, water tower, city rooftops far below, day light."
+  },
+  {
+   "id": "3",
+   "title": "School corridor",
+   "style": "anime",
+   "time": "day",
+   "setting": "school",
+   "description": "Sunlit school corridor with lockers. Fits students, classmates, school romance.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: a long anime school corridor in the afternoon, sunlight striping the floor through the windows, lockers and noticeboards along the wall, day light."
+  },
+  {
+   "id": "4",
+   "title": "Shrine steps",
+   "style": "anime",
+   "time": "morning",
+   "setting": "shrine",
+   "description": "Stone shrine steps under sakura in morning light. Fits shrine maidens, spirits, traditional and gentle characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: wide stone steps of a japanese shrine in the morning, torii gate above, blooming sakura on both sides, soft mist between the trees, morning light."
+  },
+  {
+   "id": "5",
+   "title": "Summer festival",
+   "style": "anime",
+   "time": "night",
+   "setting": "festival",
+   "description": "Festival lane with paper lanterns at night. Fits summer dates, cheerful and playful characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime summer festival lane at night, rows of glowing paper lanterns, food stalls with awnings, warm crowd light without any people, night light."
+  },
+  {
+   "id": "6",
+   "title": "Night store",
+   "style": "anime",
+   "time": "night",
+   "setting": "store",
+   "description": "Convenience store aisle at night. Fits late-night talks, casual modern characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: the inside of a japanese convenience store late at night, cold fluorescent light, neat shelves and a magazine rack, dark street beyond the glass, night light."
+  },
+  {
+   "id": "7",
+   "title": "Evening train",
+   "style": "anime",
+   "time": "evening",
+   "setting": "transit",
+   "description": "Empty commuter train at dusk. Fits quiet talks, commuters, introverts.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: the inside of an empty anime commuter train at dusk, warm interior lights, hanging handles, the sunset city sliding past the windows, evening light."
+  },
+  {
+   "id": "8",
+   "title": "Poster room",
+   "style": "anime",
+   "time": "day",
+   "setting": "room",
+   "description": "Youth room with posters, shelves and a desk. Fits gamers, otaku, teenage characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: a lived-in anime teenager room in the afternoon, walls covered with posters, shelves of figures and books, a desk with a monitor to one side, daylight from the window, day light."
+  },
+  {
+   "id": "9",
+   "title": "Kotatsu evening",
+   "style": "anime",
+   "time": "evening",
+   "setting": "room",
+   "description": "Warm living room with a kotatsu in winter. Fits cosy evenings, family, homely characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime living room on a winter evening, a kotatsu table with a blanket in the middle distance, tv glow, snow falling outside the balcony door, evening light."
+  },
+  {
+   "id": "10",
+   "title": "Anime cafe",
+   "style": "anime",
+   "time": "day",
+   "setting": "cafe",
+   "description": "Cafe interior on a rainy afternoon. Fits dates, friendly chats, baristas.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: the inside of a cosy anime cafe on a rainy afternoon, wooden counter, plants on the sills, rain streaking the big window, warm lamps, day light."
+  },
+  {
+   "id": "11",
+   "title": "Riverside sunset",
+   "style": "anime",
+   "time": "evening",
+   "setting": "nature",
+   "description": "Riverside path with cherry trees at sunset. Fits romance, walks home, wistful characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime riverside path at sunset, cherry trees along the embankment, orange sky reflected in the water, a low railing in the foreground, evening light."
+  },
+  {
+   "id": "12",
+   "title": "Summer boardwalk",
+   "style": "anime",
+   "time": "day",
+   "setting": "beach",
+   "description": "Seaside boardwalk at noon in summer. Fits holidays, energetic and cheerful characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime seaside boardwalk at bright summer noon, wooden railing, palm shadows on the planks, blue sea and a few sailboats beyond, day light."
+  },
+  {
+   "id": "13",
+   "title": "Library aisle",
+   "style": "anime",
+   "time": "day",
+   "setting": "library",
+   "description": "Sunlit library aisle. Fits studious, quiet, bookish characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an aisle between tall library shelves in an anime school, warm afternoon light from a window at the end, books and a rolling ladder, day light."
+  },
+  {
+   "id": "14",
+   "title": "Rooftop night",
+   "style": "anime",
+   "time": "night",
+   "setting": "rooftop",
+   "description": "Rooftop garden above a glowing city at night. Fits confessions, night talks, dreamers.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime rooftop garden at night, potted plants and a low bench, string lights overhead, a glowing city skyline below and stars above, night light."
+  },
+  {
+   "id": "15",
+   "title": "Onsen morning",
+   "style": "anime",
+   "time": "morning",
+   "setting": "onsen",
+   "description": "Steaming hot-spring courtyard at dawn. Fits relaxed, traditional, sensual characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: a japanese hot spring courtyard at early morning, steam rising from the water, stone lanterns and maples, pale gold dawn sky, morning light."
+  },
+  {
+   "id": "16",
+   "title": "Music room",
+   "style": "anime",
+   "time": "evening",
+   "setting": "music",
+   "description": "School music room in golden hour. Fits musicians, artists, gentle characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: an anime school music room in golden hour, a grand piano to one side, music stands, long warm light across the floor, evening light."
+  },
+  {
+   "id": "17",
+   "title": "Arcade night",
+   "style": "anime",
+   "time": "night",
+   "setting": "arcade",
+   "description": "Neon arcade interior at night. Fits gamers, playful and loud characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: the inside of a japanese arcade at night, rows of cabinets glowing pink and blue, prize machines, reflective floor, night light."
+  },
+  {
+   "id": "18",
+   "title": "Snowy vending street",
+   "style": "anime",
+   "time": "night",
+   "setting": "street",
+   "description": "Quiet snowy street with vending machines. Fits winter meetings, calm characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Anime background art, painterly cel shading, clean linework. Scene: a quiet anime residential street at night in winter, snow falling, a pair of glowing vending machines, warm windows down the road, night light."
+  },
+  {
+   "id": "19",
+   "title": "New York morning",
+   "style": "real",
+   "time": "morning",
+   "setting": "city",
+   "description": "Manhattan street from the sidewalk in the morning. Fits city dwellers, business, modern characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a new york street seen from the sidewalk in the early morning, tall buildings receding, low sun between them, steam from a grate, yellow cabs blurred in the distance, morning light."
+  },
+  {
+   "id": "20",
+   "title": "Skyline terrace",
+   "style": "real",
+   "time": "evening",
+   "setting": "city",
+   "description": "Rooftop bar over a city skyline at dusk. Fits dates, confident and glamorous characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a rooftop terrace above a big city at dusk, low glass railing, small lit tables, the skyline glowing pink and blue beyond, evening light."
+  },
+  {
+   "id": "21",
+   "title": "Fireplace room",
+   "style": "real",
+   "time": "night",
+   "setting": "room",
+   "description": "Cosy living room with a lit fireplace at night. Fits warm, intimate, homely conversations.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a cosy living room at night, a real fireplace burning to one side, armchairs and a low table, bookshelves in shadow, warm light on the walls, night light."
+  },
+  {
+   "id": "22",
+   "title": "Morning kitchen",
+   "style": "real",
+   "time": "morning",
+   "setting": "kitchen",
+   "description": "Bright modern kitchen in morning light. Fits domestic, friendly, everyday scenes.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a bright modern kitchen in the morning, sunlight across a counter with a coffee pot and fruit, open shelves, a window over the sink, morning light."
+  },
+  {
+   "id": "23",
+   "title": "Guitar room",
+   "style": "real",
+   "time": "day",
+   "setting": "room",
+   "description": "Youth room with posters, guitar and record player. Fits musicians, students, creative characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a lived-in young person's room in the afternoon, posters and photos on the wall, an electric guitar on a stand, a record player and shelves, daylight from the window, day light."
+  },
+  {
+   "id": "24",
+   "title": "Bookshop",
+   "style": "real",
+   "time": "day",
+   "setting": "bookshop",
+   "description": "Old bookshop interior on a rainy day. Fits bookish, thoughtful, mysterious characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: the inside of an old bookshop on a rainy day, tall wooden shelves, a reading table with a green lamp, rain on the shopfront window, day light."
+  },
+  {
+   "id": "25",
+   "title": "Paris terrace",
+   "style": "real",
+   "time": "morning",
+   "setting": "cafe",
+   "description": "Parisian cafe terrace in the morning. Fits romance, travel, elegant characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a parisian cafe terrace in the morning, small round tables and rattan chairs, striped awning, a quiet haussmann street beyond, morning light."
+  },
+  {
+   "id": "26",
+   "title": "Station platform",
+   "style": "real",
+   "time": "morning",
+   "setting": "transit",
+   "description": "Train station platform at first light. Fits partings, journeys, reserved characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a railway station platform at first light, long canopy, empty benches, cold blue air with a warm sunrise at the end of the tracks, morning light."
+  },
+  {
+   "id": "27",
+   "title": "Loft studio",
+   "style": "real",
+   "time": "day",
+   "setting": "work",
+   "description": "Bright loft workspace at midday. Fits colleagues, creative work, ambitious characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a bright loft workspace at midday, huge industrial windows, a long desk with a lamp and papers, plants and brick walls, day light."
+  },
+  {
+   "id": "28",
+   "title": "String lights",
+   "style": "real",
+   "time": "evening",
+   "setting": "rooftop",
+   "description": "Backyard terrace under string lights at dusk. Fits friends, relaxed evenings, warm characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a small backyard terrace at dusk, string lights overhead, a wooden table and two chairs, plants along the fence, the sky still violet, evening light."
+  },
+  {
+   "id": "29",
+   "title": "Lecture hall",
+   "style": "real",
+   "time": "day",
+   "setting": "university",
+   "description": "Empty university lecture hall in daylight. Fits teachers, students, intellectual characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: an empty university lecture hall in daylight, tiered wooden seats, a long blackboard, tall windows on one side, day light."
+  },
+  {
+   "id": "30",
+   "title": "Promenade noon",
+   "style": "real",
+   "time": "day",
+   "setting": "sea",
+   "description": "Seaside promenade under bright noon sun. Fits holidays, open and easy characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a seaside promenade at bright noon, stone balustrade along the water, palm trees, deep blue sea and a clear horizon, day light."
+  },
+  {
+   "id": "31",
+   "title": "Cabin sunrise",
+   "style": "real",
+   "time": "morning",
+   "setting": "nature",
+   "description": "Mountain cabin porch at sunrise. Fits calm, rugged, solitary characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: the porch of a mountain cabin at sunrise, wooden railing and a bench, mist in the valley below, pink light on distant peaks, morning light."
+  },
+  {
+   "id": "32",
+   "title": "Autumn park",
+   "style": "real",
+   "time": "day",
+   "setting": "park",
+   "description": "Park path with benches in autumn. Fits walks, gentle talks, nostalgic characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a park path in autumn afternoon, benches under yellow and red trees, fallen leaves on the ground, low warm sun through the branches, day light."
+  },
+  {
+   "id": "33",
+   "title": "Rain and taxis",
+   "style": "real",
+   "time": "night",
+   "setting": "city",
+   "description": "Rainy city street at night with reflections. Fits noir, detectives, brooding characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Photographic, natural light, shallow depth of field, subtle film grain. Scene: a rainy city street at night, wet asphalt reflecting red and white lights, taxis and shopfronts, umbrellas of a distant crowd, night light."
+  },
+  {
+   "id": "34",
+   "title": "Neon alley",
+   "style": "cyber",
+   "time": "night",
+   "setting": "street",
+   "description": "Rain-slick neon alley at night. Fits hackers, rebels, cyberpunk characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a rain-slick cyberpunk back alley at night, towering holographic signage in magenta and cyan, steam from vents, puddles mirroring the neon, night light."
+  },
+  {
+   "id": "35",
+   "title": "Megacity balcony",
+   "style": "cyber",
+   "time": "night",
+   "setting": "city",
+   "description": "High balcony over a cyberpunk megacity at night. Fits corporate, powerful, futuristic characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a high balcony over an endless cyberpunk megacity at night, layered towers in haze, light trails of flying traffic, distant searchlights, night light."
+  },
+  {
+   "id": "36",
+   "title": "Neon market",
+   "style": "cyber",
+   "time": "day",
+   "setting": "market",
+   "description": "Covered future market street by day. Fits traders, streetwise, playful sci-fi characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a covered futuristic market street in daylight, holographic price panels without text, hanging cables and awnings, crowds of light and colour, day light."
+  },
+  {
+   "id": "37",
+   "title": "Orbital lounge",
+   "style": "cyber",
+   "time": "day",
+   "setting": "station",
+   "description": "Space station lounge with a planet outside. Fits sci-fi, explorers, cold and clever characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a space station lounge in daylight, curved white interior, a huge round window with a blue planet below, low seating and soft instrument glow, day light."
+  },
+  {
+   "id": "38",
+   "title": "Observation deck",
+   "style": "cyber",
+   "time": "night",
+   "setting": "ship",
+   "description": "Starship observation deck facing a nebula. Fits captains, androids, distant characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a starship observation deck at night, a huge curved window facing a colourful nebula and a ringed planet, dark interior with instrument light, night light."
+  },
+  {
+   "id": "39",
+   "title": "Maglev platform",
+   "style": "cyber",
+   "time": "evening",
+   "setting": "transit",
+   "description": "Futuristic transit platform at dusk. Fits couriers, travellers, near-future characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Cyberpunk concept art, neon and haze, cinematic. Scene: a futuristic maglev platform at dusk, clean concrete and glass, cyan guide lights along the edge, a city of towers glowing beyond, evening light."
+  },
+  {
+   "id": "40",
+   "title": "Enchanted forest",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "forest",
+   "description": "Sunlit ancient forest with glowing spores. Fits elves, druids, magical creatures.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: an ancient enchanted forest at midday, mossy giant trees, shafts of green light through the canopy, glowing spores and luminous mushrooms, day light."
+  },
+  {
+   "id": "41",
+   "title": "Great library",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "library",
+   "description": "Vast magical library in daylight. Fits mages, scholars, wise characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: a vast arcane library in daylight, tall arched windows, galleries of books, floating candles and dust in the sunbeams, day light."
+  },
+  {
+   "id": "42",
+   "title": "Tavern",
+   "style": "fantasy",
+   "time": "evening",
+   "setting": "tavern",
+   "description": "Warm fantasy tavern in the evening. Fits adventurers, rogues, friendly banter.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: the inside of a fantasy tavern in the evening, a big fireplace, heavy wooden tables and benches, hanging lanterns, mugs and maps, evening light."
+  },
+  {
+   "id": "43",
+   "title": "Wizard study",
+   "style": "fantasy",
+   "time": "night",
+   "setting": "study",
+   "description": "Cluttered wizard study at night. Fits wizards, alchemists, mysterious mentors.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: a cluttered wizard study at night, potion shelves and scrolls, an orrery, candlelight and faint blue magic glow, a round window with stars, night light."
+  },
+  {
+   "id": "44",
+   "title": "Castle garden",
+   "style": "fantasy",
+   "time": "morning",
+   "setting": "castle",
+   "description": "Castle courtyard garden at sunrise. Fits royalty, knights, noble characters.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: a castle courtyard garden at sunrise, stone arcades and climbing roses, a fountain in the middle distance, pale gold light on the walls, morning light."
+  },
+  {
+   "id": "45",
+   "title": "Market square",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "village",
+   "description": "Medieval market square at midday. Fits merchants, villagers, everyday fantasy life.",
+   "prompt": "Vertical background art, twice as tall as it is wide and a bit more. Eye-level first-person view from inside the place, standing where a conversation would happen. Empty of people, no text anywhere. Open uncluttered middle of the frame, with detail towards the top and bottom edges. Cinematic natural light, deep colour, the scene filling the whole frame. Painterly fantasy illustration, warm detailed rendering. Scene: a medieval market square at midday, timbered houses, striped awnings over empty stalls, cobblestones and a well, bright clear sky, day light."
+  }
+ ]
+}

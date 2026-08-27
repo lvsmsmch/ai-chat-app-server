@@ -1,43 +1,55 @@
 package com.lvsmsmch.aichat.character
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
 /**
- * Идентификаторы встроенных обложек чата. Список ОБЯЗАН совпадать с
- * WebP-файлами в `src/main/resources/chat-covers`: сервер раздаёт клиенту и
- * идентификатор, и сам файл по `/chat-covers/<id>.webp`. Неизвестный
- * идентификатор клиент покажет градиентом, так что рассинхрон не ломает экран,
- * но и смысла в нём нет.
+ * Встроенные обложки чата. Идентификаторы номерные: смысловые коды привязывали
+ * файл к сюжету, и после перерисовки начинали врать, а обойти клиентский кэш
+ * можно было только версией в URL. Новый набор просто получает следующие
+ * номера.
  *
- * Идентификаторы НОМЕРНЫЕ, а не смысловые («room», «school»). Смысловые
- * привязывали картинку к сюжету: перерисовали спальню в что-то другое — и код
- * начинал врать, а обойти клиентский кэш можно было только версией в URL.
- * С номерами новый набор просто получает следующие номера, старые файлы
- * остаются на своих местах, и ни версию, ни базу трогать не нужно.
+ * Список берётся из `chat-covers/catalog.json` — того же файла, что раздаётся
+ * клиенту рядом с картинками. Один источник правды: если картинка появилась,
+ * а в каталоге её нет (или наоборот), это видно сразу.
  */
 object ChatCovers {
 
-    val builtIn: List<String> = (1..15).map { it.toString() }
-
     /**
-     * Как назывались обложки до перехода на номера. Нужно ровно для разовой
-     * миграции значений в базе — новые записи такие коды уже не создают.
+     * Что изображено на обложке. [description] и [setting] нужны, чтобы
+     * подбирать персонажу подходящий фон, а не случайный номер.
      */
-    val legacyIds: Map<String, String> = mapOf(
-        "room" to "1",
-        "school" to "2",
-        "street" to "3",
-        "night_city" to "4",
-        "neon_bar" to "5",
-        "party" to "6",
-        "fantasy" to "7",
-        "space" to "8",
-        "sunset" to "9",
-        "ocean" to "10",
-        "forest" to "11",
-        "snow" to "12",
-        "cyber" to "13",
-        "sakura" to "14",
-        "desert" to "15",
+    @Serializable
+    data class Cover(
+        val id: String,
+        val title: String,
+        /** anime | real | cyber | fantasy */
+        val style: String,
+        /** morning | day | evening | night */
+        val time: String,
+        /** school, room, city, forest… — место действия одним словом. */
+        val setting: String,
+        val description: String,
     )
+
+    @Serializable
+    private data class Catalog(val version: Int = 1, val items: List<Cover> = emptyList())
+
+    val catalog: List<Cover> by lazy {
+        val json = javaClass.classLoader
+            ?.getResourceAsStream("chat-covers/catalog.json")
+            ?.bufferedReader()
+            ?.use { it.readText() }
+            ?: return@lazy emptyList()
+        Json { ignoreUnknownKeys = true }.decodeFromString<Catalog>(json).items
+    }
+
+    val builtIn: List<String> by lazy { catalog.map { it.id } }
+
+    fun byId(id: String?): Cover? = catalog.firstOrNull { it.id == id }
+
+    /** Обложки, подходящие по стилю: основа будущего подбора под персонажа. */
+    fun byStyle(style: String): List<Cover> = catalog.filter { it.style == style }
 
     /**
      * Обложка по умолчанию — стабильно выведена из id персонажа, а не выбрана
@@ -45,7 +57,9 @@ object ChatCovers {
      * и при этом по каталогу они раскиданы равномерно.
      */
     fun defaultFor(characterId: String): String {
+        val ids = builtIn
+        if (ids.isEmpty()) return ""
         val hash = characterId.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7fffffff }
-        return builtIn[hash % builtIn.size]
+        return ids[hash % ids.size]
     }
 }

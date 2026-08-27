@@ -241,15 +241,6 @@ class ChatRepository {
     }
 
     /** Все чаты юзера (для каскада удаления аккаунта). */
-    /** Тот же разовый перевод обложек на номера, что и у персонажей. */
-    suspend fun migrateLegacyCovers(): Int = dbQuery {
-        var changed = 0
-        com.lvsmsmch.aichat.character.ChatCovers.legacyIds.forEach { (old, id) ->
-            changed += table.update({ table.cover eq old }) { it[table.cover] = id }
-        }
-        changed
-    }
-
     suspend fun getChatIdsByUserId(session: DbSession, userId: String): List<String> = dbQuery {
         table.selectAll().where { table.userId eq userId }.map { it[table.id] }
     }
