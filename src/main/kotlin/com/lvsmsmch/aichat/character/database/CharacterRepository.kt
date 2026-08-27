@@ -316,6 +316,18 @@ class CharacterRepository {
         ids.size
     }
 
+    /**
+     * Разовый перевод обложек со смысловых кодов на номера. Идемпотентна:
+     * ищет только те значения, которых в новом наборе быть не может.
+     */
+    suspend fun migrateLegacyCovers(): Int = dbQuery {
+        var changed = 0
+        com.lvsmsmch.aichat.character.ChatCovers.legacyIds.forEach { (old, id) ->
+            changed += table.update({ table.cover eq old }) { it[table.cover] = id }
+        }
+        changed
+    }
+
     suspend fun updateAvgRating(session: DbSession, characterId: String, newRating: Float) {
         updateById(characterId) { it[table.averageRating] = newRating }
     }

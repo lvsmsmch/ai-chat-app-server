@@ -99,7 +99,13 @@ fun Application.module() {
     // Обложки чатов: персонажам без обложки проставляем дефолтную. Разовая
     // операция, повторные старты ничего не меняют — она идемпотентна
     val charactersRepo by inject<com.lvsmsmch.aichat.character.database.CharacterRepository>()
+    val chatsRepoForCovers by inject<com.lvsmsmch.aichat.chat.database.ChatRepository>()
     launch {
+        // Сначала переводим старые смысловые коды обложек на номера, потом
+        // доставляем дефолтные тем, у кого обложки нет вовсе
+        runCatching { charactersRepo.migrateLegacyCovers() + chatsRepoForCovers.migrateLegacyCovers() }
+            .onSuccess { if (it > 0) logger.info("Chat covers renumbered: $it rows") }
+            .onFailure { logger.warn("Cover renumber failed: ${it.message}") }
         runCatching { charactersRepo.backfillCovers() }
             .onSuccess { if (it > 0) logger.info("Chat covers assigned: $it characters") }
             .onFailure { logger.warn("Cover backfill failed: ${it.message}") }
