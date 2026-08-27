@@ -396,6 +396,231 @@
    "setting": "village",
    "description": "Medieval market square at midday. Fits merchants, villagers, everyday fantasy life.",
    "prompt": "Vertical background art. A corner of the place seen from where a person would sit or stand, the view turned slightly to one side: asymmetric, natural, off-centre composition, no symmetry and no corridor vanishing point in the middle of the frame. Empty of people. Something close on one side of the frame, the rest of the scene falling away into soft depth; nothing large blocking the bottom of the frame. Cinematic natural light, deep colour, no text. Painterly fantasy illustration, warm detailed rendering. Scene: a medieval market square at midday, timbered houses, striped awnings over empty stalls, cobblestones and a well, bright clear sky, day light."
+  },
+  {
+   "id": "46",
+   "title": "Train at dusk",
+   "style": "anime",
+   "time": "evening",
+   "setting": "transit",
+   "description": "Empty commuter train at dusk. Fits quiet talks, commuters, introverts.",
+   "prompt": "(перенесено из более раннего набора: 07_evening-train.webp)"
+  },
+  {
+   "id": "47",
+   "title": "Otaku room",
+   "style": "anime",
+   "time": "day",
+   "setting": "room",
+   "description": "Youth room with posters, shelves and a desk. Fits gamers, otaku, teenage characters.",
+   "prompt": "(перенесено из более раннего набора: 08_poster-room.webp)"
+  },
+  {
+   "id": "48",
+   "title": "Riverside walk",
+   "style": "anime",
+   "time": "evening",
+   "setting": "nature",
+   "description": "Riverside path with cherry trees at sunset. Fits romance, walks home, wistful characters.",
+   "prompt": "(перенесено из более раннего набора: 11_riverside-sunset.webp)"
+  },
+  {
+   "id": "49",
+   "title": "City rooftop",
+   "style": "anime",
+   "time": "night",
+   "setting": "rooftop",
+   "description": "Rooftop garden above a glowing city at night. Fits confessions, night talks, dreamers.",
+   "prompt": "(перенесено из более раннего набора: 14_rooftop-night.webp)"
+  },
+  {
+   "id": "50",
+   "title": "Piano room",
+   "style": "anime",
+   "time": "evening",
+   "setting": "music",
+   "description": "School music room in golden hour. Fits musicians, artists, gentle characters.",
+   "prompt": "(перенесено из более раннего набора: 16_music-room.webp)"
+  },
+  {
+   "id": "51",
+   "title": "Rooftop bar",
+   "style": "real",
+   "time": "evening",
+   "setting": "city",
+   "description": "Rooftop bar over a city skyline at dusk. Fits dates, confident and glamorous characters.",
+   "prompt": "(перенесено из более раннего набора: 20_skyline-terrace.webp)"
+  },
+  {
+   "id": "52",
+   "title": "Old bookshop",
+   "style": "real",
+   "time": "day",
+   "setting": "bookshop",
+   "description": "Old bookshop interior on a rainy day. Fits bookish, thoughtful, mysterious characters.",
+   "prompt": "(перенесено из более раннего набора: 24_bookshop.webp)"
+  },
+  {
+   "id": "53",
+   "title": "Cafe terrace",
+   "style": "real",
+   "time": "morning",
+   "setting": "cafe",
+   "description": "Parisian cafe terrace in the morning. Fits romance, travel, elegant characters.",
+   "prompt": "(перенесено из более раннего набора: 25_paris-terrace.webp)"
+  },
+  {
+   "id": "54",
+   "title": "Studio loft",
+   "style": "real",
+   "time": "day",
+   "setting": "work",
+   "description": "Bright loft workspace at midday. Fits colleagues, creative work, ambitious characters.",
+   "prompt": "(перенесено из более раннего набора: 27_loft-studio.webp)"
+  },
+  {
+   "id": "55",
+   "title": "Lantern terrace",
+   "style": "real",
+   "time": "evening",
+   "setting": "rooftop",
+   "description": "Backyard terrace under string lights at dusk. Fits friends, relaxed evenings, warm characters.",
+   "prompt": "(перенесено из более раннего набора: 28_string-lights.webp)"
+  },
+  {
+   "id": "56",
+   "title": "Seaside walk",
+   "style": "real",
+   "time": "day",
+   "setting": "sea",
+   "description": "Seaside promenade under bright noon sun. Fits holidays, open and easy characters.",
+   "prompt": "(перенесено из более раннего набора: 30_promenade-noon.webp)"
+  },
+  {
+   "id": "57",
+   "title": "Mountain porch",
+   "style": "real",
+   "time": "morning",
+   "setting": "nature",
+   "description": "Mountain cabin porch at sunrise. Fits calm, rugged, solitary characters.",
+   "prompt": "(перенесено из более раннего набора: 31_cabin-sunrise.webp)"
+  },
+  {
+   "id": "58",
+   "title": "Neon street",
+   "style": "cyber",
+   "time": "night",
+   "setting": "street",
+   "description": "Rain-slick neon alley at night. Fits hackers, rebels, cyberpunk characters.",
+   "prompt": "(перенесено из более раннего набора: 34_neon-alley.webp)"
+  },
+  {
+   "id": "59",
+   "title": "City of towers",
+   "style": "cyber",
+   "time": "night",
+   "setting": "city",
+   "description": "High balcony over a cyberpunk megacity at night. Fits corporate, powerful, futuristic characters.",
+   "prompt": "(перенесено из более раннего набора: 35_megacity-balcony.webp)"
+  },
+  {
+   "id": "60",
+   "title": "Glowing forest",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "forest",
+   "description": "Sunlit ancient forest with glowing spores. Fits elves, druids, magical creatures.",
+   "prompt": "(перенесено из более раннего набора: 40_enchanted-forest.webp)"
+  },
+  {
+   "id": "61",
+   "title": "Castle courtyard",
+   "style": "fantasy",
+   "time": "morning",
+   "setting": "castle",
+   "description": "Castle courtyard garden at sunrise. Fits royalty, knights, noble characters.",
+   "prompt": "(перенесено из более раннего набора: 44_castle-garden.webp)"
+  },
+  {
+   "id": "62",
+   "title": "Rainy neon alley",
+   "style": "cyber",
+   "time": "night",
+   "setting": "street",
+   "description": "Rain-slick neon alley at night. Fits hackers, rebels, cyberpunk characters.",
+   "prompt": "(перенесено из более раннего набора: 46_neon-alley.webp)"
+  },
+  {
+   "id": "63",
+   "title": "Skyline haze",
+   "style": "cyber",
+   "time": "night",
+   "setting": "city",
+   "description": "Cyberpunk skyline in haze. Fits corporate, powerful, futuristic characters.",
+   "prompt": "(перенесено из более раннего набора: 47_megacity.webp)"
+  },
+  {
+   "id": "64",
+   "title": "Metro",
+   "style": "cyber",
+   "time": "night",
+   "setting": "transit",
+   "description": "Neon-lit metro platform. Fits commuters, streetwise, near-future characters.",
+   "prompt": "(перенесено из более раннего набора: 48_metro.webp)"
+  },
+  {
+   "id": "65",
+   "title": "School rooftop dusk",
+   "style": "anime",
+   "time": "evening",
+   "setting": "school",
+   "description": "School rooftop at golden hour. Fits students, confessions, slice-of-life.",
+   "prompt": "(перенесено из более раннего набора: 49_rooftop.webp)"
+  },
+  {
+   "id": "66",
+   "title": "Blossom path",
+   "style": "anime",
+   "time": "day",
+   "setting": "nature",
+   "description": "Path under blooming sakura. Fits romance, gentle and traditional characters.",
+   "prompt": "(перенесено из более раннего набора: 51_blossom-path.webp)"
+  },
+  {
+   "id": "67",
+   "title": "Deep forest",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "forest",
+   "description": "Deep forest with glowing mushrooms. Fits druids, spirits, magical creatures.",
+   "prompt": "(перенесено из более раннего набора: 52_enchanted-forest.webp)"
+  },
+  {
+   "id": "68",
+   "title": "Sky islands",
+   "style": "fantasy",
+   "time": "morning",
+   "setting": "sky",
+   "description": "Floating islands above the clouds. Fits mages, dreamers, epic fantasy.",
+   "prompt": "(перенесено из более раннего набора: 53_sky-islands.webp)"
+  },
+  {
+   "id": "69",
+   "title": "Old library",
+   "style": "fantasy",
+   "time": "day",
+   "setting": "library",
+   "description": "Vast old library in daylight. Fits scholars, mages, wise characters.",
+   "prompt": "(перенесено из более раннего набора: 54_great-library.webp)"
+  },
+  {
+   "id": "70",
+   "title": "Ocean shore",
+   "style": "real",
+   "time": "evening",
+   "setting": "sea",
+   "description": "Quiet ocean shore at sunset. Fits calm, open, romantic characters.",
+   "prompt": "(перенесено из более раннего набора: 58_ocean.webp)"
   }
  ]
 }
