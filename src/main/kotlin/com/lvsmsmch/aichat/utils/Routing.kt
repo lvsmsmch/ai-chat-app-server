@@ -34,6 +34,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.response.*
 import io.ktor.server.http.content.staticFiles
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.*
 import org.koin.ktor.ext.inject
 
@@ -83,6 +84,22 @@ fun Application.configureRouting() {
 
         // Картинки с локального диска (см. ImageServer): /images/<uuid>.jpg
         staticFiles("/images", ImageServer.imagesDir)
+
+        // Встроенные обои чатов теперь лежат на сервере, а не внутри APK.
+        // URL на клиенте версионирован query-параметром, поэтому конкретную
+        // версию можно безопасно держать в HTTP/Coil-кэше целый год и открывать
+        // чаты без сети после первой предзагрузки.
+        staticResources("/chat-covers", "chat-covers") {
+            cacheControl {
+                listOf(
+                    CacheControl.MaxAge(
+                        maxAgeSeconds = 31_536_000,
+                        visibility = CacheControl.Visibility.Public,
+                    )
+                )
+            }
+            enableAutoHeadResponse()
+        }
 
 
         rateLimit(RateLimitName("ip-based")) {
