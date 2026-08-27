@@ -57,7 +57,10 @@ object ChatCovers {
      * и при этом по каталогу они раскиданы равномерно.
      */
     fun defaultFor(characterId: String): String {
-        val ids = builtIn
+        // По НОМЕРУ, а не по месту в каталоге: порядок в каталоге задаёт вид
+        // списка в приложении и может меняться, а раскидка от него зависеть
+        // не должна — иначе каждая перестановка тасует обложки у всех
+        val ids = builtIn.sortedBy { it.toIntOrNull() ?: 0 }
         if (ids.isEmpty()) return ""
         val hash = characterId.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7fffffff }
         return ids[hash % ids.size]
