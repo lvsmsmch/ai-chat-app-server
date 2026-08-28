@@ -55,6 +55,8 @@ class CharacterService(
         removePicture: Boolean?,
         category: String?,
         tags: String?,
+        /** Обои чата по умолчанию: код встроенной картинки. */
+        cover: String? = null,
         oldName: String,
         oldVisibility: Int
     ): CharacterDbo {
@@ -71,7 +73,8 @@ class CharacterService(
                 pictureUrlThumbnail = pictureUrlThumbnail,
                 removePicture = removePicture,
                 category = category?.let { CharacterCategory.getByCode(it) },
-                tags = tags?.let { CharacterTag.fromString(tags) }
+                tags = tags?.let { CharacterTag.fromString(tags) },
+                cover = cover,
             )
 
 

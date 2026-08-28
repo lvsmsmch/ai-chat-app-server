@@ -649,6 +649,7 @@ fun Route.configureCharacterRouting(
             var visibility: Int? = null
             var category: String? = null
             var tags: String? = null
+            var cover: String? = null
             var removePicture: Boolean? = false
             var pictureFile: File? = null
 
@@ -663,6 +664,7 @@ fun Route.configureCharacterRouting(
                             "visibility" -> visibility = part.value.toIntOrNull()
                             "category" -> category = part.value
                             "tags" -> tags = part.value
+                            "cover" -> cover = part.value
                             "removePicture" -> removePicture = part.value.toBoolean()
                         }
                     }
@@ -692,6 +694,7 @@ fun Route.configureCharacterRouting(
             visibility?.let { validateCharacterVisibility(it) }
             category?.let { validateCharacterCategory(it) }
             tags?.let { validateCharacterTags(it) }
+            cover?.let { validateChatCover(it) }
             pictureFile?.let { validateCharacterPicture(it) }
 
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
@@ -709,6 +712,7 @@ fun Route.configureCharacterRouting(
                 removePicture = removePicture,
                 category = category,
                 tags = tags,
+                cover = cover,
                 oldName = character.name,
                 oldVisibility = character.visibility,
             )
