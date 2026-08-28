@@ -74,6 +74,16 @@ fun Route.configureUserRouting(
 
             val isOwner = currentUserId == userId
 
+            // Заблокированный автор скрыт и на собственной странице. Клиент
+            // убирал его персонажей сразу после блокировки, а сервер отдавал
+            // их снова — при следующем заходе они возвращались как ни в чём
+            // не бывало
+            if (!isOwner && userBlockRepository.isBlocked(currentUserId, userId)) {
+                return@get call.respondSuccess(
+                    data = UserCharactersResponse(characters = emptyList(), nextCursor = null),
+                )
+            }
+
             val result = characterRepository.getUserCharactersWithCursor(
                 userId = userId,
                 includePrivate = isOwner,
