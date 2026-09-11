@@ -50,11 +50,12 @@ class NotificationService(
             )
             val target = userRepository.getUserById(targetUserId) ?: return@fire
             val actor = userRepository.getUserById(actorUserId) ?: return@fire
+            val strings = pushStrings(target.uiLanguage)
             target.fcmToken?.let { token ->
                 FcmSender.send(
                     token = token,
-                    title = "New follower! 🎉",
-                    body = "@${actor.username} started following you",
+                    title = strings.newFollowerTitle(),
+                    body = strings.newFollowerBody(actor.username),
                     route = "notifications",
                 )
             }
@@ -78,11 +79,12 @@ class NotificationService(
             // Пуш автору: комменты — редкое и личное событие
             val author = userRepository.getUserById(character.authorId) ?: return@fire
             val actor = userRepository.getUserById(comment.authorId) ?: return@fire
+            val strings = pushStrings(author.uiLanguage)
             author.fcmToken?.let { token ->
                 FcmSender.send(
                     token = token,
-                    title = "New comment on ${character.name} 💬",
-                    body = "@${actor.username}: ${comment.text.take(80)}",
+                    title = strings.newCommentTitle(character.name),
+                    body = strings.newCommentBody(actor.username, comment.text.take(80)),
                     route = "notifications",
                 )
             }
@@ -143,19 +145,17 @@ class NotificationService(
             )
             // Пуш автору: веха — приятный повод вернуться
             val author = userRepository.getUserById(character.authorId) ?: return@fire
+            val strings = pushStrings(author.uiLanguage)
             author.fcmToken?.let { token ->
                 FcmSender.send(
                     token = token,
-                    title = "Milestone! 🎉",
-                    body = "${character.name} reached ${formatMilestone(total)} messages",
+                    title = strings.milestoneTitle(),
+                    body = strings.milestoneBody(character.name, total),
                     route = "notifications",
                 )
             }
         }
     }
-
-    private fun formatMilestone(m: Int): String =
-        if (m >= 1_000 && m % 1_000 == 0) "${m / 1_000},000" else "$m"
 
     private companion object {
         val MILESTONES = setOf(1_000, 10_000, 100_000)

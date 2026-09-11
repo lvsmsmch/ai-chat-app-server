@@ -389,7 +389,11 @@ fun Route.configureUserRouting(
             if (request.token.isBlank() || request.token.length > 4096) {
                 throw ValidationException("Invalid FCM token")
             }
-            userRepository.saveFcmToken(userId, request.token)
+            val uiLanguage = request.language.replace('_', '-').lowercase()
+            if (!uiLanguage.matches(Regex("[a-z]{2,3}(-[a-z0-9]{2,8})*"))) {
+                throw ValidationException("Invalid interface language")
+            }
+            userRepository.saveFcmToken(userId, request.token, uiLanguage)
             call.respondSuccess()
         }
 

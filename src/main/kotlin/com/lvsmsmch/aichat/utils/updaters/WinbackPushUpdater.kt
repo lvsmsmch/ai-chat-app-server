@@ -40,10 +40,11 @@ fun configureWinbackPushUpdater(
                 var sent = 0
                 for (user in candidates) {
                     val token = user.fcmToken ?: continue
+                    val strings = com.lvsmsmch.aichat.notification.pushStrings(user.uiLanguage)
                     val ok = FcmSender.send(
                         token = token,
-                        title = "A gift is waiting for you! 🎁",
-                        body = "+$WINBACK_GIFT_MESSAGES free messages. Tap to claim your gift!",
+                        title = strings.winbackTitle(),
+                        body = strings.winbackBody(WINBACK_GIFT_MESSAGES),
                     )
                     if (ok) {
                         userRepository.grantWinbackGift(user.id, WINBACK_GIFT_MESSAGES)

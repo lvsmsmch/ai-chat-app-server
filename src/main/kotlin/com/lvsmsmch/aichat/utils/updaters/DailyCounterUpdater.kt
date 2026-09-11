@@ -70,10 +70,11 @@ private suspend fun sendLimitResetPushes(
         val lastPush = user.lastLimitPushAt?.let { runCatching { com.lvsmsmch.aichat.utils.UtcTimestamp.parse(it) }.getOrNull() }
         val due = lastPush == null || lastPush.addDays(intervalDays).isInPast()
         if (!due) continue
+        val strings = com.lvsmsmch.aichat.notification.pushStrings(user.uiLanguage)
         val ok = com.lvsmsmch.aichat.utils.FcmSender.send(
             token = token,
-            title = "Your daily messages are back! ✨",
-            body = "The limit has reset - your characters are waiting to chat.",
+            title = strings.dailyMessagesTitle(),
+            body = strings.dailyMessagesBody(),
         )
         if (ok) {
             userRepository.markLimitPushSent(user.id, user.limitPushStage + 1)

@@ -293,8 +293,11 @@ class UserRepository {
 
     // ---- Пуши ----
 
-    suspend fun saveFcmToken(userId: String, token: String) {
-        updateById(userId) { it[Tables.Users.fcmToken] = token }
+    suspend fun saveFcmToken(userId: String, token: String, uiLanguage: String) {
+        updateById(userId) {
+            it[Tables.Users.fcmToken] = token
+            it[Tables.Users.uiLanguage] = uiLanguage
+        }
     }
 
     /**

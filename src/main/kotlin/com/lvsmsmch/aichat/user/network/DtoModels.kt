@@ -110,7 +110,8 @@ data class SetCharacterLanguageRequest(
 
 @kotlinx.serialization.Serializable
 data class SetFcmTokenRequest(
-    @kotlinx.serialization.SerialName("token") val token: String
+    @kotlinx.serialization.SerialName("token") val token: String,
+    @kotlinx.serialization.SerialName("language") val language: String = "en",
 )
 
 /** [DEBUG] Оверрайды моделей: null — не менять, пустая строка — сбросить на дефолт. */

@@ -35,6 +35,7 @@ object Tables {
         val accountType = text("account_type")
         val hasSubscription = bool("has_subscription")
         val characterLanguage = text("character_language")
+        val uiLanguage = text("ui_language").default("en")
         val deviceId = text("device_id").nullable()
         /** Apple sub из identity-токена: у Apple это единственный стабильный id. */
         val appleOauthId = text("apple_oauth_id").nullable()

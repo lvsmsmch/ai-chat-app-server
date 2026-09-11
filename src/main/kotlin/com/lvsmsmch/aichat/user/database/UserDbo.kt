@@ -21,6 +21,8 @@ data class UserDbo(
     val hasSubscription: Boolean = false,
     /** Язык персонажей (каталог, промпты, ответы в чате). */
     val characterLanguage: String = "en",
+    /** Язык интерфейса устройства; нужен для локализованных push-уведомлений. */
+    val uiLanguage: String = "en",
     val deviceId: String? = null,
     /** Apple sub: почту Apple отдаёт только при первой авторизации, id — всегда. */
     val appleOauthId: String? = null,
