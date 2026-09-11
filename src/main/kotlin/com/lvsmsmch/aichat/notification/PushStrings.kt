@@ -35,10 +35,42 @@ private object EnglishPushStrings : PushStringTable {
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }
 
-/** Язык без региона: `pt-BR` использует таблицу `pt`, если она появится. */
-internal fun pushStrings(language: String?): PushStringTable = when (
-    language?.substringBefore('-')?.lowercase()
-) {
-    "en" -> EnglishPushStrings
-    else -> EnglishPushStrings
+/** Сначала учитываем точный регион, затем используем основной язык. */
+internal fun pushStrings(language: String?): PushStringTable {
+    val rawCode = language?.trim()?.replace('_', '-')?.lowercase().orEmpty()
+    val normalized = when {
+        rawCode == "in" || rawCode.startsWith("in-") -> rawCode.replaceFirst("in", "id")
+        rawCode == "iw" || rawCode.startsWith("iw-") -> rawCode.replaceFirst("iw", "he")
+        rawCode.startsWith("zh-hant") || rawCode in setOf("zh-tw", "zh-hk", "zh-mo") -> "zh-tw"
+        rawCode.startsWith("zh-hans") || rawCode in setOf("zh-cn", "zh-sg") -> "zh-cn"
+        else -> rawCode
+    }
+    return when (normalized) {
+        "es-419" -> Es419PushStrings
+        "pt-br" -> PtBrPushStrings
+        "zh-cn" -> ZhCnPushStrings
+        "zh-tw" -> ZhTwPushStrings
+        "tr-tr" -> TrTrPushStrings
+        else -> when (normalized.substringBefore('-')) {
+            "en" -> EnglishPushStrings
+            "es" -> Es419PushStrings
+            "pt" -> PtPushStrings
+            "ar" -> ArPushStrings
+            "id" -> IdPushStrings
+            "ru" -> RuPushStrings
+            "fr" -> FrPushStrings
+            "uk" -> UkPushStrings
+            "zh" -> ZhCnPushStrings
+            "he" -> HePushStrings
+            "vi" -> ViPushStrings
+            "ms" -> MsPushStrings
+            "de" -> DePushStrings
+            "ja" -> JaPushStrings
+            "it" -> ItPushStrings
+            "th" -> ThPushStrings
+            "tr" -> TrTrPushStrings
+            "ka" -> KaPushStrings
+            else -> EnglishPushStrings
+        }
+    }
 }
