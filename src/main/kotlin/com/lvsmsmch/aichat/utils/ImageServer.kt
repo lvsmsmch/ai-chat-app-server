@@ -25,7 +25,7 @@ object ImageServer {
     }
 
     private val baseUrl: String by lazy {
-        (System.getenv("IMAGES_BASE_URL") ?: "http://161.35.210.53:8080/images").trimEnd('/')
+        (System.getenv("IMAGES_BASE_URL") ?: "https://api.kichat.eu/images").trimEnd('/')
     }
 
     /** Целевой размер файла: пережимаем всё, что тяжелее (~500КБ), к ~300-400КБ. */
