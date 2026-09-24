@@ -51,29 +51,33 @@ fun Application.module() {
             // 100/мин не хватало: активная навигация по приложению (профили,
             // лента, лимиты, синки) легко превышала порог и валила экраны в 429
             rateLimiter(limit = 400, refillPeriod = 1.minutes)
+            // getUserIp, а не remoteHost: за nginx удалённый адрес у ВСЕХ
+            // запросов один и тот же — адрес самого прокси, и всё приложение
+            // оказалось бы в общем ведре лимитов. Настоящий адрес приходит
+            // в X-Forwarded-For, который nginx проставляет сам
             requestKey { call ->
-                call.request.origin.remoteHost
+                call.getUserIp()
             }
         }
 
         register(RateLimitName("auth-strict")) {
             rateLimiter(limit = 5, refillPeriod = 1.minutes)
             requestKey { call ->
-                call.request.origin.remoteHost
+                call.getUserIp()
             }
         }
 
         register(RateLimitName("rewarded")) {
             rateLimiter(limit = 3, refillPeriod = 1.minutes)
             requestKey { call ->
-                call.request.headers["Authorization"] ?: call.request.origin.remoteHost
+                call.request.headers["Authorization"] ?: call.getUserIp()
             }
         }
 
         register(RateLimitName("ai-search")) {
             rateLimiter(limit = 10, refillPeriod = 1.minutes)
             requestKey { call ->
-                call.request.headers["Authorization"] ?: call.request.origin.remoteHost
+                call.request.headers["Authorization"] ?: call.getUserIp()
             }
         }
     }
