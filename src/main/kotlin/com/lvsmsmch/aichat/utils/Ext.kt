@@ -53,6 +53,23 @@ suspend fun ApplicationCall.respondError(httpStatusCode: HttpStatusCode, code: S
  * проверки кто угодно подставлял бы в заголовок чужой адрес: по этому же
  * значению считаются лимиты, то есть обход был бы в одну строку curl.
  */
+/**
+ * Доступ к отладочным ручкам.
+ *
+ * Мало включить их переменной окружения: сервер один на все сборки, и релизное
+ * приложение ходит туда же, куда отладочное. Поэтому нужен ещё и секрет,
+ * который знает только debug-сборка — она получает его на этапе компиляции, а
+ * в релизной его просто нет.
+ *
+ * Секрет не задан — ручки закрыты, даже если флаг включён: безопасный дефолт
+ * важнее удобства.
+ */
+fun ApplicationCall.debugAccessAllowed(): Boolean {
+    if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) return false
+    val expected = System.getenv("DEBUG_KEY")?.takeIf { it.isNotBlank() } ?: return false
+    return request.header("X-Debug-Key") == expected
+}
+
 fun ApplicationCall.getUserIp(): String {
     val remoteHost = request.origin.remoteHost
     if (remoteHost.isLoopbackAddress()) {

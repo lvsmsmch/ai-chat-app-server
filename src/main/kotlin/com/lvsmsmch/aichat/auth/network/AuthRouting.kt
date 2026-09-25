@@ -134,7 +134,7 @@ fun Route.configureAuthRouting(
 
             val purchaseToken = request.purchaseToken?.takeIf { it.isNotBlank() }
             if (purchaseToken == null) {
-                if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+                if (!call.debugAccessAllowed()) {
                     throw ForbiddenException(errorMessage = "Purchase token is required")
                 }
                 userRepository.updateSubscriptionStatus(userDbo.id, request.hasSubscription)

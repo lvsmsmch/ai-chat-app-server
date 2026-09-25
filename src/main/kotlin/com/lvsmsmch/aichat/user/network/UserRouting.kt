@@ -321,7 +321,7 @@ fun Route.configureUserRouting(
          * иначе любой юзер сбрасывает себе лимиты прямым запросом.
          */
         post("/{userId}/debug-reset-limits") {
-            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+            if (!call.debugAccessAllowed()) {
                 throw ForbiddenException(errorMessage = "debug endpoints disabled")
             }
             val sessionDbo = sessionRepository.verifyToken(call)
@@ -336,7 +336,7 @@ fun Route.configureUserRouting(
 
         /** [DEBUG] Текущие оверрайды моделей (текст/картинки). */
         get("/{userId}/debug-models") {
-            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+            if (!call.debugAccessAllowed()) {
                 throw ForbiddenException(errorMessage = "debug endpoints disabled")
             }
             sessionRepository.verifyToken(call)
@@ -354,7 +354,7 @@ fun Route.configureUserRouting(
          * пустая строка — сброс на обычную логику (тиринг/гибрид).
          */
         post("/{userId}/debug-models") {
-            if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+            if (!call.debugAccessAllowed()) {
                 throw ForbiddenException(errorMessage = "debug endpoints disabled")
             }
             sessionRepository.verifyToken(call)
