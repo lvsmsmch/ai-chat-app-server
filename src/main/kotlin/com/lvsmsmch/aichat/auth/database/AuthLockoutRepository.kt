@@ -24,7 +24,7 @@ class AuthLockoutRepository {
 
     private val table = Tables.AuthLockouts
 
-    data class Lockout(val failedCount: Int, val lockedUntil: String?)
+    data class Lockout(val failedCount: Int, val lockedUntil: String?, val lastFailedAt: String?)
 
     /** Сколько секунд ещё ждать; 0 — можно пробовать. */
     suspend fun secondsRemaining(loginKey: String): Long {
@@ -41,14 +41,23 @@ class AuthLockoutRepository {
             .where { table.loginKey eq loginKey }
             .limit(1)
             .firstOrNull()
-            ?.let { Lockout(it[table.failedCount], it[table.lockedUntil]) }
+            ?.let { Lockout(it[table.failedCount], it[table.lockedUntil], it[table.lastFailedAt]) }
     }
 
     /** Неудачная попытка входа: счётчик растёт, пауза удлиняется. */
     suspend fun registerFailure(loginKey: String) {
         val now = UtcTimestamp.now()
         val current = get(loginKey)
-        val nextCount = (current?.failedCount ?: 0) + 1
+        // Счётчик забывается, если промахов давно не было: иначе полсотни
+        // опечаток за год оставляли бы человека с 12-часовой паузой навсегда
+        val stale = current?.lastFailedAt
+            ?.let { runCatching { UtcTimestamp.parse(it) }.getOrNull() }
+            ?.let {
+                java.time.Duration.between(it.instant, java.time.Instant.now()).toHours() >=
+                    FAILURE_MEMORY_HOURS
+            }
+            ?: true
+        val nextCount = if (stale) 1 else (current?.failedCount ?: 0) + 1
         val lockMinutes = lockMinutesFor(nextCount)
         dbQuery {
             table.upsert {
@@ -70,6 +79,11 @@ class AuthLockoutRepository {
      * Первые три промаха не наказываются вообще: это обычные опечатки. Дальше
      * пауза растёт до получаса и в пределе до двенадцати часов.
      */
+    private companion object {
+        /** Через столько часов без промахов счётчик начинается заново. */
+        const val FAILURE_MEMORY_HOURS = 12L
+    }
+
     private fun lockMinutesFor(failedCount: Int): Long = when (failedCount) {
         in 0..3 -> 0
         in 4..5 -> 1

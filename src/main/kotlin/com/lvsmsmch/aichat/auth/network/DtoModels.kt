@@ -15,7 +15,19 @@ data class UserLoginInfoDto(
 @Serializable
 data class UserPrivateInfoDto(
     @SerialName("id") val id: String,
-    @SerialName("isGuest") val isGuest: Boolean
+    @SerialName("isGuest") val isGuest: Boolean,
+    /** Почта привязана, но код из письма ещё не введён — клиент покажет экран кода. */
+    @SerialName("hasEmail") val hasEmail: Boolean = false,
+    @SerialName("emailVerified") val emailVerified: Boolean = false,
+    /** Google привязан: настройки не должны предлагать привязать его второй раз. */
+    @SerialName("hasGoogle") val hasGoogle: Boolean = false,
+    /**
+     * У аккаунта есть пароль. У входа через Google его нет, и «сменить пароль»
+     * там показывать нельзя — менять нечего.
+     */
+    @SerialName("hasPassword") val hasPassword: Boolean = false,
+    /** Сам адрес: настройки показывают его, а восстановление подставляет в поле. */
+    @SerialName("email") val email: String? = null,
 )
 
 @Serializable
@@ -121,6 +133,8 @@ data class SubscriptionStatusRequest(
 data class OAuthUserData(
     val id: String,
     val email: String?,
+    /** Google подтвердил адрес. Неподтверждённый занимать аккаунтом нельзя. */
+    val emailVerified: Boolean,
     val name: String?,
     val profilePictureUrl: String?
 )

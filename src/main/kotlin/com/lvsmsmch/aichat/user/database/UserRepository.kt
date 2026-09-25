@@ -160,12 +160,21 @@ class UserRepository {
         }
     }
 
+    /**
+     * Привязка Google. Почта пишется только когда её ещё нет: аккаунт мог быть
+     * заведён по почте с паролем, и адрес от Google затирал бы логин — человек
+     * переставал попадать в свой аккаунт по паролю. Адрес от Google считается
+     * подтверждённым: его проверил сам Google.
+     */
     suspend fun linkGoogleToUser(userId: String, googleId: String, email: String? = null) {
         updateById(userId) {
             it[Tables.Users.accountType] = AccountType.REGISTERED.name
             it[Tables.Users.deviceId] = null
             it[Tables.Users.googleOauthId] = googleId
-            it[Tables.Users.email] = email
+            if (email != null) {
+                it[Tables.Users.email] = email
+                it[Tables.Users.emailVerified] = true
+            }
         }
     }
 

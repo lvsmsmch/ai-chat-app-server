@@ -146,7 +146,12 @@ suspend fun UserDbo.toUserPrivateInfoDto(
 ): UserPrivateInfoDto {
     return UserPrivateInfoDto(
         id = id,
-        isGuest = accountType == AccountType.GUEST
+        isGuest = accountType == AccountType.GUEST,
+        hasEmail = email != null,
+        emailVerified = emailVerified,
+        hasGoogle = googleOauthId != null,
+        hasPassword = hashedPassword != null,
+        email = email,
     )
 }
 

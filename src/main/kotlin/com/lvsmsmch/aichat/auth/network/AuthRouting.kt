@@ -42,13 +42,47 @@ fun Route.configureAuthRouting(
                 validateDeviceId(request.deviceId)
 
                 val oauthUserData = getOauthUserData(request.googleToken)
+                // Адрес берём только подтверждённый: по нему мы пускаем в чужой
+                // аккаунт (см. ниже), и неподтверждённый тут — дыра
+                val googleEmail = oauthUserData.email?.takeIf { oauthUserData.emailVerified }
+
+                // Адрес свободен — новый аккаунт получит его сразу подтверждённым
+                val freeEmail = googleEmail?.takeIf { userRepository.findUserByEmail(it) == null }
 
                 val userDbo = userRepository.findByGoogleId(oauthUserData.id)
+                // Этим адресом уже зарегистрирован аккаунт по почте: это тот же
+                // человек нажал «Войти через Google» вместо пароля. Привязываем
+                // Google к его аккаунту, иначе получилось бы два аккаунта с
+                // одной почтой и вход по паролю попадал бы в случайный из них.
+                //
+                // Привязываемся только к ПОДТВЕРЖДЁННОЙ почте (или к аккаунту
+                // без пароля): иначе кто угодно занял бы чужой адрес заранее и
+                // получил доступ к аккаунту, в который войдёт настоящий хозяин.
+                    ?: googleEmail?.let { email ->
+                        userRepository.findUserByEmail(email)
+                            ?.takeIf { it.googleOauthId == null }
+                            ?.takeIf { it.emailVerified || it.hashedPassword == null }
+                            ?.also {
+                                userRepository.linkGoogleToUser(
+                                    userId = it.id,
+                                    googleId = oauthUserData.id,
+                                    email = null, // адрес у аккаунта уже этот
+                                )
+                                if (!it.emailVerified) {
+                                    userRepository.setEmailVerified(it.id, email)
+                                }
+                            }
+                            ?.let { userRepository.getUserById(it.id) ?: it }
+                    }
                     ?: UserDbo(
                         id = idGenerator.generateId(EntityType.USER),
                         username = usernameGenerator.generateUniqueUsername(),
                         googleOauthId = oauthUserData.id,
-                        email = oauthUserData.email,
+                        // Адрес занят другим аккаунтом, к которому привязаться
+                        // нельзя — заводим аккаунт без почты, а не второй с той
+                        // же: почта должна оставаться уникальной
+                        email = freeEmail,
+                        emailVerified = freeEmail != null,
                         name = oauthUserData.name,
                         profilePictureUrl = null,
                         accountType = AccountType.REGISTERED
@@ -118,6 +152,32 @@ fun Route.configureAuthRouting(
 
 
         /**
+         * Подъём сохранённой сессии при старте приложения.
+         *
+         * Отдаёт ровно то же, что вход: приложению нужны не только профиль, но
+         * и флаги аккаунта (почта, пароль, Google) с лимитами — держать их в
+         * локальном хранилище нельзя, они меняются с другого устройства.
+         *
+         * Заодно это проверка, что сессия жива: сервер гасит все сессии при
+         * сбросе пароля, и клиент узнаёт об этом здесь.
+         */
+        get("/me") {
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userDbo = userRepository.getUserById(sessionDbo.userId)
+                ?: throw BadRequestException("User does not exist")
+
+            call.respondSuccess(
+                SuccessfulLoginDto(
+                    userLoginInfoDto = userDbo.toUserLoginInfoDto(mapper, sessionToken = sessionDbo.token),
+                    userPrivateInfoDto = userDbo.toUserPrivateInfoDto(mapper),
+                    userDto = userDbo.toUserDto(mapper),
+                    userDetailsDto = userDbo.toUserDetailsDto(mapper, demanderId = userDbo.id),
+                    limitsResponse = userRepository.getLimits(userDbo.id),
+                )
+            )
+        }
+
+        /**
          * Статус подписки.
          *
          * С токеном покупки — боевой путь: подписку подтверждает Google, а не
@@ -176,6 +236,12 @@ fun Route.configureAuthRouting(
                 val userDbo = userRepository.getUserById(sessionDbo.userId)
                     ?: throw BadRequestException("User does not exist")
 
+                // Второй Google поверх первого — не «перепривязка», а потеря
+                // доступа к аккаунту через прежний: отказываем явно
+                if (userDbo.googleOauthId != null) {
+                    throw BadRequestException("Account already has a linked Google account")
+                }
+
                 val oauthUserData = getOauthUserData(request.googleToken)
 
                 val existingUser = userRepository.findByGoogleId(oauthUserData.id)
@@ -183,10 +249,18 @@ fun Route.configureAuthRouting(
                     throw GoogleAccountAlreadyInUseException()
                 }
 
+                // Почту от Google пишем, только если у аккаунта её нет и адрес
+                // не занят кем-то ещё: логин по почте должен оставаться
+                // однозначным, а зарегистрированный адрес — не перетираться
+                val googleEmail = oauthUserData.email
+                    ?.takeIf { oauthUserData.emailVerified }
+                    ?.takeIf { userDbo.email == null }
+                    ?.takeIf { userRepository.findUserByEmail(it) == null }
+
                 userRepository.linkGoogleToUser(
                     userId = sessionDbo.userId,
                     googleId = oauthUserData.id,
-                    email = oauthUserData.email,
+                    email = googleEmail,
                 )
 
                 call.respondSuccess()
@@ -237,10 +311,15 @@ private suspend fun getOauthUserData(googleToken: String): OAuthUserData {
             }
         }
 
+        val rawEmail = json["email"]?.jsonPrimitive?.content
         OAuthUserData(
             id = json["sub"]?.jsonPrimitive?.content
                 ?: throw Exception("Google response missing 'sub' field"),
-            email = json["email"]?.jsonPrimitive?.content,
+            // Адрес приводим к нижнему регистру сразу: по нему ищут аккаунт, а
+            // «A@x.com» и «a@x.com» — один и тот же ящик
+            email = rawEmail?.let { com.lvsmsmch.aichat.auth.Emails.normalize(it) }
+                ?.takeIf { it.isNotBlank() },
+            emailVerified = json["email_verified"]?.jsonPrimitive?.content == "true",
             name = json["name"]?.jsonPrimitive?.content,
             profilePictureUrl = json["picture"]?.jsonPrimitive?.content
         )
