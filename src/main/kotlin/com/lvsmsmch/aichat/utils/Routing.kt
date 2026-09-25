@@ -3,7 +3,6 @@ package com.lvsmsmch.aichat.utils
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.UsernameGenerator
 import com.lvsmsmch.aichat._common.database.ReportRepository
-import com.lvsmsmch.aichat.app_data.network.configureAppDataRouting
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
 import com.lvsmsmch.aichat.auth.network.configureAuthRouting
 import com.lvsmsmch.aichat.auth.network.configureAppleAuthRouting
@@ -142,7 +141,6 @@ fun Application.configureRouting() {
                 userService = userService,
             )
 
-            configureAppDataRouting()
 
             configureUserRouting(
                 characterLikeRepository = characterLikeRepository,

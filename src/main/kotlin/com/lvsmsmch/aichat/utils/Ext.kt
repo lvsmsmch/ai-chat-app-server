@@ -45,13 +45,29 @@ suspend fun ApplicationCall.respondError(httpStatusCode: HttpStatusCode, code: S
     )
 }
 
+/**
+ * Адрес клиента.
+ *
+ * X-Forwarded-For доверяем ТОЛЬКО когда запрос пришёл от локального nginx.
+ * Порт 8080 открыт наружу ради уже установленных приложений, и без этой
+ * проверки кто угодно подставлял бы в заголовок чужой адрес: по этому же
+ * значению считаются лимиты, то есть обход был бы в одну строку curl.
+ */
 fun ApplicationCall.getUserIp(): String {
-    val forwardedForHeader = request.header("X-Forwarded-For")
-    if (!forwardedForHeader.isNullOrBlank()) {
-        return forwardedForHeader.split(",")[0].trim()
+    val remoteHost = request.origin.remoteHost
+    if (remoteHost.isLoopbackAddress()) {
+        request.header("X-Forwarded-For")
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
     }
-    return request.origin.remoteHost
+    return remoteHost
 }
+
+private fun String.isLoopbackAddress(): Boolean =
+    this == "127.0.0.1" || this == "::1" || this == "0:0:0:0:0:0:0:1" || this == "localhost"
 
 fun loadConfig(): Properties {
     val properties = Properties()
