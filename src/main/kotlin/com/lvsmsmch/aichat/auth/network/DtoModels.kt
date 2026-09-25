@@ -107,7 +107,14 @@ data class LinkEmailRequest(
 
 @Serializable
 data class SubscriptionStatusRequest(
-    @SerialName("hasSubscription") val hasSubscription: Boolean
+    @SerialName("hasSubscription") val hasSubscription: Boolean,
+    /**
+     * Токен покупки из Play. Есть — подписку подтверждает Google; нет — это
+     * отладочное переключение флага, и оно разрешено только при
+     * DEBUG_ENDPOINTS=true.
+     */
+    @SerialName("purchaseToken") val purchaseToken: String? = null,
+    @SerialName("productId") val productId: String? = null,
 )
 
 

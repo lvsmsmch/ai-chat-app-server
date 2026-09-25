@@ -111,6 +111,21 @@ object Tables {
      * Блокировка перебора пароля. Ключ — почта в нижнем регистре: лимит по IP
      * (rate-limit Ktor) сам по себе не спасает, атака идёт из многих адресов.
      */
+    /**
+     * Покупка подписки: токен от Play и последний известный статус. Храним,
+     * чтобы можно было перепроверить подписку у Google позже — сам по себе
+     * флаг has_subscription у юзера ничего не доказывает.
+     */
+    object Subscriptions : Table("subscriptions") {
+        val userId = text("user_id")
+        val purchaseToken = text("purchase_token")
+        val productId = text("product_id")
+        val active = bool("active").default(false)
+        val updatedAt = text("updated_at")
+
+        override val primaryKey = PrimaryKey(userId)
+    }
+
     object AuthLockouts : Table("auth_lockouts") {
         val loginKey = text("login_key")
         val failedCount = integer("failed_count").default(0)
@@ -644,6 +659,6 @@ object Tables {
         CharacterActivityLogs, UserRecommendationsCache,
         CategoryRecommendationsCache, DefaultRecommendationsCache,
         DiscoverSectionsCache, CharacterListCopies, DeviceLimitCarryovers, AvatarGenerationLimits,
-        DeletedIdsStats, MessageRatings,
+        DeletedIdsStats, MessageRatings, Subscriptions,
     )
 }

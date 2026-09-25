@@ -67,6 +67,8 @@ val appModule = module {
     }
     single<MailSender> { MailSenderFactory.create(get(named("mailHttpClient"))) }
     single { AppleIdentityTokenVerifier(HttpClient()) }
+    single { com.lvsmsmch.aichat.billing.SubscriptionRepository() }
+    single { com.lvsmsmch.aichat.billing.PlayPurchaseVerifier(HttpClient()) }
 
     // ---- репозитории ----
     single { SessionRepository() }

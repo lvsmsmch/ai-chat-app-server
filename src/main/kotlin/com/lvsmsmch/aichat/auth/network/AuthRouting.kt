@@ -30,6 +30,8 @@ fun Route.configureAuthRouting(
     mapper: Mapper,
     discoverSectionsRepository: com.lvsmsmch.aichat.cache.database.DiscoverSectionsCacheRepository,
     userService: com.lvsmsmch.aichat.user.UserService,
+    subscriptionRepository: com.lvsmsmch.aichat.billing.SubscriptionRepository,
+    purchaseVerifier: com.lvsmsmch.aichat.billing.PlayPurchaseVerifier,
 ) {
     route("/auth") {
 
@@ -115,6 +117,14 @@ fun Route.configureAuthRouting(
         }
 
 
+        /**
+         * Статус подписки.
+         *
+         * С токеном покупки — боевой путь: подписку подтверждает Google, а не
+         * приложение. Без токена флаг переключается напрямую, и это разрешено
+         * только в отладочном режиме: иначе премиум включался бы одним
+         * запросом с любого устройства.
+         */
         post("/subscription") {
             val sessionDbo = sessionRepository.verifyToken(call)
             val request = call.receive<SubscriptionStatusRequest>()
@@ -122,7 +132,38 @@ fun Route.configureAuthRouting(
             val userDbo = userRepository.getUserById(sessionDbo.userId)
                 ?: throw BadRequestException("User does not exist")
 
-            userRepository.updateSubscriptionStatus(userDbo.id, request.hasSubscription)
+            val purchaseToken = request.purchaseToken?.takeIf { it.isNotBlank() }
+            if (purchaseToken == null) {
+                if (System.getenv("DEBUG_ENDPOINTS")?.toBoolean() != true) {
+                    throw ForbiddenException(errorMessage = "Purchase token is required")
+                }
+                userRepository.updateSubscriptionStatus(userDbo.id, request.hasSubscription)
+                if (!request.hasSubscription) subscriptionRepository.clear(userDbo.id)
+                call.respondSuccess()
+                return@post
+            }
+
+            val active = when (val check = purchaseVerifier.verify(purchaseToken)) {
+                com.lvsmsmch.aichat.billing.PurchaseCheck.Active -> true
+                com.lvsmsmch.aichat.billing.PurchaseCheck.Inactive -> false
+                // Ключа для проверки ещё нет: сам факт токена означает, что
+                // покупка через Play была, но подтвердить её мы не можем —
+                // верим и громко пишем об этом в лог
+                com.lvsmsmch.aichat.billing.PurchaseCheck.NotConfigured -> {
+                    logger.warn("Purchase accepted without verification (no Play service account)")
+                    true
+                }
+                is com.lvsmsmch.aichat.billing.PurchaseCheck.Error ->
+                    throw BadRequestException("Purchase verification failed: ${check.message}")
+            }
+
+            subscriptionRepository.save(
+                userId = userDbo.id,
+                purchaseToken = purchaseToken,
+                productId = request.productId ?: "premium",
+                active = active,
+            )
+            userRepository.updateSubscriptionStatus(userDbo.id, active)
 
             call.respondSuccess()
         }

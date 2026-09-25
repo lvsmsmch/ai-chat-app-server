@@ -49,6 +49,8 @@ fun Application.configureRouting() {
     val messageRatingRepository: com.lvsmsmch.aichat.chat.database.MessageRatingRepository by inject()
     val reviewRepository: ReviewRepository by inject()
     val sessionRepository: SessionRepository by inject()
+    val subscriptionRepository: com.lvsmsmch.aichat.billing.SubscriptionRepository by inject()
+    val purchaseVerifier: com.lvsmsmch.aichat.billing.PlayPurchaseVerifier by inject()
     val followRepository: FollowRepository by inject()
     val userBlockRepository: com.lvsmsmch.aichat.user.database.UserBlockRepository by inject()
     val reportRepository: ReportRepository by inject()
@@ -112,6 +114,8 @@ fun Application.configureRouting() {
                 mapper = mapper,
                 discoverSectionsRepository = discoverSectionsRepository,
                 userService = userService,
+                subscriptionRepository = subscriptionRepository,
+                purchaseVerifier = purchaseVerifier,
             )
 
             configureEmailAuthRouting(
