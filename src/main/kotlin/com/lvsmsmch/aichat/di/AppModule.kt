@@ -156,6 +156,7 @@ val appModule = module {
     single {
         BackgroundJobs(
             userRepository = get(),
+            sessionRepository = get(),
             characterRepository = get(),
             chatRepository = get(),
             messageRepository = get(),

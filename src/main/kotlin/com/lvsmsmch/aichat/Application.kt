@@ -23,7 +23,10 @@ import kotlin.time.Duration.Companion.minutes
 
 fun main() {
     logger.info("Application started...")
-    embeddedServer(Netty, port = 8080) {
+    // Только петлевой адрес: снаружи сервер доступен через nginx по HTTPS, а
+    // прямой порт больше никому не нужен — на нём не было ни TLS, ни защиты от
+    // подделки X-Forwarded-For
+    embeddedServer(Netty, port = 8080, host = "127.0.0.1") {
         logger.info("Server started...")
         module()
         logger.info("Module configured...")

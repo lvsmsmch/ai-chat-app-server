@@ -37,6 +37,7 @@ import kotlinx.coroutines.cancelAndJoin
  */
 class BackgroundJobs(
     private val userRepository: UserRepository,
+    private val sessionRepository: com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository,
     private val characterRepository: CharacterRepository,
     private val chatRepository: ChatRepository,
     private val messageRepository: MessageRepository,
@@ -121,6 +122,10 @@ class BackgroundJobs(
             configureAuthCodesCleanupUpdater(
                 databaseScope = scope,
                 authCodeRepository = authCodeRepository,
+            ),
+            configureSessionsCleanupUpdater(
+                databaseScope = scope,
+                sessionRepository = sessionRepository,
             ),
             configureStuckMessagesUpdater(
                 databaseScope = scope,
