@@ -430,13 +430,21 @@ class UserRepository {
         updateById(userId) { it[Tables.Users.hashedPassword] = hashedPassword }
     }
 
-    /** Гость завёл почту с паролем: аккаунт тот же, тип становится обычным. */
+    /**
+     * Гость завёл почту с паролем: аккаунт тот же, тип становится обычным.
+     *
+     * Device id при этом снимается — как и при привязке Google. Иначе гостевой
+     * вход по этому устройству продолжал бы отдавать уже защищённый паролем
+     * аккаунт: «выйти» переставало что-либо значить, а попавший в чужие руки
+     * телефон открывал аккаунт вообще без пароля.
+     */
     suspend fun attachEmailPassword(userId: String, email: String, hashedPassword: String) {
         updateById(userId) {
             it[Tables.Users.email] = email
             it[Tables.Users.emailVerified] = false
             it[Tables.Users.hashedPassword] = hashedPassword
             it[Tables.Users.accountType] = AccountType.REGISTERED.name
+            it[Tables.Users.deviceId] = null
         }
     }
 

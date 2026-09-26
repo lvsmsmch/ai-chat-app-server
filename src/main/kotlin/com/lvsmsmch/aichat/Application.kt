@@ -64,7 +64,12 @@ fun Application.module() {
         }
 
         register(RateLimitName("auth-strict")) {
-            rateLimiter(limit = 5, refillPeriod = 1.minutes)
+            // 5/мин на IP оказалось слишком узко: за одним адресом сидит целый
+            // оператор мобильной связи или офис, и обычные входы соседей друг
+            // друга блокировали. Подбор пароля ловится не этим лимитом, а
+            // блокировкой по аккаунту (AuthLockoutRepository) и счётчиком
+            // попыток у кода, поэтому здесь важнее не мешать живым людям
+            rateLimiter(limit = 20, refillPeriod = 1.minutes)
             requestKey { call ->
                 call.getUserIp()
             }
