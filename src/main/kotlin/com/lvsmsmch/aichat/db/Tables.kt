@@ -86,8 +86,13 @@ object Tables {
      */
     object AuthCodes : Table("auth_codes") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
-        /** EMAIL_VERIFY либо PASSWORD_RESET. */
+        /** EMAIL_VERIFY, PASSWORD_RESET либо EMAIL_SIGNUP. */
         val purpose = text("purpose")
         val codeHash = text("code_hash")
         /** Адрес, на который код отправлен: у смены почты он не равен текущему. */
@@ -103,6 +108,7 @@ object Tables {
 
         init {
             index(false, userId, purpose)
+            index(false, email, purpose)
             index(false, expiresAt)
         }
     }
@@ -117,6 +123,11 @@ object Tables {
      * флаг has_subscription у юзера ничего не доказывает.
      */
     object Subscriptions : Table("subscriptions") {
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val purchaseToken = text("purchase_token")
         val productId = text("product_id")
@@ -199,6 +210,11 @@ object Tables {
         val lastModifiedAt = text("last_modified_at")
         val createdAt = text("created_at")
         val type = text("type")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         /** JSON-массив id участников (у DIRECT — один). */
         val characterIds = text("character_ids")
@@ -288,6 +304,11 @@ object Tables {
         val updatedAt = text("updated_at")
         /** 1 — палец вверх, -1 — вниз, 0 — оценку сняли. */
         val rating = integer("rating")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val userHasSubscription = bool("user_has_subscription").default(false)
         /** Серверный и клиентский id сообщения: строка переживёт его удаление. */
@@ -329,6 +350,11 @@ object Tables {
         val token = text("token")
         val createdAt = text("created_at")
         val expiresAt = text("expires_at")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val ipAddress = text("ip_address")
 
@@ -364,6 +390,11 @@ object Tables {
 
     object CommentLikes : Table("comment_likes") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val commentId = text("comment_id")
         val likedAt = text("liked_at")
@@ -401,6 +432,11 @@ object Tables {
 
     object ReviewLikes : Table("review_likes") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val reviewId = text("review_id")
         val likedAt = text("liked_at")
@@ -416,6 +452,11 @@ object Tables {
 
     object CharacterLikes : Table("character_likes") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val characterId = text("character_id")
         val likedAt = text("liked_at")
@@ -488,6 +529,11 @@ object Tables {
     object Feedbacks : Table("feedbacks") {
         val id = text("id")
         val createdAt = text("created_at")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val text = text("text")
 
@@ -515,6 +561,11 @@ object Tables {
 
     object UserNotifications : Table("user_notifications") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val type = text("type")
         val createdAt = text("created_at")
@@ -541,6 +592,11 @@ object Tables {
         val timestamp = text("timestamp")
         val characterId = text("character_id")
         val activityType = integer("activity_type")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
 
         override val primaryKey = PrimaryKey(id)
@@ -554,6 +610,11 @@ object Tables {
     }
 
     object UserRecommendationsCache : Table("user_recommendations_cache") {
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val characterIds = text("character_ids")
         val updatedAt = text("updated_at")
@@ -592,6 +653,11 @@ object Tables {
 
     object CharacterListCopies : Table("character_list_copy") {
         val id = text("id")
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val deviceId = text("device_id")
         val listType = text("list_type")
@@ -627,6 +693,11 @@ object Tables {
 
     /** Rolling-окна генерации аватаров: одна блокируемая строка на пользователя. */
     object AvatarGenerationLimits : Table("avatar_generation_limits") {
+        /**
+         * Чей код. У регистрации аккаунта ещё нет, поэтому там пусто, и код
+         * ищется по [email]: подтвердить адрес нужно ДО создания аккаунта,
+         * иначе в базе копятся неподтверждённые регистрации на чужие адреса.
+         */
         val userId = text("user_id")
         val hourlyWindowStartedAt = long("hourly_window_started_at")
         val hourlyCount = integer("hourly_count")

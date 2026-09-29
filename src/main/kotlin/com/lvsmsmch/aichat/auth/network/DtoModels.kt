@@ -88,6 +88,35 @@ data class EmailLoginRequest(
     @SerialName("deviceId") val deviceId: String,
 )
 
+/** Шаг 1 регистрации: только адрес, аккаунта ещё нет. */
+@Serializable
+data class SignupStartRequest(
+    @SerialName("email") val email: String,
+)
+
+/** Шаг 2: код из письма. Код не сжигается — он нужен ещё на шаге 3. */
+@Serializable
+data class SignupVerifyRequest(
+    @SerialName("email") val email: String,
+    @SerialName("code") val code: String,
+)
+
+/** Шаг 3: пароль. Только теперь появляется аккаунт. */
+@Serializable
+data class SignupCompleteRequest(
+    @SerialName("email") val email: String,
+    @SerialName("code") val code: String,
+    @SerialName("password") val password: String,
+    @SerialName("deviceId") val deviceId: String,
+)
+
+/** Средний шаг восстановления: проверить код, не тратя его. */
+@Serializable
+data class ResetVerifyRequest(
+    @SerialName("email") val email: String,
+    @SerialName("code") val code: String,
+)
+
 @Serializable
 data class EmailVerifyRequest(
     @SerialName("code") val code: String,

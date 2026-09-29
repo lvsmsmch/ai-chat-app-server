@@ -59,6 +59,15 @@ fun Route.configureEmailAuthRouting(
         if (!enabled) throw EmailAuthDisabledException()
     }
 
+    /** Тема и текст письма под назначение кода. */
+    fun mailFor(purpose: AuthCodePurpose, code: String): Pair<String, String> =
+        when (purpose) {
+            AuthCodePurpose.EMAIL_VERIFY, AuthCodePurpose.EMAIL_SIGNUP ->
+                MailTemplates.verifyEmail(code, AuthCodeRepository.TTL_MINUTES)
+            AuthCodePurpose.PASSWORD_RESET ->
+                MailTemplates.resetPassword(code, AuthCodeRepository.TTL_MINUTES)
+        }
+
     suspend fun sendCode(user: UserDbo, purpose: AuthCodePurpose, email: String) {
         val lastIssuedAt = authCodeRepository.lastIssuedAt(user.id, purpose)
         if (lastIssuedAt != null) {
@@ -72,12 +81,7 @@ fun Route.configureEmailAuthRouting(
             }
         }
         val code = authCodeRepository.issue(user.id, purpose, email)
-        val (subject, text) = when (purpose) {
-            AuthCodePurpose.EMAIL_VERIFY ->
-                MailTemplates.verifyEmail(code, AuthCodeRepository.TTL_MINUTES)
-            AuthCodePurpose.PASSWORD_RESET ->
-                MailTemplates.resetPassword(code, AuthCodeRepository.TTL_MINUTES)
-        }
+        val (subject, text) = mailFor(purpose, code)
         mailSender.send(email, subject, text)
     }
 
@@ -130,6 +134,151 @@ fun Route.configureEmailAuthRouting(
 
                 runCatching { sendCode(user, AuthCodePurpose.EMAIL_VERIFY, email) }
                 call.respondLogin(user)
+            }
+
+            /**
+             * Регистрация, шаг 1: только адрес. Аккаунт НЕ создаётся — сначала
+             * человек должен доказать, что почта его. Иначе в базе копились бы
+             * неподтверждённые регистрации на чужие адреса, а сам адрес
+             * оказывался бы занят кем угодно.
+             */
+            post("/signup/start") {
+                requireEnabled()
+                val request = call.receive<SignupStartRequest>()
+                val email = Emails.validateAndNormalize(request.email)
+
+                if (userRepository.findUserByEmail(email) != null) {
+                    throw EmailAlreadyInUseException()
+                }
+
+                val lastIssuedAt =
+                    authCodeRepository.lastIssuedAtForEmail(email, AuthCodePurpose.EMAIL_SIGNUP)
+                if (lastIssuedAt != null) {
+                    val since = runCatching { UtcTimestamp.parse(lastIssuedAt) }.getOrNull()
+                    if (since != null) {
+                        val elapsed = java.time.Duration
+                            .between(since.instant, java.time.Instant.now())
+                            .seconds
+                        val wait = AuthCodeRepository.RESEND_COOLDOWN_SECONDS - elapsed
+                        if (wait > 0) throw CodeRequestedTooSoonException(retryAfterSeconds = wait)
+                    }
+                }
+
+                val code = authCodeRepository.issueForEmail(email, AuthCodePurpose.EMAIL_SIGNUP)
+                val (subject, text) = mailFor(AuthCodePurpose.EMAIL_SIGNUP, code)
+                mailSender.send(email, subject, text)
+                call.respondSuccess()
+            }
+
+            /**
+             * Шаг 2: проверка кода. Код НЕ сжигается: на следующем экране
+             * человек вводит пароль, и там код нужен ещё раз. Неверные попытки
+             * при этом считаются, как обычно.
+             */
+            post("/signup/verify") {
+                requireEnabled()
+                val request = call.receive<SignupVerifyRequest>()
+                val email = Emails.validateAndNormalize(request.email)
+
+                when (
+                    authCodeRepository.checkAndConsumeForEmail(
+                        email = email,
+                        purpose = AuthCodePurpose.EMAIL_SIGNUP,
+                        code = request.code,
+                        consume = false,
+                    )
+                ) {
+                    is CodeCheck.Ok -> call.respondSuccess()
+                    CodeCheck.Wrong -> throw InvalidCodeException()
+                    CodeCheck.NotFound -> throw InvalidCodeException(
+                        errorMessage = "Code expired or not requested. Request a new one."
+                    )
+                    CodeCheck.TooManyAttempts -> throw InvalidCodeException(
+                        errorCode = "too_many_code_attempts",
+                        errorMessage = "Too many wrong attempts. Request a new code.",
+                    )
+                }
+            }
+
+            /**
+             * Шаг 3: пароль — и только теперь появляется аккаунт. Почта у него
+             * сразу подтверждённая: её доказали кодом.
+             */
+            post("/signup/complete") {
+                requireEnabled()
+                val request = call.receive<SignupCompleteRequest>()
+                validateDeviceId(request.deviceId)
+                val email = Emails.validateAndNormalize(request.email)
+                Passwords.validate(request.password, email)
+
+                // Пока человек придумывал пароль, адрес могли занять
+                if (userRepository.findUserByEmail(email) != null) {
+                    throw EmailAlreadyInUseException()
+                }
+
+                when (
+                    authCodeRepository.checkAndConsumeForEmail(
+                        email = email,
+                        purpose = AuthCodePurpose.EMAIL_SIGNUP,
+                        code = request.code,
+                    )
+                ) {
+                    is CodeCheck.Ok -> Unit
+                    CodeCheck.Wrong -> throw InvalidCodeException()
+                    CodeCheck.NotFound -> throw InvalidCodeException(
+                        errorMessage = "Code expired or not requested. Request a new one."
+                    )
+                    CodeCheck.TooManyAttempts -> throw InvalidCodeException(
+                        errorCode = "too_many_code_attempts",
+                        errorMessage = "Too many wrong attempts. Request a new code.",
+                    )
+                }
+
+                val user = UserDbo(
+                    id = idGenerator.generateId(EntityType.USER),
+                    username = usernameGenerator.generateUniqueUsername(),
+                    email = email,
+                    emailVerified = true,
+                    hashedPassword = Passwords.hash(request.password),
+                    accountType = AccountType.REGISTERED,
+                ).also {
+                    userService.addUser(it)
+                    // Секции Discover — мгновенно из дефолтного набора
+                    runCatching { discoverSectionsRepository.copyDefaultTo(it.id) }
+                }
+
+                call.respondLogin(user)
+            }
+
+            /**
+             * Средний шаг восстановления: проверить код, не тратя его. Новый
+             * пароль вводится на следующем экране, и там код нужен снова.
+             */
+            post("/reset/verify") {
+                requireEnabled()
+                val request = call.receive<ResetVerifyRequest>()
+                val email = Emails.validateAndNormalize(request.email)
+                val user = userRepository.findUserByEmail(email)
+                    ?: throw InvalidCodeException()
+
+                when (
+                    authCodeRepository.checkAndConsume(
+                        userId = user.id,
+                        purpose = AuthCodePurpose.PASSWORD_RESET,
+                        code = request.code,
+                        consume = false,
+                    )
+                ) {
+                    is CodeCheck.Ok -> call.respondSuccess()
+                    CodeCheck.Wrong -> throw InvalidCodeException()
+                    CodeCheck.NotFound -> throw InvalidCodeException(
+                        errorMessage = "Code expired or not requested. Request a new one."
+                    )
+                    CodeCheck.TooManyAttempts -> throw InvalidCodeException(
+                        errorCode = "too_many_code_attempts",
+                        errorMessage = "Too many wrong attempts. Request a new code.",
+                    )
+                }
             }
 
             post("/login") {

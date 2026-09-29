@@ -16,7 +16,16 @@ import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 /** Зачем выдан код из письма. */
-enum class AuthCodePurpose { EMAIL_VERIFY, PASSWORD_RESET }
+enum class AuthCodePurpose {
+    EMAIL_VERIFY,
+    PASSWORD_RESET,
+
+    /**
+     * Регистрация: адрес подтверждается ДО того, как появится аккаунт.
+     * Такой код привязан к почте, а не к пользователю.
+     */
+    EMAIL_SIGNUP,
+}
 
 data class AuthCodeDbo(
     val id: String,
@@ -79,6 +88,46 @@ class AuthCodeRepository {
         return code
     }
 
+    /**
+     * Код для регистрации: аккаунта ещё нет, поэтому ключ — адрес.
+     * Прошлые коды на этот же адрес гасятся, как и в [issue].
+     */
+    suspend fun issueForEmail(email: String, purpose: AuthCodePurpose): String {
+        val code = Passwords.generateEmailCode()
+        val now = UtcTimestamp.now()
+        dbQuery {
+            table.deleteWhere {
+                (table.email eq email) and (table.purpose eq purpose.name) and
+                    (table.userId eq "")
+            }
+            table.insert {
+                it[table.id] = UUID.randomUUID().toString()
+                it[table.userId] = ""
+                it[table.purpose] = purpose.name
+                it[table.codeHash] = Passwords.hash(code)
+                it[table.email] = email
+                it[table.createdAt] = now.toString()
+                it[table.expiresAt] = now.addMinutes(TTL_MINUTES).toString()
+                it[table.attempts] = 0
+                it[table.consumedAt] = null
+            }
+        }
+        return code
+    }
+
+    /** Когда последний раз отправляли код на этот адрес (кулдаун регистрации). */
+    suspend fun lastIssuedAtForEmail(email: String, purpose: AuthCodePurpose): String? = dbQuery {
+        table.selectAll()
+            .where {
+                (table.email eq email) and (table.purpose eq purpose.name) and
+                    (table.userId eq "")
+            }
+            .orderBy(table.createdAt to SortOrder.DESC)
+            .limit(1)
+            .firstOrNull()
+            ?.get(table.createdAt)
+    }
+
     /** Когда последний раз отправляли код — для кулдауна на повторную отправку. */
     suspend fun lastIssuedAt(userId: String, purpose: AuthCodePurpose): String? = dbQuery {
         table.selectAll()
@@ -97,6 +146,12 @@ class AuthCodeRepository {
         userId: String,
         purpose: AuthCodePurpose,
         code: String,
+        /**
+         * false — код проверяется, но остаётся живым. Нужно там, где проверка
+         * разнесена на два шага: сначала экран ввода кода, потом экран пароля,
+         * и сжечь код на первом шаге нельзя — второй остался бы без него.
+         */
+        consume: Boolean = true,
     ): CodeCheck = dbQuery {
         val now = UtcTimestamp.now()
         val row = table.selectAll()
@@ -136,7 +191,61 @@ class AuthCodeRepository {
             }
             return@dbQuery CodeCheck.Wrong
         }
-        table.update({ table.id eq dbo.id }) { it[table.consumedAt] = now.toString() }
+        if (consume) {
+            table.update({ table.id eq dbo.id }) { it[table.consumedAt] = now.toString() }
+        }
+        CodeCheck.Ok(dbo)
+    }
+
+    /**
+     * То же самое для кода регистрации: аккаунта ещё нет, ищем по адресу.
+     */
+    suspend fun checkAndConsumeForEmail(
+        email: String,
+        purpose: AuthCodePurpose,
+        code: String,
+        consume: Boolean = true,
+    ): CodeCheck = dbQuery {
+        val now = UtcTimestamp.now()
+        val row = table.selectAll()
+            .where {
+                (table.email eq email) and
+                    (table.userId eq "") and
+                    (table.purpose eq purpose.name) and
+                    table.consumedAt.isNull()
+            }
+            .orderBy(table.createdAt to SortOrder.DESC)
+            .limit(1)
+            .firstOrNull()
+            ?: return@dbQuery CodeCheck.NotFound
+
+        val dbo = AuthCodeDbo(
+            id = row[table.id],
+            userId = row[table.userId],
+            purpose = row[table.purpose],
+            codeHash = row[table.codeHash],
+            email = row[table.email],
+            createdAt = row[table.createdAt],
+            expiresAt = row[table.expiresAt],
+            attempts = row[table.attempts],
+            consumedAt = row[table.consumedAt],
+        )
+
+        if (UtcTimestamp.parse(dbo.expiresAt).isInPast()) {
+            table.deleteWhere { table.id eq dbo.id }
+            return@dbQuery CodeCheck.NotFound
+        }
+        if (dbo.attempts >= MAX_ATTEMPTS) {
+            table.deleteWhere { table.id eq dbo.id }
+            return@dbQuery CodeCheck.TooManyAttempts
+        }
+        if (!Passwords.matches(code.trim(), dbo.codeHash)) {
+            table.update({ table.id eq dbo.id }) { it[table.attempts] = table.attempts plus 1 }
+            return@dbQuery CodeCheck.Wrong
+        }
+        if (consume) {
+            table.update({ table.id eq dbo.id }) { it[table.consumedAt] = now.toString() }
+        }
         CodeCheck.Ok(dbo)
     }
 
