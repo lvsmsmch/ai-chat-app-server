@@ -63,7 +63,15 @@ val appModule = module {
     // ---- инфраструктура ----
     single { TransactionHelper() }
     single(named("mailHttpClient")) {
-        HttpClient { install(ContentNegotiation) { json(defaultJson) } }
+        HttpClient {
+            install(ContentNegotiation) { json(defaultJson) }
+            // Письмо отправляется внутри запроса регистрации: зависший
+            // почтовый провайдер не должен держать ответ приложению
+            install(io.ktor.client.plugins.HttpTimeout) {
+                requestTimeoutMillis = 10_000
+                connectTimeoutMillis = 5_000
+            }
+        }
     }
     single<MailSender> { MailSenderFactory.create(get(named("mailHttpClient"))) }
     single { AppleIdentityTokenVerifier(HttpClient()) }
