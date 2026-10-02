@@ -76,7 +76,18 @@ val appModule = module {
     single<MailSender> { MailSenderFactory.create(get(named("mailHttpClient"))) }
     single { AppleIdentityTokenVerifier(HttpClient()) }
     single { com.lvsmsmch.aichat.billing.SubscriptionRepository() }
-    single { com.lvsmsmch.aichat.billing.PlayPurchaseVerifier(HttpClient()) }
+    // Таймаут обязателен: без него зависший Google подвешивает и запрос на
+    // покупку, и фоновую сверку подписок — они ждали бы ответа вечно
+    single {
+        com.lvsmsmch.aichat.billing.PlayPurchaseVerifier(
+            HttpClient {
+                install(io.ktor.client.plugins.HttpTimeout) {
+                    requestTimeoutMillis = 10_000
+                    connectTimeoutMillis = 5_000
+                }
+            },
+        )
+    }
 
     // ---- репозитории ----
     single { SessionRepository() }

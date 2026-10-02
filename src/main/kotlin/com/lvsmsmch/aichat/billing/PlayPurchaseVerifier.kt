@@ -34,6 +34,11 @@ sealed interface PurchaseCheck {
  */
 class PlayPurchaseVerifier(private val client: HttpClient) {
 
+    private companion object {
+        const val ATTEMPTS = 3
+        const val RETRY_DELAY_MS = 700L
+    }
+
     private val packageName: String =
         System.getenv("PLAY_PACKAGE_NAME") ?: "com.lvsmsmch.aichat"
 
@@ -60,15 +65,37 @@ class PlayPurchaseVerifier(private val client: HttpClient) {
         val url = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications/" +
             "$packageName/purchases/subscriptionsv2/tokens/$purchaseToken"
 
-        val response = runCatching {
-            client.get(url) { header(HttpHeaders.Authorization, "Bearer $accessToken") }
-        }.getOrElse { return PurchaseCheck.Error("request failed: ${it.message}") }
-
-        if (response.status != HttpStatusCode.OK) {
-            return PurchaseCheck.Error("Play answered ${response.status}")
+        // Короткие перебои у Google — обычное дело, а цена ошибки здесь высокая:
+        // человек уже заплатил. Пара повторов снимает почти все случайные сбои,
+        // не затягивая запрос настолько, чтобы клиент отвалился по таймауту
+        var response: io.ktor.client.statement.HttpResponse? = null
+        var lastError = "no attempts"
+        for (attempt in 0 until ATTEMPTS) {
+            if (attempt > 0) kotlinx.coroutines.delay(RETRY_DELAY_MS)
+            val call = runCatching {
+                client.get(url) { header(HttpHeaders.Authorization, "Bearer $accessToken") }
+            }
+            val attempted = call.getOrNull()
+            if (attempted == null) {
+                lastError = "request failed: ${call.exceptionOrNull()?.message}"
+                continue
+            }
+            // 4xx — это ответ по существу (нет такой покупки, нет прав), его
+            // повтор не исправит. Повторяем только серверные сбои
+            if (attempted.status.value < 500) {
+                response = attempted
+                break
+            }
+            lastError = "Play answered ${attempted.status}"
         }
+
+        val answer = response ?: return PurchaseCheck.Error(lastError)
+        if (answer.status != HttpStatusCode.OK) {
+            return PurchaseCheck.Error("Play answered ${answer.status}")
+        }
+
         val state = runCatching {
-            Json.parseToJsonElement(response.bodyAsText())
+            Json.parseToJsonElement(answer.bodyAsText())
                 .jsonObject["subscriptionState"]?.jsonPrimitive?.content
         }.getOrNull()
 

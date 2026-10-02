@@ -4,6 +4,8 @@ import com.lvsmsmch.aichat.db.Db.dbQuery
 import com.lvsmsmch.aichat.db.Tables
 import com.lvsmsmch.aichat.utils.UtcTimestamp
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.neq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -30,6 +32,22 @@ class SubscriptionRepository {
             }
         }
         Unit
+    }
+
+    /**
+     * Кому ещё приписан этот токен покупки.
+     *
+     * Один токен — один оплативший. Иначе достаточно отдать свой токен
+     * приятелям, и премиум будет у всех: токен приходит от клиента, а
+     * сам по себе он не говорит, кто за него платил.
+     */
+    suspend fun otherOwnersOf(purchaseToken: String, exceptUserId: String): List<String> = dbQuery {
+        Tables.Subscriptions.selectAll()
+            .where {
+                (Tables.Subscriptions.purchaseToken eq purchaseToken) and
+                    (Tables.Subscriptions.userId neq exceptUserId)
+            }
+            .map { it[Tables.Subscriptions.userId] }
     }
 
     suspend fun clear(userId: String) = dbQuery {

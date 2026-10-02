@@ -213,8 +213,25 @@ fun Route.configureAuthRouting(
                     logger.warn("Purchase accepted without verification (no Play service account)")
                     true
                 }
-                is com.lvsmsmch.aichat.billing.PurchaseCheck.Error ->
-                    throw BadRequestException("Purchase verification failed: ${check.message}")
+                // Google не ответил. Отказать нельзя: деньги уже списаны, а
+                // отказ потерял бы покупку бесследно. Запоминаем токен
+                // погашенным — фоновая сверка добудится до Google и включит
+                // премиум сама, когда тот снова начнёт отвечать
+                is com.lvsmsmch.aichat.billing.PurchaseCheck.Error -> {
+                    logger.error("Покупка ${userDbo.id} сохранена без подтверждения: ${check.message}")
+                    false
+                }
+            }
+
+            // Один токен — один оплативший. Повторная присылка чужого токена
+            // не размножает премиум, а переносит его: так переживается и
+            // переустановка с входом в новый аккаунт приложения
+            if (active) {
+                subscriptionRepository.otherOwnersOf(purchaseToken, userDbo.id).forEach { previous ->
+                    logger.warn("Токен покупки перешёл от $previous к ${userDbo.id}")
+                    subscriptionRepository.clear(previous)
+                    userRepository.updateSubscriptionStatus(previous, false)
+                }
             }
 
             subscriptionRepository.save(
