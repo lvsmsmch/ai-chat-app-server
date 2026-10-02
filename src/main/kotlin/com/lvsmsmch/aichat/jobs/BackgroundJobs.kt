@@ -51,6 +51,8 @@ class BackgroundJobs(
     private val idGenerator: IdGenerator,
     private val usernameGenerator: UsernameGenerator,
     private val userService: UserService,
+    private val subscriptionRepository: com.lvsmsmch.aichat.billing.SubscriptionRepository,
+    private val purchaseVerifier: com.lvsmsmch.aichat.billing.PlayPurchaseVerifier,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -142,6 +144,13 @@ class BackgroundJobs(
             configureMonthlyCountersUpdater(
                 databaseScope = scope,
                 userRepository = userRepository,
+            ),
+            configureSubscriptionsVerifyUpdater(
+                databaseScope = scope,
+                subscriptionRepository = subscriptionRepository,
+                userRepository = userRepository,
+                purchaseVerifier = purchaseVerifier,
+                intervalHours = 6,
             ),
             configureWinbackPushUpdater(
                 databaseScope = scope,

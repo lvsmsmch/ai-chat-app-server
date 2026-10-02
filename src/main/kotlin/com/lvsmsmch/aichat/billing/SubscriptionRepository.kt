@@ -37,11 +37,35 @@ class SubscriptionRepository {
         Unit
     }
 
-    suspend fun tokenOf(userId: String): String? = dbQuery {
-        Tables.Subscriptions.selectAll()
-            .where { Tables.Subscriptions.userId eq userId }
-            .limit(1)
-            .firstOrNull()
-            ?.get(Tables.Subscriptions.purchaseToken)
+    /**
+     * Все известные покупки — и живые, и погашенные. Погашенные тоже нужны:
+     * после холда или возобновления Google снова признаёт тот же токен, и
+     * премиум должен вернуться сам, без повторной покупки.
+     */
+    suspend fun all(): List<SubscriptionDbo> = dbQuery {
+        Tables.Subscriptions.selectAll().map {
+            SubscriptionDbo(
+                userId = it[Tables.Subscriptions.userId],
+                purchaseToken = it[Tables.Subscriptions.purchaseToken],
+                productId = it[Tables.Subscriptions.productId],
+                active = it[Tables.Subscriptions.active],
+            )
+        }
+    }
+
+    /** Пишем только при реальной смене состояния: иначе [updatedAt] потерял бы смысл. */
+    suspend fun setActive(userId: String, active: Boolean) = dbQuery {
+        Tables.Subscriptions.update({ Tables.Subscriptions.userId eq userId }) {
+            it[Tables.Subscriptions.active] = active
+            it[updatedAt] = UtcTimestamp.now().toString()
+        }
+        Unit
     }
 }
+
+data class SubscriptionDbo(
+    val userId: String,
+    val purchaseToken: String,
+    val productId: String,
+    val active: Boolean,
+)

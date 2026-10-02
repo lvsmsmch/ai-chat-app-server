@@ -178,6 +178,8 @@ val appModule = module {
             idGenerator = get(),
             usernameGenerator = get(),
             userService = get(),
+            subscriptionRepository = get(),
+            purchaseVerifier = get(),
         )
     }
 
