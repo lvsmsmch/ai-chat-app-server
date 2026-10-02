@@ -49,6 +49,7 @@ class LoggingMailSender : MailSender {
 class ResendMailSender(
     private val apiKey: String,
     private val from: String,
+    private val replyTo: String,
     private val client: HttpClient,
 ) : MailSender {
 
@@ -58,6 +59,18 @@ class ResendMailSender(
         val to: List<String>,
         val subject: String,
         val text: String,
+        /**
+         * HTML-часть рядом с текстовой. Письмо из одного голого текста с
+         * шестизначным кодом похоже на фишинг, и фильтры к нему относятся
+         * соответственно: нормальная транзакционная почта — multipart.
+         */
+        val html: String,
+        /**
+         * Живой адрес для ответа. Отправитель noreply сам по себе ничего не
+         * нарушает, но письмо, на которое физически некому ответить, — минус
+         * к доверию. Сюда пишет человек, у которого не сработал код.
+         */
+        @kotlinx.serialization.SerialName("reply_to") val replyTo: List<String>,
     )
 
     override suspend fun send(to: String, subject: String, text: String): Boolean {
@@ -65,7 +78,16 @@ class ResendMailSender(
             val response = client.post("https://api.resend.com/emails") {
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
                 contentType(ContentType.Application.Json)
-                setBody(ResendRequest(from = from, to = listOf(to), subject = subject, text = text))
+                setBody(
+                    ResendRequest(
+                        from = from,
+                        to = listOf(to),
+                        subject = subject,
+                        text = text,
+                        html = MailTemplates.asHtml(text),
+                        replyTo = listOf(replyTo),
+                    )
+                )
             }
             if (!response.status.isSuccess()) {
                 // Тело ответа — единственный способ понять, что не так с доменом или ключом
@@ -95,7 +117,14 @@ object MailSenderFactory {
         val from = System.getenv("MAIL_FROM")?.takeIf { it.isNotBlank() }
         return if (apiKey != null && from != null) {
             logger.info("Почта: Resend, отправитель $from")
-            ResendMailSender(apiKey = apiKey, from = from, client = client)
+            ResendMailSender(
+                apiKey = apiKey,
+                from = from,
+                // Адрес поддержки: на него и так отвечают, и он указан на сайте
+                replyTo = System.getenv("MAIL_REPLY_TO")?.takeIf { it.isNotBlank() }
+                    ?: "iamajavagod@gmail.com",
+                client = client,
+            )
         } else {
             logger.warn("Почта: провайдер не настроен (нет RESEND_API_KEY/MAIL_FROM), письма идут в лог")
             LoggingMailSender()
@@ -130,4 +159,22 @@ object MailTemplates {
 
             If you didn't request a reset, ignore this email — your password stays unchanged.
         """.trimIndent()
+}
+
+/** Текст письма в простой HTML — без картинок, кнопок и стилей-ловушек. */
+internal fun MailTemplates.asHtml(text: String): String {
+    val escaped = text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    val paragraphs = escaped.split("\n\n")
+        .filter { it.isNotBlank() }
+        .joinToString("\n") { "<p style=\"margin:0 0 16px\">" + it.replace("\n", "<br>") + "</p>" }
+    return """
+        <!doctype html>
+        <html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+            font-size:15px;line-height:1.6;color:#1a1a1a;max-width:520px">
+        $paragraphs
+        </body></html>
+    """.trimIndent()
 }
