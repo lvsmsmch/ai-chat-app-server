@@ -550,9 +550,11 @@ fun Route.configureCharacterRouting(
                 throw CharacterNotFoundException(id = characterId)
             }
 
+            val lang = mapper.languageOf(currentUserId)
             call.respondSuccess(
-                data = characterDbo.toCharacterDto(
-                    mapper, mapper.languageOf(currentUserId), likerId = currentUserId,
+                data = characterDbo.toCharacterDto(mapper, lang, likerId = currentUserId).copy(
+                    // Первую реплику и так видит любой, кто начнёт чат
+                    initialMessage = characterDbo.localized(lang).initialMessage.takeIf { it.isNotBlank() },
                 )
             )
         }

@@ -27,7 +27,14 @@ data class CharacterDto(
     @SerialName("isLikedByCurrentUser") val isLikedByCurrentUser: Boolean = false,
     @SerialName("averageRating") val averageRating: Float,
     @SerialName("color") val color: String = "",
-    @SerialName("topRank") val topRank: Int? = null
+    @SerialName("topRank") val topRank: Int? = null,
+    /**
+     * Первая реплика персонажа («First scene» на его странице). Приходит
+     * только в ответе на один персонаж; в списках поле не передаётся вовсе.
+     */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @SerialName("initialMessage") val initialMessage: String? = null,
 )
 
 @Serializable
