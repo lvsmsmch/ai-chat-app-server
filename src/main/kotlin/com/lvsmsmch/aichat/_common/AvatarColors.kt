@@ -12,6 +12,8 @@ package com.lvsmsmch.aichat._common
  */
 object AvatarColors {
     val palette = listOf(
+        // Коралл Luma — цвет монограмм в макете редизайна
+        "#F45B70",
         "#6F48BF", "#3864A5", "#8C7633", "#A04832", "#963553",
         "#504DA6", "#4E6B8C", "#2E6F8C", "#7E3F8C",
     )
