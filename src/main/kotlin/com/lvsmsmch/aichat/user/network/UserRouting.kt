@@ -334,6 +334,31 @@ fun Route.configureUserRouting(
             call.respondSuccess()
         }
 
+        /**
+         * [DEBUG] Урезать свой бесплатный лимит сообщений втрое (переключатель в
+         * DEBUG-разделе настроек тестовой сборки). Только для себя и только
+         * вниз: поднять лимит этим запросом нельзя. Отвечает свежими лимитами.
+         */
+        post("/{userId}/debug-reduced-limit") {
+            if (!call.debugAccessAllowed()) {
+                throw ForbiddenException(errorMessage = "debug endpoints disabled")
+            }
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "You can only change your own limits")
+            }
+            val request = call.receive<DebugReducedLimitRequest>()
+            if (request.enabled) {
+                com.lvsmsmch.aichat.utils.DebugOverrides.reducedLimitUsers.add(userId)
+            } else {
+                com.lvsmsmch.aichat.utils.DebugOverrides.reducedLimitUsers.remove(userId)
+            }
+            logger.info("[DEBUG] reduced free limit for $userId: ${request.enabled}")
+            call.respondSuccess(data = userRepository.getLimits(userId))
+        }
+
         /** [DEBUG] Текущие оверрайды моделей (текст/картинки). */
         get("/{userId}/debug-models") {
             if (!call.debugAccessAllowed()) {

@@ -126,3 +126,9 @@ data class DebugModelsResponse(
     @kotlinx.serialization.SerialName("textModel") val textModel: String?,
     @kotlinx.serialization.SerialName("imageModel") val imageModel: String?,
 )
+
+/** [DEBUG] Урезанный втрое бесплатный лимит сообщений: включить или выключить. */
+@kotlinx.serialization.Serializable
+data class DebugReducedLimitRequest(
+    @kotlinx.serialization.SerialName("enabled") val enabled: Boolean,
+)

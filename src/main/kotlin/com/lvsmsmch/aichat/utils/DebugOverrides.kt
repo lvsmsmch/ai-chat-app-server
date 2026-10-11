@@ -13,4 +13,18 @@ object DebugOverrides {
     /** Модель картинок вместо гибрида Gemini-топ/провайдер; null — обычная логика. */
     @Volatile
     var imageModel: String? = null
+
+    /**
+     * Юзеры с урезанным втрое бесплатным лимитом сообщений — переключатель в
+     * DEBUG-разделе настроек тестовой сборки, чтобы быстро дойти до лимита.
+     * В памяти: после рестарта приложение присылает своё состояние заново.
+     */
+    val reducedLimitUsers: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** Урезанный втрое лимит: 50 → 17. */
+    fun reduced(base: Int): Int = (base + 2) / 3
+
+    /** Бесплатный лимит юзера с учётом урезания. */
+    fun freeLimit(userId: String, base: Int): Int =
+        if (userId in reducedLimitUsers) reduced(base) else base
 }

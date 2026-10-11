@@ -1,5 +1,7 @@
 package com.lvsmsmch.aichat.user.database
 
+import com.lvsmsmch.aichat.utils.DebugOverrides
+
 import com.lvsmsmch.aichat.chat.network.LimitsResponse
 import com.lvsmsmch.aichat.db.Db.dbQuery
 import com.lvsmsmch.aichat.db.Tables
@@ -87,8 +89,10 @@ class UserRepository {
     suspend fun getLimits(userId: String): LimitsResponse {
         val user = getUserById(userId) ?: throw UserNotFoundException()
 
-        val dailyLimit = if (user.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
-        val hourlyLimit = if (user.hasSubscription) HOURLY_LIMIT_MESSAGES_PREMIUM else HOURLY_LIMIT_MESSAGES_REGULAR
+        val dailyLimit = if (user.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM
+            else DebugOverrides.freeLimit(user.id, DAILY_LIMIT_MESSAGES_REGULAR)
+        val hourlyLimit = if (user.hasSubscription) HOURLY_LIMIT_MESSAGES_PREMIUM
+            else DebugOverrides.freeLimit(user.id, HOURLY_LIMIT_MESSAGES_REGULAR)
 
         val now = java.time.LocalDateTime.now()
 
@@ -314,10 +318,18 @@ class UserRepository {
      * дневной лимит (вызывать ДО полуночного сброса счётчиков).
      */
     suspend fun findLimitResetPushCandidates(): List<UserDbo> = dbQuery {
+        // [DEBUG] Урезанный лимит тоже даёт пуш о сбросе — проверяется весь путь
+        val reduced = DebugOverrides.reducedLimitUsers.toList()
+        val burnedOut = if (reduced.isEmpty()) {
+            Tables.Users.dailyMessageCount greaterEq DAILY_LIMIT_MESSAGES_REGULAR
+        } else {
+            (Tables.Users.dailyMessageCount greaterEq DAILY_LIMIT_MESSAGES_REGULAR) or
+                ((Tables.Users.id inList reduced) and
+                    (Tables.Users.dailyMessageCount greaterEq DebugOverrides.reduced(DAILY_LIMIT_MESSAGES_REGULAR)))
+        }
         Tables.Users.selectAll()
             .where {
-                (Tables.Users.hasSubscription eq false) and
-                    (Tables.Users.dailyMessageCount greaterEq DAILY_LIMIT_MESSAGES_REGULAR) and
+                (Tables.Users.hasSubscription eq false) and burnedOut and
                     Tables.Users.fcmToken.isNotNull()
             }
             .map { it.toUserDbo() }
@@ -378,8 +390,8 @@ class UserRepository {
     suspend fun notifyCharacterMessageWasSent(session: DbSession, userId: String) {
         val userDbo = getUserById(userId) ?: return
         // Сначала тратится обычный дневной лимит, экстра-подарок — только после него
-        val dailyLimit =
-            if (userDbo.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM else DAILY_LIMIT_MESSAGES_REGULAR
+        val dailyLimit = if (userDbo.hasSubscription) DAILY_LIMIT_MESSAGES_PREMIUM
+            else DebugOverrides.freeLimit(userDbo.id, DAILY_LIMIT_MESSAGES_REGULAR)
         val spendExtra = !userDbo.hasSubscription &&
             userDbo.dailyMessageCount >= dailyLimit &&
             userDbo.extraFreeMessagesCount > 0
