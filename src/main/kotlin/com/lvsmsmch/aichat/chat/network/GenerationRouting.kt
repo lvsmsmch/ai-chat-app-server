@@ -18,6 +18,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
@@ -166,52 +172,90 @@ fun Route.configureGenerationRouting(
                         messageFinisher.finishMessageAsync(message.id)
                     }
 
-                    // firstOrNull завершает подписку на терминальном чанке (collect с
-                    // return@collect висел вечно); таймаут страхует от молчащей генерации —
-                    // соединение всегда закрывается, пул клиента не забивается.
-                    val terminal = withTimeoutOrNull(180_000L) {
-                        messageRepository.streamMessageUpdates(message.id).firstOrNull { update ->
-                            val chunk = if (update.isComplete || update.isFailed) {
-                                val finalSyncResponse = generateChatSyncResponse(
-                                    chat = chat,
-                                    chatSyncRequest = request.chatSyncRequest,
-                                    chatRepository = chatRepository,
-                                    messageRepository = messageRepository,
-                                    mapper = mapper
-                                )
+                    // Пока генерация молчит (картинка идёт до полутора минут), каждые
+                    // 15 секунд шлём SSE-комментарий «: ping». Без него клиентский
+                    // таймаут сокета (30 с) рвал соединение: приложение помечало
+                    // картинку ошибкой и переподключалось, а здесь копились мёртвые
+                    // подписки, которые падали на записи уже готового результата.
+                    // Комментарии парсеры SSE пропускают — и новые, и старое приложение.
+                    // Ушедшего клиента пинг замечает сразу и снимает подписку.
+                    val writeLock = Mutex()
+                    var clientGone = false
+                    val terminal = coroutineScope {
+                        // firstOrNull завершает подписку на терминальном чанке (collect с
+                        // return@collect висел вечно); таймаут страхует от молчащей генерации —
+                        // соединение всегда закрывается, пул клиента не забивается.
+                        val waiter = async {
+                            withTimeoutOrNull(180_000L) {
+                                messageRepository.streamMessageUpdates(message.id).firstOrNull { update ->
+                                    val chunk = if (update.isComplete || update.isFailed) {
+                                        val finalSyncResponse = generateChatSyncResponse(
+                                            chat = chat,
+                                            chatSyncRequest = request.chatSyncRequest,
+                                            chatRepository = chatRepository,
+                                            messageRepository = messageRepository,
+                                            mapper = mapper
+                                        )
 
-                                StreamMessageChunk(
-                                    chunk = update.newText,
-                                    isComplete = update.isComplete,
-                                    isFailed = update.isFailed,
-                                    failReason = update.failReason,
-                                    nsfw = false,
-                                    imageUrl = update.imageUrl,
-                                    imageDebugInfo = update.imageDebugInfo,
-                                    chatSyncResponse = finalSyncResponse
-                                )
-                            } else {
-                                StreamMessageChunk(
-                                    chunk = update.newText,
-                                    isComplete = false,
-                                    isFailed = false,
-                                    nsfw = false
-                                )
-                            }
+                                        StreamMessageChunk(
+                                            chunk = update.newText,
+                                            isComplete = update.isComplete,
+                                            isFailed = update.isFailed,
+                                            failReason = update.failReason,
+                                            nsfw = false,
+                                            imageUrl = update.imageUrl,
+                                            imageDebugInfo = update.imageDebugInfo,
+                                            chatSyncResponse = finalSyncResponse
+                                        )
+                                    } else {
+                                        StreamMessageChunk(
+                                            chunk = update.newText,
+                                            isComplete = false,
+                                            isFailed = false,
+                                            nsfw = false
+                                        )
+                                    }
 
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    write("data: ${defaultJson.encodeToString(chunk)}\n\n")
-                                    flush()
-                                } catch (writeException: Exception) {
+                                    withContext(Dispatchers.IO) {
+                                        writeLock.withLock {
+                                            try {
+                                                write("data: ${defaultJson.encodeToString(chunk)}\n\n")
+                                                flush()
+                                            } catch (writeException: Exception) {
+                                            }
+                                        }
+                                    }
+
+                                    update.isComplete || update.isFailed
                                 }
                             }
-
-                            update.isComplete || update.isFailed
                         }
+                        val pinger = launch(Dispatchers.IO) {
+                            while (waiter.isActive) {
+                                delay(15_000)
+                                if (!waiter.isActive) break
+                                val delivered = writeLock.withLock {
+                                    runCatching { write(": ping\n\n"); flush() }.isSuccess
+                                }
+                                if (!delivered) {
+                                    clientGone = true
+                                    waiter.cancel()
+                                    break
+                                }
+                            }
+                        }
+                        val result = try {
+                            waiter.await()
+                        } catch (e: CancellationException) {
+                            // Отменили не мы (сервер закрывает вызов) — пробрасываем
+                            if (!clientGone) throw e
+                            null
+                        }
+                        pinger.cancel()
+                        result
                     }
 
-                    if (terminal == null) {
+                    if (terminal == null && !clientGone) {
                         val timeoutChunk = StreamMessageChunk(
                             chunk = "",
                             isComplete = false,
