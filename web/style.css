@@ -1,27 +1,137 @@
-:root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: #101010; color: #e9e9e9;
-  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+/* Luma — те же токены, что в приложении (ai-chat-app-kmp: theme/Luma.kt).
+   Приложение только тёмное — сайт тоже. */
+:root {
+  color-scheme: dark;
+  --ink: #101014;
+  --surface: #1C1920;
+  --surface2: #29232B;
+  --dark-button: #262028;
+  --white: #FBF8F8;
+  --muted: #B5ADB7;
+  --soft: #837A87;
+  --tab-idle: #A9A1A9;
+  --line: rgba(255, 255, 255, 0.11);
+  --coral: #F45B70;
+  --coral2: #FF7380;
+  --on-coral: #1D1118;
+  --lime: #B7FA39;
+  --gutter: 22px;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
-.wrap { max-width: 760px; margin: 0 auto; padding: 40px 20px 96px; }
-nav { display: flex; flex-wrap: wrap; gap: 18px; padding-bottom: 28px; border-bottom: 1px solid #262626; margin-bottom: 36px; font-size: 14px; }
-nav a { color: #828282; text-decoration: none; }
-nav a:hover, nav a[aria-current] { color: #a3e635; }
-h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; color: #fff; }
-h2 { font-size: 19px; margin: 38px 0 10px; color: #fff; }
-h3 { font-size: 16px; margin: 26px 0 6px; color: #fff; }
-.meta { color: #828282; font-size: 14px; margin-bottom: 32px; }
-p, li { color: #c7c7c7; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--white);
+  font: 16px/1.65 var(--sans);
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 var(--gutter) 72px; }
+a { color: var(--coral2); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Знак: «Luma» курсивом 900 и под ним скошенная черта — 2/3 коралл, 1/3 лайм */
+.top { display: flex; align-items: center; min-height: 68px; }
+.brand {
+  display: inline-flex; flex-direction: column; align-items: stretch; gap: 3px;
+  color: var(--white); text-decoration: none;
+  font-size: 28px; line-height: 28px; font-weight: 900; font-style: italic; letter-spacing: -0.01em;
+}
+.brand::after {
+  content: ""; height: 5px; transform: skewX(-24deg);
+  background: linear-gradient(90deg, var(--coral) 0 67%, var(--lime) 67% 100%);
+}
+
+/* Вкладки — как категории в Discover: белая подпись и коралловая черта */
+.tabs {
+  display: flex; gap: 24px; overflow-x: auto; scrollbar-width: none;
+  margin: 0 calc(-1 * var(--gutter)) 34px; padding: 6px var(--gutter) 0;
+  border-bottom: 1px solid var(--line);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a {
+  flex: none; padding: 10px 0 12px; font-size: 13px; line-height: 16px; font-weight: 650;
+  color: var(--tab-idle); text-decoration: none; border-bottom: 3px solid transparent;
+}
+.tabs a:hover { color: var(--white); }
+.tabs a[aria-current] { color: var(--white); border-bottom-color: var(--coral); }
+
+/* Текст документов */
+h1 { font-size: 32px; line-height: 1.12; font-weight: 850; margin: 0 0 10px; letter-spacing: -0.015em; }
+h2 { font-size: 19px; line-height: 1.3; font-weight: 750; margin: 40px 0 10px; }
+h3 { font-size: 16px; line-height: 1.35; font-weight: 750; margin: 28px 0 6px; }
+.meta { color: var(--soft); font-size: 13px; margin-bottom: 30px; }
+p, li { color: var(--muted); }
+strong { color: var(--white); font-weight: 700; }
 ul, ol { padding-left: 22px; }
 li { margin: 6px 0; }
-a { color: #a3e635; }
-code { background: #1e1e1e; padding: 2px 6px; border-radius: 6px; font-size: 14px; color: #e9e9e9; }
-.card { border: 1px solid #363636; border-radius: 12px; padding: 16px 18px; margin: 26px 0; background: #161616; }
+li::marker { color: var(--coral); }
+code { font-size: 13px; background: var(--surface2); padding: 2px 6px; border-radius: 5px; color: var(--white); }
+.card { border: 1px solid var(--line); border-radius: 7px; padding: 16px 18px; margin: 26px 0; background: var(--surface); }
 .card p:first-child { margin-top: 0; }
 .card p:last-child { margin-bottom: 0; }
-hr { border: 0; border-top: 1px solid #262626; margin: 44px 0 0; }
-footer { color: #828282; font-size: 14px; padding-top: 18px; }
-.hero { text-align: center; padding: 50px 0 10px; }
-.hero h1 { font-size: 38px; }
-.hero p { color: #828282; font-size: 17px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0 0; }
+footer { color: var(--soft); font-size: 13px; line-height: 1.7; padding-top: 18px; }
+
+/* Пометка раздела — коралловая капитель, как над заголовками онбординга */
+.kicker {
+  margin: 40px 0 8px; font-size: 11px; line-height: 1.2; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--coral);
+}
+
+/* Список документов — строки настроек: подпись, пояснение, шеврон */
+.rows { margin: 0; padding: 0; list-style: none; }
+.rows li { margin: 0; }
+.row {
+  display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 13px 0;
+  border-bottom: 1px solid var(--line); text-decoration: none;
+}
+.row span { flex: 1; min-width: 0; }
+.row b { display: block; font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--white); }
+.row small { display: block; margin-top: 4px; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.row svg { flex: none; width: 18px; height: 18px; color: var(--soft); }
+.row:hover b { color: var(--coral2); }
+
+/* Кнопки — как в приложении: коралл с тёмной подписью, тёмная вторичная;
+   скругление 7, высота от 52, стрелка после подписи */
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 52px; padding: 0 22px; border-radius: 7px;
+  background: var(--coral); color: var(--on-coral);
+  font-size: 15px; line-height: 1.1; font-weight: 750; text-decoration: none;
+}
+.button:hover { filter: brightness(1.06); }
+.button svg { width: 19px; height: 19px; flex: none; }
+.button.dark { background: var(--dark-button); color: var(--white); border: 1px solid var(--line); }
+
+/* Главная: обложка персонажа, гаснет в тёмный — как первый экран приложения */
+.hero {
+  position: relative; overflow: hidden; display: flex; flex-direction: column;
+  min-height: min(88vh, 740px); margin: 0 calc(-1 * var(--gutter)) 6px;
+  padding: 0 var(--gutter) 30px; background: var(--ink);
+}
+.hero > img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 0; object-fit: cover; object-position: 50% 15%;
+}
+.hero::before {
+  content: ""; position: absolute; z-index: 1; inset: 0;
+  background: linear-gradient(180deg,
+    rgba(16, 16, 20, 0.5) 0%, rgba(16, 16, 20, 0) 18%,
+    rgba(16, 16, 20, 0) 36%, rgba(16, 16, 20, 0.62) 56%,
+    rgba(16, 16, 20, 0.94) 74%, #101014 90%);
+}
+.hero > :not(img) { position: relative; z-index: 2; }
+.hero .top { min-height: 76px; }
+.hero-text { margin-top: auto; }
+.hero .kicker { margin: 0 0 10px; }
+.hero h1 { font-size: 40px; line-height: 1.02; font-weight: 900; letter-spacing: -0.02em; margin: 0; }
+.hero h1 em { color: var(--coral); font-style: italic; }
+.hero p.lead { margin: 14px 0 0; font-size: 15px; line-height: 1.5; color: var(--muted); max-width: 32em; }
+
+@media (min-width: 806px) {
+  .hero { margin: 24px 0 6px; border-radius: 8px; min-height: 640px; padding: 0 34px 36px; }
+  .hero h1 { font-size: 52px; }
+}
