@@ -116,11 +116,39 @@ fun Route.configureCharacterRouting(
             coverFile?.let { validateCoverPicture(it) }
             cover?.let { validateChatCover(it) }
 
-            val existingCharactersCount = characterRepository.getCharactersByUserId(
-                userId = sessionDbo.userId, includePrivate = true
-            ).size
+            val cleanDescription = collapseExcessLineBreaks(description!!)
+            val tagCodes = CharacterTag.fromString(tags!!).map { it.code }
+            // В Discover — только с портретом и строкой о персонаже: пустышки
+            // засоряют каталог. Новое приложение такое не отправит, а старые
+            // версии получат приватного персонажа вместо ошибки
+            val effectiveVisibility =
+                if (visibility == CharacterVisibility.PUBLIC.code &&
+                    (pictureFile == null || cleanDescription.isBlank())
+                ) CharacterVisibility.PRIVATE.code else visibility!!
 
-            if (existingCharactersCount > 500) {
+            val existingCharacters = characterRepository.getCharactersByUserId(
+                userId = sessionDbo.userId, includePrivate = true
+            )
+
+            // Та же форма ещё раз через минуту: ответ на первую отправку
+            // потерялся в плохой сети, и человек нажал снова. Отдаём уже
+            // созданного — 23.10.2026 так в каталоге появились три одинаковых
+            // пустых персонажа
+            val repeatSince = UtcTimestamp.now().subtractMinutes(REPEAT_SUBMIT_WINDOW_MINUTES)
+            existingCharacters.firstOrNull {
+                UtcTimestamp.parse(it.createdAt).isAfter(repeatSince) &&
+                    it.name == name && it.description == cleanDescription &&
+                    it.prompt == prompt && it.initialMessage == initialMessage &&
+                    it.category == category && it.tags == tagCodes &&
+                    it.visibility == effectiveVisibility &&
+                    !it.picUrl.isNullOrBlank() == (pictureFile != null)
+            }?.let { repeated ->
+                pictureFile?.delete()
+                coverFile?.delete()
+                return@post call.respondSuccess(data = repeated.toCharacterFullInfoDto(mapper, sessionDbo.userId))
+            }
+
+            if (existingCharacters.size > 500) {
                 throw BadRequestException("Maximum characters limit exceeded (500)")
             }
 
@@ -135,13 +163,13 @@ fun Route.configureCharacterRouting(
                 id = characterId,
                 authorId = userId,
                 name = name!!,
-                description = collapseExcessLineBreaks(description!!),
+                description = cleanDescription,
                 prompt = prompt!!,
                 picUrl = images?.originalUrl,
                 picUrlThumbnail = images?.thumbnailUrl,
-                visibility = visibility!!,
+                visibility = effectiveVisibility,
                 category = category!!,
-                tags = CharacterTag.fromString(tags!!).map { it.code },
+                tags = tagCodes,
                 initialMessage = initialMessage!!,
                 // Ничего не выбрали — обложка назначается сама, чтобы у чата
                 // не было пустого фона
@@ -175,7 +203,9 @@ fun Route.configureCharacterRouting(
             // Персонажи ВСЕХ секций разом: раньше на каждого шёл свой запрос,
             // то есть тринадцать секций по тридцать давали под четыреста
             val byId = mapper
-                .charactersDtoByIds(sectionsRaw.flatMap { it.characterIds }.distinct(), "en", emptySet())
+                .charactersDtoByIds(
+                    sectionsRaw.flatMap { it.characterIds }.distinct(), "en", emptySet(), publicOnly = true,
+                )
                 .associateBy { it.id }
             val sections = sectionsRaw.map { s ->
                 DiscoverSectionDto(
@@ -201,8 +231,11 @@ fun Route.configureCharacterRouting(
             // Заблокированные авторы: кэш секций общий и о блокировках не знает,
             // поэтому чистим на выдаче
             val blocked = userBlockRepository.getBlockedIds(currentUserId)
+            // publicOnly: кэш пересобирается раз в 20 минут, а персонажа могли
+            // сделать приватным раньше — до пересборки он не должен светиться
             val byId = mapper.charactersDtoByIds(
                 sectionsRaw.flatMap { it.characterIds }.distinct(), lang, sectionLiked,
+                publicOnly = true,
                 blockedAuthorIds = blocked,
             ).associateBy { it.id }
             val sections = sectionsRaw.map { s ->
@@ -492,7 +525,7 @@ fun Route.configureCharacterRouting(
                 val page = ids.drop(cursor).take(request.size)
                 val likedIds = characterLikeRepository.getLikedIds(currentUserId, page)
                 val characters = mapper.charactersDtoByIds(
-                    page, lang, likedIds,
+                    page, lang, likedIds, publicOnly = true,
                     blockedAuthorIds = userBlockRepository.getBlockedIds(currentUserId),
                 )
                 val next = (cursor + page.size).takeIf { it < ids.size }?.toString()
@@ -699,6 +732,15 @@ fun Route.configureCharacterRouting(
             cover?.let { validateChatCover(it) }
             pictureFile?.let { validateCharacterPicture(it) }
 
+            // Правило каталога то же, что при создании, но здесь отказ, а не
+            // тихая приватность: смена видимости удаляет чужие чаты с персонажем
+            val stayPublic = (visibility ?: character.visibility) == CharacterVisibility.PUBLIC.code
+            val keepsPicture = pictureFile != null || (!character.picUrl.isNullOrBlank() && removePicture != true)
+            val keepsDescription = (description ?: character.description).isNotBlank()
+            if (stayPublic && (!keepsPicture || !keepsDescription)) {
+                throw ValidationException("A public character needs a picture and a description")
+            }
+
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
             val updatedCharacter = characterService.updateCharacter(
@@ -790,3 +832,6 @@ private fun AvatarGenerationQuota.toAvatarLimitsDto() = AvatarGenerationLimitsDt
     hourlyResetAfterSeconds = hourlyResetAfterSeconds,
     dailyResetAfterSeconds = dailyResetAfterSeconds,
 )
+
+/** Сколько минут повтор той же формы создания считается переотправкой, а не новым персонажем. */
+private const val REPEAT_SUBMIT_WINDOW_MINUTES = 10L
