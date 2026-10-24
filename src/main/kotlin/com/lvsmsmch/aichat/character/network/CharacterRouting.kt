@@ -15,6 +15,8 @@ import io.ktor.server.request.*
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
@@ -119,65 +121,71 @@ fun Route.configureCharacterRouting(
             val cleanDescription = collapseExcessLineBreaks(description!!)
             val tagCodes = CharacterTag.fromString(tags!!).map { it.code }
 
-            val existingCharacters = characterRepository.getCharactersByUserId(
-                userId = sessionDbo.userId, includePrivate = true
-            )
+            // Создания одного автора — по очереди: повтор, пришедший, пока
+            // первая отправка ещё сохраняется, иначе не увидел бы её и создал копию
+            val created = creationLockFor(sessionDbo.userId).withLock {
+                val existingCharacters = characterRepository.getCharactersByUserId(
+                    userId = sessionDbo.userId, includePrivate = true
+                )
 
-            // Та же форма ещё раз через минуту: ответ на первую отправку
-            // потерялся в плохой сети, и человек нажал снова. Отдаём уже
-            // созданного — 23.10.2026 так в каталоге появились три одинаковых
-            // персонажа подряд
-            val repeatSince = UtcTimestamp.now().subtractMinutes(REPEAT_SUBMIT_WINDOW_MINUTES)
-            existingCharacters.firstOrNull {
-                UtcTimestamp.parse(it.createdAt).isAfter(repeatSince) &&
-                    it.name == name && it.description == cleanDescription &&
-                    it.prompt == prompt && it.initialMessage == initialMessage &&
-                    it.category == category && it.tags == tagCodes &&
-                    it.visibility == visibility &&
-                    !it.picUrl.isNullOrBlank() == (pictureFile != null)
-            }?.let { repeated ->
-                pictureFile?.delete()
-                coverFile?.delete()
-                return@post call.respondSuccess(data = repeated.toCharacterFullInfoDto(mapper, sessionDbo.userId))
+                // Та же форма ещё раз через минуту: ответ на первую отправку
+                // потерялся в плохой сети, и человек нажал снова. Отдаём уже
+                // созданного — 23.10.2026 так в каталоге появились три одинаковых
+                // персонажа подряд
+                val repeatSince = UtcTimestamp.now().subtractMinutes(REPEAT_SUBMIT_WINDOW_MINUTES)
+                val repeated = existingCharacters.firstOrNull {
+                    UtcTimestamp.parse(it.createdAt).isAfter(repeatSince) &&
+                        it.name == name && it.description == cleanDescription &&
+                        it.prompt == prompt && it.initialMessage == initialMessage &&
+                        it.category == category && it.tags == tagCodes &&
+                        it.visibility == visibility &&
+                        !it.picUrl.isNullOrBlank() == (pictureFile != null)
+                }
+                if (repeated != null) {
+                    pictureFile?.delete()
+                    coverFile?.delete()
+                    return@withLock repeated
+                }
+
+                if (existingCharacters.size > 500) {
+                    throw BadRequestException("Maximum characters limit exceeded (500)")
+                }
+
+                val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
+                // Своя обложка перевешивает выбранную встроенную
+                val coverImages = coverFile?.let { ImageServer.uploadImageOnServer(it) }
+
+                val userId = sessionDbo.userId
+
+                val characterId = idGenerator.generateId(EntityType.CHARACTER)
+                val characterDbo = CharacterDbo(
+                    id = characterId,
+                    authorId = userId,
+                    name = name!!,
+                    description = cleanDescription,
+                    prompt = prompt!!,
+                    picUrl = images?.originalUrl,
+                    picUrlThumbnail = images?.thumbnailUrl,
+                    visibility = visibility!!,
+                    category = category!!,
+                    tags = tagCodes,
+                    initialMessage = initialMessage!!,
+                    // Ничего не выбрали — обложка назначается сама, чтобы у чата
+                    // не было пустого фона
+                    cover = coverImages?.originalUrl
+                        ?: cover?.takeIf { it.isNotBlank() }
+                        ?: com.lvsmsmch.aichat.character.ChatCovers.defaultFor(characterId),
+                )
+
+                characterService.addCharacter(characterDbo)
+                // Фолловерам автора — «добавил персонажа» (только публичные)
+                if (characterDbo.visibility != CharacterVisibility.PRIVATE.code) {
+                    notificationService.onFolloweeNewCharacter(characterDbo.authorId, characterDbo.id)
+                }
+                characterDbo
             }
 
-            if (existingCharacters.size > 500) {
-                throw BadRequestException("Maximum characters limit exceeded (500)")
-            }
-
-            val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
-            // Своя обложка перевешивает выбранную встроенную
-            val coverImages = coverFile?.let { ImageServer.uploadImageOnServer(it) }
-
-            val userId = sessionDbo.userId
-
-            val characterId = idGenerator.generateId(EntityType.CHARACTER)
-            val characterDbo = CharacterDbo(
-                id = characterId,
-                authorId = userId,
-                name = name!!,
-                description = cleanDescription,
-                prompt = prompt!!,
-                picUrl = images?.originalUrl,
-                picUrlThumbnail = images?.thumbnailUrl,
-                visibility = visibility!!,
-                category = category!!,
-                tags = tagCodes,
-                initialMessage = initialMessage!!,
-                // Ничего не выбрали — обложка назначается сама, чтобы у чата
-                // не было пустого фона
-                cover = coverImages?.originalUrl
-                    ?: cover?.takeIf { it.isNotBlank() }
-                    ?: com.lvsmsmch.aichat.character.ChatCovers.defaultFor(characterId),
-            )
-
-            characterService.addCharacter(characterDbo)
-            // Фолловерам автора — «добавил персонажа» (только публичные)
-            if (characterDbo.visibility != CharacterVisibility.PRIVATE.code) {
-                notificationService.onFolloweeNewCharacter(characterDbo.authorId, characterDbo.id)
-            }
-
-            call.respondSuccess(data = characterDbo.toCharacterFullInfoDto(mapper, sessionDbo.userId))
+            call.respondSuccess(data = created.toCharacterFullInfoDto(mapper, sessionDbo.userId))
         }
 
         /**
@@ -819,3 +827,9 @@ private fun AvatarGenerationQuota.toAvatarLimitsDto() = AvatarGenerationLimitsDt
 
 /** Сколько минут повтор той же формы создания считается переотправкой, а не новым персонажем. */
 private const val REPEAT_SUBMIT_WINDOW_MINUTES = 10L
+
+/** Замки создания персонажей: автор всегда попадает в один и тот же, а их число не растёт с числом юзеров. */
+private val creationLocks = Array(64) { Mutex() }
+
+private fun creationLockFor(userId: String): Mutex =
+    creationLocks[(userId.hashCode() and Int.MAX_VALUE) % creationLocks.size]
