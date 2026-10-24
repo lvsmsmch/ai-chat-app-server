@@ -118,13 +118,6 @@ fun Route.configureCharacterRouting(
 
             val cleanDescription = collapseExcessLineBreaks(description!!)
             val tagCodes = CharacterTag.fromString(tags!!).map { it.code }
-            // В Discover — только с портретом и строкой о персонаже: пустышки
-            // засоряют каталог. Новое приложение такое не отправит, а старые
-            // версии получат приватного персонажа вместо ошибки
-            val effectiveVisibility =
-                if (visibility == CharacterVisibility.PUBLIC.code &&
-                    (pictureFile == null || cleanDescription.isBlank())
-                ) CharacterVisibility.PRIVATE.code else visibility!!
 
             val existingCharacters = characterRepository.getCharactersByUserId(
                 userId = sessionDbo.userId, includePrivate = true
@@ -133,14 +126,14 @@ fun Route.configureCharacterRouting(
             // Та же форма ещё раз через минуту: ответ на первую отправку
             // потерялся в плохой сети, и человек нажал снова. Отдаём уже
             // созданного — 23.10.2026 так в каталоге появились три одинаковых
-            // пустых персонажа
+            // персонажа подряд
             val repeatSince = UtcTimestamp.now().subtractMinutes(REPEAT_SUBMIT_WINDOW_MINUTES)
             existingCharacters.firstOrNull {
                 UtcTimestamp.parse(it.createdAt).isAfter(repeatSince) &&
                     it.name == name && it.description == cleanDescription &&
                     it.prompt == prompt && it.initialMessage == initialMessage &&
                     it.category == category && it.tags == tagCodes &&
-                    it.visibility == effectiveVisibility &&
+                    it.visibility == visibility &&
                     !it.picUrl.isNullOrBlank() == (pictureFile != null)
             }?.let { repeated ->
                 pictureFile?.delete()
@@ -167,7 +160,7 @@ fun Route.configureCharacterRouting(
                 prompt = prompt!!,
                 picUrl = images?.originalUrl,
                 picUrlThumbnail = images?.thumbnailUrl,
-                visibility = effectiveVisibility,
+                visibility = visibility!!,
                 category = category!!,
                 tags = tagCodes,
                 initialMessage = initialMessage!!,
@@ -731,15 +724,6 @@ fun Route.configureCharacterRouting(
             tags?.let { validateCharacterTags(it) }
             cover?.let { validateChatCover(it) }
             pictureFile?.let { validateCharacterPicture(it) }
-
-            // Правило каталога то же, что при создании, но здесь отказ, а не
-            // тихая приватность: смена видимости удаляет чужие чаты с персонажем
-            val stayPublic = (visibility ?: character.visibility) == CharacterVisibility.PUBLIC.code
-            val keepsPicture = pictureFile != null || (!character.picUrl.isNullOrBlank() && removePicture != true)
-            val keepsDescription = (description ?: character.description).isNotBlank()
-            if (stayPublic && (!keepsPicture || !keepsDescription)) {
-                throw ValidationException("A public character needs a picture and a description")
-            }
 
             val images = pictureFile?.let { ImageServer.uploadImageOnServer(it) }
 
