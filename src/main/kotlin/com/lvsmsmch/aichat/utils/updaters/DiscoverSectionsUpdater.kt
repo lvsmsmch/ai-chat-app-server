@@ -101,8 +101,10 @@ const val KEY_MOST_POPULAR = "most_popular"
 
 private const val MAIN_LIST_SIZE = 200
 private const val HEAD_SIZE = 10
-private const val ALL_SECTION_SIZE = 4
-private const val POPULAR_RANDOM_POOL = 20
+private const val ALL_SECTION_SIZE = 20
+/** Первые позиции секции All — их видно без прокрутки ленты, повторов между секциями тут нет. */
+private const val ALL_SECTION_HEAD = 5
+private const val POPULAR_RANDOM_POOL = 40
 private const val MIN_CATEGORY_CHARACTERS = 3
 
 /** Полные списки вкладок: первые HEAD_SIZE не пересекаются между тремя. */
@@ -132,7 +134,12 @@ private fun buildMainLists(
     )
 }
 
-/** Секции экрана All: по 4 персонажа, все уникальны в пределах экрана. */
+/**
+ * Секции экрана All — ленты по [ALL_SECTION_SIZE]. Сначала в ленту идут
+ * персонажи, которых на экране ещё не было; уже показанные — только в хвост,
+ * когда в пуле не хватает новых (малые категории), и не те, что стоят в
+ * голове другой секции. Первые [ALL_SECTION_HEAD] у всех секций разные.
+ */
 private fun buildAllScreen(
     forYouPool: List<CharacterDbo>,
     trendingPool: List<CharacterDbo>,
@@ -140,17 +147,20 @@ private fun buildAllScreen(
     byCategory: Map<String, List<CharacterDbo>>,
 ): List<DiscoverSectionDbo> {
     val used = mutableSetOf<String>()
+    val heads = mutableSetOf<String>()
 
-    fun pick(pool: List<CharacterDbo>): List<String> =
-        pool.asSequence()
-            .filter { it.id !in used }
-            .take(ALL_SECTION_SIZE)
-            .map { it.id }
-            .toList()
-            .also { used += it }
+    fun pick(pool: List<CharacterDbo>): List<String> {
+        val ids = pool.map { it.id }.distinct()
+        val fresh = ids.filter { it !in used }
+        val repeats = ids.filter { it in used && it !in heads }
+        val picked = (fresh + repeats).take(ALL_SECTION_SIZE)
+        used += picked
+        heads += picked.take(ALL_SECTION_HEAD)
+        return picked
+    }
 
     val sections = mutableListOf<DiscoverSectionDbo>()
-    // Most popular не статичен: случайные 4 из топ-20 по чатам
+    // Most popular не статичен: случайные из топ-40 по чатам
     sections += DiscoverSectionDbo(
         ALL_PREFIX + KEY_MOST_POPULAR,
         pick(popularPool.take(POPULAR_RANDOM_POOL).shuffled(Random.Default)),
@@ -158,7 +168,7 @@ private fun buildAllScreen(
     sections += DiscoverSectionDbo(ALL_PREFIX + KEY_TRENDING, pick(trendingPool))
     sections += DiscoverSectionDbo(ALL_PREFIX + KEY_FOR_YOU, pick(forYouPool))
 
-    // Категории — тоже по 4 и без повторов с уже показанным на экране
+    // Категории — тоже лентами, новые персонажи вперёд уже показанных
     CharacterCategory.entries.forEach { category ->
         val pool = byCategory[category.code].orEmpty()
         if (pool.size < MIN_CATEGORY_CHARACTERS) return@forEach

@@ -197,10 +197,12 @@ fun Route.configureCharacterRouting(
         get("/discover-sections/public") {
             val cache = discoverSectionsRepository.getForUserOrDefault("")
                 ?: return@get call.respondSuccess(DiscoverSectionsResponse(emptyList()))
+            val limit = call.sectionLimit()
             val sectionsRaw = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
                 // for_you в дефолтном наборе нет, но на всякий случай фильтруем
                 .filterNot { it.key.contains("for_you") }
+                .map { it.copy(characterIds = it.characterIds.take(limit)) }
             // Персонажи ВСЕХ секций разом: раньше на каждого шёл свой запрос,
             // то есть тринадцать секций по тридцать давали под четыреста
             val byId = mapper
@@ -227,8 +229,10 @@ fun Route.configureCharacterRouting(
                 currentUserId,
                 cache.sections.flatMap { it.characterIds },
             )
+            val limit = call.sectionLimit()
             val sectionsRaw = cache.sections
                 .filter { it.key.startsWith(com.lvsmsmch.aichat.utils.updaters.ALL_PREFIX) }
+                .map { it.copy(characterIds = it.characterIds.take(limit)) }
             // Заблокированные авторы: кэш секций общий и о блокировках не знает,
             // поэтому чистим на выдаче
             val blocked = userBlockRepository.getBlockedIds(currentUserId)
@@ -833,3 +837,10 @@ private val creationLocks = Array(64) { Mutex() }
 
 private fun creationLockFor(userId: String): Mutex =
     creationLocks[(userId.hashCode() and Int.MAX_VALUE) % creationLocks.size]
+
+/**
+ * Сколько персонажей секции отдавать: приложения до лент (секция сеткой по
+ * два) параметра не шлют и получают прежние 4, новые просят ленту целиком.
+ */
+private fun io.ktor.server.application.ApplicationCall.sectionLimit(): Int =
+    request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 50) ?: 4
