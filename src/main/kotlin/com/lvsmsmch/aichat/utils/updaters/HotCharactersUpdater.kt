@@ -21,24 +21,17 @@ object HotCharacters {
 }
 
 /**
- * HOT — это «с ним сейчас много разговаривают РАЗНЫЕ люди».
+ * HOT — это «с ним сейчас разговаривают РАЗНЫЕ люди». Метка редкая: только
+ * живая активность за [windowDays] дней, без запаса по старым счётчикам
+ * (засеянные счётчики каталога делали горячими почти все популярные ленты).
  *
- * Скор = база + импульс:
- * - база — общая популярность по счётчикам чатов и сообщений (логарифм:
- *   9000 сообщений не в сто раз «горячее» 90). Она гарантирует, что HOT
- *   всегда есть, даже в тихую неделю;
- * - импульс — живая активность за [windowDays] дней по журналу действий:
- *   число разных собеседников и их сообщения, у каждого не больше
- *   [PER_USER_CAP] — один фанат с тысячей сообщений не делает персонажа
- *   горячим. Импульс считается, только если собеседников хотя бы
- *   [MIN_RECENT_USERS].
+ * Кандидат — персонаж, с которым за окно говорили хотя бы [MIN_RECENT_USERS]
+ * разных собеседника. Скор = собеседники + их сообщения (у каждого не больше
+ * [PER_USER_CAP] — один фанат с тысячей сообщений не делает персонажа
+ * горячим) + немного общей популярности, чтобы развести равных.
+ * Сообщения АВТОРА персонажа не считаются.
  *
- * Сообщения АВТОРА персонажа не считаются нигде в журнале. Кроме того,
- * попасть в HOT может только персонаж, с которым за всё время говорили
- * хотя бы [MIN_PROVEN_USERS] не-автора, либо с большим числом чатов: автор,
- * который сам написал своему новому персонажу сто сообщений, HOT не получит.
- *
- * Берём [HOT_COUNT] лучших.
+ * Берём не больше [HOT_COUNT] лучших; в тихую неделю HOT может не быть вовсе.
  */
 fun configureHotCharactersUpdater(
     databaseScope: CoroutineScope,
@@ -65,19 +58,13 @@ fun configureHotCharactersUpdater(
                         UtcTimestamp.now().subtractDays(windowDays),
                     )
                 )
-                val allTime = byCharacter(characterActivityLogRepository.messageCountsByCharacterAndUser(null))
 
                 val scored = characters.mapNotNull { c ->
-                    val proven = (allTime[c.id]?.size ?: 0) >= MIN_PROVEN_USERS || c.totalChats >= PROVEN_CHATS
-                    if (!proven) return@mapNotNull null
-                    val base = 2 * ln(1.0 + c.totalChats) + ln(1.0 + c.totalMessages)
                     val users = recent[c.id].orEmpty()
-                    val momentum = if (users.size >= MIN_RECENT_USERS) {
-                        4.0 * users.size + users.sumOf { min(it.messages, PER_USER_CAP) } / 40.0
-                    } else {
-                        0.0
-                    }
-                    c.id to base + momentum
+                    if (users.size < MIN_RECENT_USERS) return@mapNotNull null
+                    val momentum = 4.0 * users.size + users.sumOf { min(it.messages, PER_USER_CAP) } / 40.0
+                    val base = ln(1.0 + c.totalChats) / 2
+                    c.id to momentum + base
                 }
                 val hot = scored.sortedByDescending { it.second }.take(HOT_COUNT).map { it.first }.toSet()
                 HotCharacters.ids = hot
@@ -96,17 +83,11 @@ fun configureHotCharactersUpdater(
     return parentJob
 }
 
-/** Сколько персонажей носят HOT. */
-private const val HOT_COUNT = 30
+/** Сколько персонажей самое большее носят HOT. */
+private const val HOT_COUNT = 8
 
-/** Разных собеседников (не автора) за окно, чтобы активность считалась импульсом. */
-private const val MIN_RECENT_USERS = 2
-
-/** Разных собеседников (не автора) за всё время — «проверенный» персонаж. */
-private const val MIN_PROVEN_USERS = 2
-
-/** Либо столько чатов по общему счётчику — давно популярные персонажи каталога. */
-private const val PROVEN_CHATS = 100
+/** Разных собеседников (не автора) за окно, чтобы персонаж мог стать HOT. */
+private const val MIN_RECENT_USERS = 3
 
 /** Больше этого сообщений от одного человека в окне не учитываем. */
 private const val PER_USER_CAP = 400
