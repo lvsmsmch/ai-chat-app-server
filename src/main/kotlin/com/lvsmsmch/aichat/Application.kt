@@ -108,6 +108,13 @@ fun Application.module() {
     val backgroundJobs by inject<BackgroundJobs>()
     backgroundJobs.start()
 
+    // Мёртвые FCM-токены стираются сразу: пуши на них уже никогда не дойдут,
+    // а свежий токен приложение пришлёт само при следующем запуске
+    val usersRepo by inject<com.lvsmsmch.aichat.user.database.UserRepository>()
+    com.lvsmsmch.aichat.utils.FcmSender.onDeadToken = { token ->
+        launch { runCatching { usersRepo.clearFcmToken(token) } }
+    }
+
     // Обложки чатов: персонажам без обложки проставляем дефолтную. Разовая
     // операция, повторные старты ничего не меняют — она идемпотентна
     val charactersRepo by inject<com.lvsmsmch.aichat.character.database.CharacterRepository>()

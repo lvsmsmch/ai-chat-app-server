@@ -306,6 +306,11 @@ class UserRepository {
 
     // ---- Пуши ----
 
+    /** FCM сказал «такого токена нет» — убираем его у всех, у кого он записан. */
+    suspend fun clearFcmToken(token: String): Int = dbQuery {
+        Tables.Users.update({ Tables.Users.fcmToken eq token }) { it[Tables.Users.fcmToken] = null }
+    }
+
     suspend fun saveFcmToken(userId: String, token: String, uiLanguage: String) {
         updateById(userId) {
             it[Tables.Users.fcmToken] = token

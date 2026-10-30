@@ -4,6 +4,8 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingException
+import com.google.firebase.messaging.MessagingErrorCode
 import com.google.firebase.messaging.Message
 import com.google.firebase.messaging.Notification
 import java.io.FileInputStream
@@ -33,6 +35,14 @@ object FcmSender {
     }
 
     /**
+     * Что делать с токеном, который FCM больше не знает (приложение удалено
+     * или токен сменился). Ставится на старте сервера: без этого каждый
+     * проход винбэка и лимитов снова и снова бил в сотни мёртвых токенов.
+     */
+    @Volatile
+    var onDeadToken: ((String) -> Unit)? = null
+
+    /**
      * true — сообщение принято FCM (не гарантия доставки на девайс).
      * @param route deep-link для клиента: тап по пушу открывает нужный экран
      */
@@ -45,7 +55,12 @@ object FcmSender {
             route?.let { builder.putData("route", it) }
             FirebaseMessaging.getInstance().send(builder.build())
         }.onFailure {
-            logger.error("FCM send failed: ${it.message}")
+            if (it is FirebaseMessagingException && it.messagingErrorCode == MessagingErrorCode.UNREGISTERED) {
+                logger.info("FCM token is no longer registered - dropping it")
+                onDeadToken?.invoke(token)
+            } else {
+                logger.error("FCM send failed: ${it.message}")
+            }
         }.isSuccess
     }
 }
