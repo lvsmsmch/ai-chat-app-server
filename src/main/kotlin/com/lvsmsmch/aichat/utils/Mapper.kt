@@ -204,6 +204,7 @@ suspend fun CharacterDbo.toCharacterDto(
         cover = cover,
         color = color,
         topRank = topRank,
+        isHot = id in com.lvsmsmch.aichat.utils.updaters.HotCharacters.ids,
         totalLikes = totalLikes,
         isLikedByCurrentUser = liked,
     )

@@ -28,6 +28,8 @@ data class CharacterDto(
     @SerialName("averageRating") val averageRating: Float,
     @SerialName("color") val color: String = "",
     @SerialName("topRank") val topRank: Int? = null,
+    /** Метка HOT на плитке — см. [com.lvsmsmch.aichat.utils.updaters.HotCharacters]. */
+    @SerialName("isHot") val isHot: Boolean = false,
     /**
      * Первая реплика персонажа («First scene» на его странице). Приходит
      * только в ответе на один персонаж; в списках поле не передаётся вовсе.

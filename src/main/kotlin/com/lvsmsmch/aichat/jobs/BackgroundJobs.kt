@@ -110,6 +110,11 @@ class BackgroundJobs(
                 categoryRecommendationsCacheRepository = categoryRecommendationsCacheRepository,
                 updateIntervalMinutes = 5,
             ),
+            configureHotCharactersUpdater(
+                databaseScope = scope,
+                characterRepository = characterRepository,
+                characterActivityLogRepository = characterActivityLogRepository,
+            ),
             configureTopCharactersUpdater(
                 databaseScope = scope,
                 characterRepository = characterRepository,

@@ -11,6 +11,7 @@ import org.bson.types.ObjectId
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.countDistinct
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -84,4 +85,23 @@ class CharacterActivityLogRepository {
             ?.toInt()
             ?: 0
     }
+
+    /**
+     * Сколько сообщений каждый юзер написал каждому персонажу — одной
+     * группировкой по всей таблице. [since] = null — за всё время. Нужна
+     * HOT-метке: кто пишет персонажу, важнее, чем сколько.
+     */
+    suspend fun messageCountsByCharacterAndUser(since: UtcTimestamp?): List<CharacterUserActivity> = dbQuery {
+        val t = Tables.CharacterActivityLogs
+        val cnt = t.id.count()
+        t.select(t.characterId, t.userId, cnt)
+            .where {
+                val byType = t.activityType eq ActivityType.MESSAGE_SENT.code
+                if (since == null) byType else byType and (t.timestamp greaterEq since.toString())
+            }
+            .groupBy(t.characterId, t.userId)
+            .map { CharacterUserActivity(it[t.characterId], it[t.userId], it[cnt].toInt()) }
+    }
 }
+
+data class CharacterUserActivity(val characterId: String, val userId: String, val messages: Int)
