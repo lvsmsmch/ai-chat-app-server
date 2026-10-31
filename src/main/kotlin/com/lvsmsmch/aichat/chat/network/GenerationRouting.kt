@@ -136,6 +136,14 @@ fun Route.configureGenerationRouting(
             call.response.header("X-Accel-Buffering", "no")
 
             call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+                // Заголовки ответа Netty отправляет только вместе с первыми байтами
+                // тела, а неотправленную запись держит не дольше 10 с
+                // (responseWriteTimeoutSeconds) — и рвёт соединение. Картинка молчит
+                // дольше 10 с, первый пинг был только на 15-й: nginx отвечал 502,
+                // приложение показывало ошибку, хотя картинка потом дорисовывалась.
+                // Поэтому сразу отдаём SSE-комментарий — заголовки уходят вместе с
+                // ним. Комментарии парсеры SSE пропускают (оба приложения).
+                runCatching { write(": open\n\n"); flush() }
                 try {
                     val currentMessage = messageRepository.getMessageById(message.id)
                         ?: return@respondTextWriter
