@@ -17,6 +17,9 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.*
 import java.io.File
 import java.util.*
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Генерация изображений персонажа (Gemini image-модели / Nano Banana).
@@ -27,6 +30,12 @@ object AiImageGeneratorUtil {
 
     private const val GENERATED_IMAGE_ASPECT_RATIO = "3:4"
     private const val FAL_PORTRAIT_IMAGE_SIZE = "portrait_4_3"
+
+    /**
+     * Сколько ждём fal, прежде чем уйти в запасной Grok. Картинке в чате
+     * сервер даёт 90 с на всё (MessageFinisher) — Grok должен успеть.
+     */
+    private val FAL_ATTEMPT_TIMEOUT = 55.seconds
 
     private val geminiApiUrl
         get() = System.getenv("GEMINI_API_URL") ?: "https://generativelanguage.googleapis.com/v1beta/models"
@@ -101,12 +110,14 @@ object AiImageGeneratorUtil {
                     "people, extra faces, or cropped-off head."
             )
         }
-        return generateViaFal(
-            model = "seedream-4.5",
-            prompt = prompt,
-            refFiles = emptyList(),
-            imageSize = "square_hd",
-        )
+        return falOrNull("avatar") {
+            generateViaFal(
+                model = "seedream-4.5",
+                prompt = prompt,
+                refFiles = emptyList(),
+                imageSize = "square_hd",
+            )
+        } ?: generateViaXai(prompt, emptyList(), aspectRatio = "1:1")
     }
 
     private suspend fun generateImageInner(
@@ -231,7 +242,10 @@ object AiImageGeneratorUtil {
         }
 
         if (goXai) return generateViaXai(prompt, refFiles)
-        if (goFal) return generateViaFal(debugModel ?: "seedream-4.5", prompt, refFiles)
+        if (goFal) {
+            return falOrNull("chat image") { generateViaFal(debugModel ?: "seedream-4.5", prompt, refFiles) }
+                ?: generateViaXai(prompt, refFiles)
+        }
 
         // Gemini: генерация + QA-проверка анатомии дешёвой vision-моделью.
         // Каша с конечностями — главный провал модели; ловим и перегенерируем один раз
@@ -423,7 +437,33 @@ object AiImageGeneratorUtil {
      * Grok Imagine (xAI): без референса — /images/generations, с референсами
      * (прошлая сцена/персонаж + пользователь) — multi-image /images/edits.
      */
-    private suspend fun generateViaXai(prompt: String, refFiles: List<File>): ImageGenResult {
+    /**
+     * fal — основной провайдер картинок, Grok (xAI) — запасной. Кончились
+     * кредиты на fal, сбой сети или API, fal не ответил за [FAL_ATTEMPT_TIMEOUT] —
+     * возвращаем null, и вызывающий уходит в Grok: картинка всё равно приходит.
+     * Цензура — не сбой: её пробрасываем как есть (Grok такое тоже не пропустит,
+     * а лимит за запрещёнку и так списывается).
+     */
+    private suspend fun falOrNull(what: String, block: suspend () -> ImageGenResult): ImageGenResult? {
+        val result = try {
+            withTimeoutOrNull(FAL_ATTEMPT_TIMEOUT) { block() }
+        } catch (e: CensoredException) {
+            throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn("fal $what failed (${e.message}), falling back to xAI")
+            return null
+        }
+        if (result == null) logger.warn("fal $what: no answer in $FAL_ATTEMPT_TIMEOUT, falling back to xAI")
+        return result
+    }
+
+    private suspend fun generateViaXai(
+        prompt: String,
+        refFiles: List<File>,
+        aspectRatio: String = GENERATED_IMAGE_ASPECT_RATIO,
+    ): ImageGenResult {
         val endpoint = if (refFiles.isNotEmpty()) {
             "https://api.x.ai/v1/images/edits"
         } else {
@@ -433,7 +473,7 @@ object AiImageGeneratorUtil {
             put("model", xaiImageModel)
             put("prompt", prompt)
             put("response_format", "b64_json")
-            put("aspect_ratio", GENERATED_IMAGE_ASPECT_RATIO)
+            put("aspect_ratio", aspectRatio)
             if (refFiles.size == 1) {
                 putJsonObject("image") {
                     put("url", "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(refFiles.first().readBytes()))
