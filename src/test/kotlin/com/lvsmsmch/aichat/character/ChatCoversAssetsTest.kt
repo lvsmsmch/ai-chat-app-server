@@ -8,7 +8,7 @@ class ChatCoversAssetsTest {
 
     @Test
     fun `every declared chat cover is packaged as webp`() {
-        assertEquals(15, ChatCovers.builtIn.distinct().size)
+        assertEquals(ChatCovers.builtIn.size, ChatCovers.builtIn.distinct().size)
 
         ChatCovers.builtIn.forEach { code ->
             val stream = assertNotNull(

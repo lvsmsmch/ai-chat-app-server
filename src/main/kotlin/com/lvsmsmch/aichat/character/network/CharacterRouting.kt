@@ -3,6 +3,7 @@ package com.lvsmsmch.aichat.character.network
 import com.lvsmsmch.aichat._common.IdGenerator
 import com.lvsmsmch.aichat._common.database.*
 import com.lvsmsmch.aichat.auth.database.tokens.session_tokens.SessionRepository
+import com.lvsmsmch.aichat.cache.DiscoverFeed
 import com.lvsmsmch.aichat.cache.CacheListType
 import com.lvsmsmch.aichat.cache.CacheManager
 import com.lvsmsmch.aichat.character.database.*
@@ -508,7 +509,8 @@ fun Route.configureCharacterRouting(
                 com.lvsmsmch.aichat.utils.updaters.KEY_TRENDING,
                 com.lvsmsmch.aichat.utils.updaters.KEY_MOST_POPULAR,
             )
-            if (category != "personalized" && category !in mainKeys) {
+            val discoverFeed = DiscoverFeed.entries.firstOrNull { it.code == category }
+            if (category != "personalized" && category !in mainKeys && discoverFeed == null) {
                 validateCharacterCategory(category)
             }
             require(request.size in 1..100) { "Size must be between 1 and 100" }
@@ -520,6 +522,22 @@ fun Route.configureCharacterRouting(
             }
 
             require(cursor >= 0) { "Cursor position must be non-negative" }
+
+            if (discoverFeed != null) {
+                val blockedAuthors = userBlockRepository.getBlockedIds(currentUserId)
+                val result = cacheManager.getDiscoverFeed(
+                    userId = currentUserId,
+                    deviceId = request.deviceId,
+                    feed = discoverFeed,
+                    size = request.size,
+                    cursor = cursor,
+                    refresh = request.refresh,
+                    blockedAuthorIds = blockedAuthors,
+                )
+                return@get call.respondSuccess(
+                    result.toDto(mapper, mapper.languageOf(currentUserId), likerId = currentUserId),
+                )
+            }
 
             // Вкладки Trending / Most popular — из кэша Discover (200 персонажей),
             // курсор = offset; пагинация та же, что у категорий

@@ -15,6 +15,8 @@ import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.inList
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.notInList
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.like
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
@@ -39,6 +41,24 @@ class CharacterRepository {
     /** Точечное обновление одного персонажа. */
     private suspend fun updateById(characterId: String, body: (UpdateStatement) -> Unit): Int =
         dbQuery { table.update({ table.id eq characterId }) { body(it) } }
+
+    suspend fun getDiscoverFeedIds(
+        createdSince: UtcTimestamp?,
+        blockedAuthorIds: Set<String>,
+        limit: Int,
+    ): List<String> = dbQuery {
+        val ranking = if (createdSince != null) table.createdAt else table.recommendationScore
+        table.select(table.id)
+            .where {
+                var eligible: Op<Boolean> = table.visibility eq CharacterVisibility.PUBLIC.code
+                if (createdSince != null) eligible = eligible and (table.createdAt greaterEq createdSince.toString())
+                if (blockedAuthorIds.isNotEmpty()) eligible = eligible and (table.authorId notInList blockedAuthorIds)
+                eligible
+            }
+            .orderBy(ranking to SortOrder.DESC, table.id to SortOrder.ASC)
+            .limit(limit)
+            .map { it[table.id] }
+    }
 
     suspend fun getCharacters(
         searchQuery: String = "",

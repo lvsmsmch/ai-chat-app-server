@@ -27,6 +27,39 @@ class CacheManager(
         }
     }
 
+    suspend fun getDiscoverFeed(
+        userId: String,
+        deviceId: String,
+        feed: DiscoverFeed,
+        size: Int,
+        cursor: Int,
+        refresh: Boolean,
+        blockedAuthorIds: Set<String>,
+    ): CachedCharactersResult {
+        val listType = CacheListType.Discover(feed)
+        val now = UtcTimestamp.now()
+        val createdSince = if (feed == DiscoverFeed.NewArrivals) now.subtractDays(7) else null
+        val existingCopy = if (cursor > 0 && !refresh) {
+            characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
+        } else {
+            null
+        }
+        val copy = existingCopy ?: CharacterListCopyDbo(
+            id = "${userId}_${deviceId}_${listType.code}",
+            userId = userId,
+            deviceId = deviceId,
+            listType = listType.code,
+            characterIds = characterRepository.getDiscoverFeedIds(createdSince, blockedAuthorIds, limit = 1000),
+            currentPosition = 0,
+            baseListVersion = now.toString(),
+        ).also { characterListCopyRepository.upsert(it) }
+        return takeItemsAndMoveCursor(
+            userId, deviceId, listType, if (existingCopy == null) 0 else cursor, size, copy,
+        ) { character ->
+            character.authorId !in blockedAuthorIds && (createdSince == null || character.createdAt >= createdSince.toString())
+        }.copy(refreshed = existingCopy == null)
+    }
+
     private suspend fun handleSearchRequest(
         userId: String,
         deviceId: String,
@@ -115,9 +148,11 @@ class CacheManager(
         deviceId: String,
         listType: CacheListType,
         cursorPosition: Int,
-        size: Int
+        size: Int,
+        snapshot: CharacterListCopyDbo? = null,
+        eligible: (CharacterDbo) -> Boolean = { true },
     ): CachedCharactersResult {
-        val copy = characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
+        val copy = snapshot ?: characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
             ?: return CachedCharactersResult(false, emptyList(), null)
 
         val validCharacters = mutableListOf<CharacterDbo>()
@@ -126,7 +161,7 @@ class CacheManager(
         while (validCharacters.size < size && currentCursorPos < copy.characterIds.size) {
             copy.characterIds.getOrNull(currentCursorPos)?.let { characterId ->
                 characterRepository.getCharacter(characterId)
-                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code }
+                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code && eligible(it) }
                     ?.let { validCharacters.add(it) }
             }
             currentCursorPos++
@@ -139,7 +174,7 @@ class CacheManager(
         while (checkPos < copy.characterIds.size && checkPos < maxLookaheadPos && !hasMoreValid) {
             copy.characterIds.getOrNull(checkPos)?.let { characterId ->
                 characterRepository.getCharacter(characterId)
-                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code }
+                    ?.takeIf { it.visibility == CharacterVisibility.PUBLIC.code && eligible(it) }
                     ?.let { hasMoreValid = true }
             }
             checkPos++
@@ -220,7 +255,7 @@ class CacheManager(
                     .getCategoryCache(listType.category)?.characterIds
             }
 
-            is CacheListType.Search -> null
+            is CacheListType.Search, is CacheListType.Discover -> null
         }
     }
 
@@ -236,7 +271,7 @@ class CacheManager(
                     .getCategoryCache(listType.category)?.version
             }
 
-            is CacheListType.Search -> null
+            is CacheListType.Search, is CacheListType.Discover -> null
         }
     }
 }
