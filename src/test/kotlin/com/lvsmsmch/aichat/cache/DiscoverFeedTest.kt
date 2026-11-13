@@ -43,14 +43,8 @@ class DiscoverFeedTest {
         val recommended = character("recommended", now.subtractDays(60))
 
         coEvery { characterRepository.getDiscoverFeedIds(any(), emptySet(), 1000) } answers {
-            val cutoff = firstArg<UtcTimestamp?>()
-            if (cutoff == null) {
-                listOf(recommended.id)
-            } else {
-                val cutoffAge = now.epochMillis - cutoff.epochMillis
-                assertTrue(cutoffAge in (7 * 86_400_000L - 10_000)..(7 * 86_400_000L + 10_000))
-                listOf(newest.id, previous.id)
-            }
+            // true — New arrivals (сначала новые, без отсечки по дате)
+            if (firstArg<Boolean>()) listOf(newest.id, previous.id) else listOf(recommended.id)
         }
         coEvery {
             characterRepository.getCharacters(
@@ -73,7 +67,7 @@ class DiscoverFeedTest {
     }
 
     @Test
-    fun `an existing new arrivals snapshot skips blocked private and aged out characters`() = runBlocking {
+    fun `an existing new arrivals snapshot skips blocked and private but keeps older characters`() = runBlocking {
         val newest = character("newest")
         val agedOut = character("aged-out", UtcTimestamp.now().subtractDays(8))
         val blocked = character("blocked", authorId = "blocked-author")
@@ -89,9 +83,16 @@ class DiscoverFeedTest {
             blocked = setOf(blocked.authorId),
         )
 
-        assertEquals(listOf(stillVisible), secondPage.items)
+        // Старше недели — не повод прятать: лента «сначала новые» без отсечки
+        assertEquals(listOf(agedOut), secondPage.items)
         assertFalse(secondPage.refreshed)
-        assertNull(secondPage.nextCursor)
+        val thirdPage = feed(
+            DiscoverFeed.NewArrivals,
+            cursor = assertNotNull(secondPage.nextCursor),
+            blocked = setOf(blocked.authorId),
+        )
+        assertEquals(listOf(stillVisible), thirdPage.items)
+        assertNull(thirdPage.nextCursor)
     }
 
     private suspend fun feed(

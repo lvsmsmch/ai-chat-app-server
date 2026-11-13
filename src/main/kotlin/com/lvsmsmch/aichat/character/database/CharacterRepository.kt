@@ -42,16 +42,20 @@ class CharacterRepository {
     private suspend fun updateById(characterId: String, body: (UpdateStatement) -> Unit): Int =
         dbQuery { table.update({ table.id eq characterId }) { body(it) } }
 
+    /**
+     * Ленты главной: [newestFirst] — New arrivals (весь каталог, сначала самые
+     * новые: свежих мало, и лента не должна пустеть), иначе — More to discover
+     * по рекомендательному рейтингу.
+     */
     suspend fun getDiscoverFeedIds(
-        createdSince: UtcTimestamp?,
+        newestFirst: Boolean,
         blockedAuthorIds: Set<String>,
         limit: Int,
     ): List<String> = dbQuery {
-        val ranking = if (createdSince != null) table.createdAt else table.recommendationScore
+        val ranking = if (newestFirst) table.createdAt else table.recommendationScore
         table.select(table.id)
             .where {
                 var eligible: Op<Boolean> = table.visibility eq CharacterVisibility.PUBLIC.code
-                if (createdSince != null) eligible = eligible and (table.createdAt greaterEq createdSince.toString())
                 if (blockedAuthorIds.isNotEmpty()) eligible = eligible and (table.authorId notInList blockedAuthorIds)
                 eligible
             }

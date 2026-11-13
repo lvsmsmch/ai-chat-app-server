@@ -38,7 +38,6 @@ class CacheManager(
     ): CachedCharactersResult {
         val listType = CacheListType.Discover(feed)
         val now = UtcTimestamp.now()
-        val createdSince = if (feed == DiscoverFeed.NewArrivals) now.subtractDays(7) else null
         val existingCopy = if (cursor > 0 && !refresh) {
             characterListCopyRepository.getExistingCopy(userId, deviceId, listType.code)
         } else {
@@ -49,14 +48,14 @@ class CacheManager(
             userId = userId,
             deviceId = deviceId,
             listType = listType.code,
-            characterIds = characterRepository.getDiscoverFeedIds(createdSince, blockedAuthorIds, limit = 1000),
+            characterIds = characterRepository.getDiscoverFeedIds(feed == DiscoverFeed.NewArrivals, blockedAuthorIds, limit = 1000),
             currentPosition = 0,
             baseListVersion = now.toString(),
         ).also { characterListCopyRepository.upsert(it) }
         return takeItemsAndMoveCursor(
             userId, deviceId, listType, if (existingCopy == null) 0 else cursor, size, copy,
         ) { character ->
-            character.authorId !in blockedAuthorIds && (createdSince == null || character.createdAt >= createdSince.toString())
+            character.authorId !in blockedAuthorIds
         }.copy(refreshed = existingCopy == null)
     }
 
