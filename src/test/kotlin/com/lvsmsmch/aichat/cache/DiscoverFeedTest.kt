@@ -42,7 +42,7 @@ class DiscoverFeedTest {
         val previous = character("previous", now.subtractDays(2))
         val recommended = character("recommended", now.subtractDays(60))
 
-        coEvery { characterRepository.getDiscoverFeedIds(any(), emptySet(), 1000) } answers {
+        coEvery { characterRepository.getDiscoverFeedIds(any(), emptySet(), any()) } answers {
             // true — New arrivals (сначала новые, без отсечки по дате)
             if (firstArg<Boolean>()) listOf(newest.id, previous.id) else listOf(recommended.id)
         }
@@ -73,7 +73,7 @@ class DiscoverFeedTest {
         val blocked = character("blocked", authorId = "blocked-author")
         val private = character("private", visibility = CharacterVisibility.PRIVATE.code)
         val stillVisible = character("visible")
-        coEvery { characterRepository.getDiscoverFeedIds(any(), emptySet(), 1000) } returns
+        coEvery { characterRepository.getDiscoverFeedIds(any(), emptySet(), any()) } returns
             listOf(newest.id, agedOut.id, blocked.id, private.id, stillVisible.id)
 
         val firstPage = feed(DiscoverFeed.NewArrivals)

@@ -48,7 +48,11 @@ class CacheManager(
             userId = userId,
             deviceId = deviceId,
             listType = listType.code,
-            characterIds = characterRepository.getDiscoverFeedIds(feed == DiscoverFeed.NewArrivals, blockedAuthorIds, limit = 1000),
+            // New arrivals — конечная лента: 30 самых новых (правки 15.11)
+            characterIds = characterRepository.getDiscoverFeedIds(
+                feed == DiscoverFeed.NewArrivals, blockedAuthorIds,
+                limit = if (feed == DiscoverFeed.NewArrivals) NEW_ARRIVALS_LIMIT else 1000,
+            ),
             currentPosition = 0,
             baseListVersion = now.toString(),
         ).also { characterListCopyRepository.upsert(it) }
@@ -274,3 +278,6 @@ class CacheManager(
         }
     }
 }
+
+/** Сколько персонажей в ленте New arrivals: она не бесконечная. */
+const val NEW_ARRIVALS_LIMIT = 30
