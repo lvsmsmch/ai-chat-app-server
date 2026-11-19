@@ -302,6 +302,13 @@ fun Route.configureGenerationRouting(
 
         rateLimit(RateLimitName("rewarded")) {
             post("/rewarded") {
+                // Награда за рекламу начисляется по слову клиента, без проверки
+                // просмотра. Пока реклама в приложении выключена, ручка закрыта:
+                // иначе любой накручивал бы себе бесплатные сообщения прямыми
+                // запросами (аудит 19.11). Включается env REWARDED_ADS=true
+                if (System.getenv("REWARDED_ADS")?.toBoolean() != true) {
+                    throw ForbiddenException(errorMessage = "Rewarded ads are disabled")
+                }
                 val userId = sessionRepository.verifyToken(call).userId
                 val request = call.receive<UserRewardedRequest>()
 
