@@ -31,6 +31,8 @@ object ImageServer {
     /** Целевой размер файла: пережимаем всё, что тяжелее (~500КБ), к ~300-400КБ. */
     private const val TARGET_BYTES = 500_000
     private const val MAX_SIDE = 1024
+    /** Больше 40 Мп не раскрываем: ~160 МБ памяти на одну картинку. */
+    private const val MAX_DECODE_PIXELS = 40_000_000L
 
     /** Локальный файл по публичному /images-URL (референсы для генерации картинок). */
     fun localFileForUrl(url: String?): File? {
@@ -72,6 +74,10 @@ object ImageServer {
 
     /** PNG/JPEG → JPEG ≤1024px и ~≤500КБ (ступенчатое снижение качества). */
     private fun recompress(input: File): File {
+        // Огромное разрешение в маленьком файле не раскрываем — память сервера
+        readImageSize(input)?.let { (w, h) ->
+            if (w.toLong() * h > MAX_DECODE_PIXELS) throw Exception("Image is too large: ${w}x$h")
+        }
         val src = ImageIO.read(input) ?: throw Exception("Could not read image file")
 
         val scale = MAX_SIDE.toFloat() / maxOf(src.width, src.height)
@@ -97,6 +103,9 @@ object ImageServer {
 
     private fun convertToJpeg(inputFile: File, quality: Float): File {
         try {
+            readImageSize(inputFile)?.let { (w, h) ->
+                if (w.toLong() * h > MAX_DECODE_PIXELS) throw Exception("Image is too large: ${w}x$h")
+            }
             val image = ImageIO.read(inputFile)
                 ?: throw Exception("Could not read image file")
 

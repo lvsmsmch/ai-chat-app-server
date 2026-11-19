@@ -206,12 +206,13 @@ fun Route.configureAuthRouting(
             val active = when (val check = purchaseVerifier.verify(purchaseToken)) {
                 com.lvsmsmch.aichat.billing.PurchaseCheck.Active -> true
                 com.lvsmsmch.aichat.billing.PurchaseCheck.Inactive -> false
-                // Ключа для проверки ещё нет: сам факт токена означает, что
-                // покупка через Play была, но подтвердить её мы не можем —
-                // верим и громко пишем об этом в лог
+                // Ключа для проверки нет (сломался или пропал из env): НЕ верим
+                // токену на слово — иначе любой включал бы премиум выдуманной
+                // строкой. Покупка сохраняется погашенной, как при сбое Google:
+                // фоновая сверка включит премиум, когда ключ вернётся (аудит 19.11)
                 com.lvsmsmch.aichat.billing.PurchaseCheck.NotConfigured -> {
-                    logger.warn("Purchase accepted without verification (no Play service account)")
-                    true
+                    logger.error("Purchase NOT accepted: Play service account is not configured")
+                    false
                 }
                 // Google не ответил. Отказать нельзя: деньги уже списаны, а
                 // отказ потерял бы покупку бесследно. Запоминаем токен

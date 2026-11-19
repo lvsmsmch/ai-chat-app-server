@@ -221,6 +221,17 @@ private fun validatePicture(
         throw ValidationException("Picture must be smaller than $maxSizeBytes bytes")
     }
 
+    // Размеры — из заголовка файла, ДО раскрытия картинки: маленький файл с
+    // огромным разрешением («бомба») при полном раскрытии съел бы память
+    // сервера (аудит 19.11). Не прочитались — это и не картинка
+    val (headerW, headerH) = readImageSize(pictureFile)
+        ?: throw ValidationException("Uploaded file is not a valid image")
+    if (headerW > maxDimensionsPixels.first || headerH > maxDimensionsPixels.second) {
+        throw ValidationException(
+            "Image dimensions must be at most ${maxDimensionsPixels.first}x${maxDimensionsPixels.second} pixels"
+        )
+    }
+
     try {
         val inputStream = pictureFile.inputStream()
         val image = javax.imageio.ImageIO.read(inputStream)
@@ -277,3 +288,22 @@ fun collapseExcessLineBreaks(text: String, keep: Int = 5, threshold: Int = 5): S
     }
     return sb.toString().trimEnd()
 }
+
+
+/**
+ * Ширина и высота картинки из её заголовка — без раскрытия пикселей в память.
+ * null — формат не распознан.
+ */
+fun readImageSize(file: File): Pair<Int, Int>? = runCatching {
+    javax.imageio.ImageIO.createImageInputStream(file).use { stream ->
+        val readers = javax.imageio.ImageIO.getImageReaders(stream)
+        if (!readers.hasNext()) return@use null
+        val reader = readers.next()
+        try {
+            reader.input = stream
+            reader.getWidth(0) to reader.getHeight(0)
+        } finally {
+            reader.dispose()
+        }
+    }
+}.getOrNull()
