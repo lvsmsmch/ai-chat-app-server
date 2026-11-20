@@ -15,6 +15,12 @@ internal interface PushStringTable {
     fun dailyMessagesBody(): String
     fun winbackTitle(): String
     fun winbackBody(messageCount: Int): String
+    /**
+     * Напоминание от лица персонажа (заголовок — его имя): [step] 0 — через
+     * день тишины, 1 — через 3 дня, 2 — через неделю. Тексты нейтральны по
+     * роду и говорящего, и собеседника.
+     */
+    fun reengageBody(step: Int): String
 }
 
 private object EnglishPushStrings : PushStringTable {
@@ -30,6 +36,12 @@ private object EnglishPushStrings : PushStringTable {
     override fun winbackTitle() = "A gift is waiting for you! 🎁"
     override fun winbackBody(messageCount: Int) =
         "+$messageCount free messages. Tap to claim your gift!"
+
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Hey, you there? I was just thinking about our conversation 💭"
+        1 -> "Our chat is right where we left it. Shall we continue?"
+        else -> "It's been a while… I miss talking with you."
+    }
 
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"

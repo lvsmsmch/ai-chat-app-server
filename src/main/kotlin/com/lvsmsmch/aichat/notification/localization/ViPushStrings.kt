@@ -14,6 +14,12 @@ internal object ViPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount tin nhắn miễn phí. Chạm để nhận quà của bạn!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Này, bạn có đó không? Mình vừa nghĩ về cuộc trò chuyện của chúng ta 💭"
+        1 -> "Cuộc trò chuyện của chúng ta vẫn đang chờ ở chỗ cũ. Tiếp tục nhé?"
+        else -> "Lâu rồi không gặp… Mình nhớ những cuộc trò chuyện của chúng ta."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

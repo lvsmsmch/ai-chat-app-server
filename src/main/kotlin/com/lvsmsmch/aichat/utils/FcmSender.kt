@@ -45,13 +45,19 @@ object FcmSender {
     /**
      * true — сообщение принято FCM (не гарантия доставки на девайс).
      * @param route deep-link для клиента: тап по пушу открывает нужный экран
+     * @param imageUrl картинка пуша (ава персонажа): в фоне её показывает
+     *   сама система, на открытом приложении — наш LumaMessagingService
      */
-    fun send(token: String, title: String, body: String, route: String? = null): Boolean {
+    fun send(token: String, title: String, body: String, route: String? = null, imageUrl: String? = null): Boolean {
         if (!enabled) return false
         return runCatching {
             val builder = Message.builder()
                 .setToken(token)
-                .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+                .setNotification(
+                    Notification.builder().setTitle(title).setBody(body)
+                        .apply { imageUrl?.let { setImage(it) } }
+                        .build()
+                )
             route?.let { builder.putData("route", it) }
             FirebaseMessaging.getInstance().send(builder.build())
         }.onFailure {

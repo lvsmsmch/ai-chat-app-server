@@ -14,6 +14,12 @@ internal object ThPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount ข้อความฟรี แตะเพื่อรับของขวัญของคุณ!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "เฮ้ ยังอยู่ไหม? เพิ่งคิดถึงบทสนทนาของเราอยู่เลย 💭"
+        1 -> "บทสนทนาของเรายังรออยู่ตรงที่เราหยุดไว้ ไปต่อกันไหม?"
+        else -> "ไม่ได้คุยกันนานเลย… คิดถึงการคุยกับเธอนะ"
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000} ล้าน" else "$value"
 }

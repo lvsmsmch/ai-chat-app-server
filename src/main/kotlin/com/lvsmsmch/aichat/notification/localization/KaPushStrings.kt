@@ -14,6 +14,12 @@ internal object KaPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "$messageCount უფასო შეტყობინება. შეეხეთ თქვენი საჩუქრის მისაღებად!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "ჰეი, აქ ხარ? ახლახან ჩვენს საუბარზე ვფიქრობდი 💭"
+        1 -> "ჩვენი საუბარი იქ გელოდება, სადაც გავჩერდით. გავაგრძელოთ?"
+        else -> "დიდი ხანია… მენატრება ჩვენი საუბრები."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

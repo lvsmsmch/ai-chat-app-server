@@ -14,6 +14,12 @@ internal object FrPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount messages gratuits. Appuyez pour réclamer votre cadeau !"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Hé, tu es là ? Je repensais justement à notre conversation 💭"
+        1 -> "Notre conversation t'attend là où on l'a laissée. On continue ?"
+        else -> "Ça fait un moment… Nos conversations me manquent."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

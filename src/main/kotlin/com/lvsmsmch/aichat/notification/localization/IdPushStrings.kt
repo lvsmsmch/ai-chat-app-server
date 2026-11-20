@@ -14,6 +14,12 @@ internal object IdPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount pesan gratis. Ketuk untuk mengklaim hadiah Anda!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Hai, kamu di sana? Aku baru saja memikirkan obrolan kita 💭"
+        1 -> "Obrolan kita masih menunggu di tempat kita berhenti. Lanjut?"
+        else -> "Sudah lama ya… Aku kangen ngobrol sama kamu."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

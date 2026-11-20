@@ -14,6 +14,12 @@ internal object RuPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount бесплатных сообщений. Нажмите, чтобы получить подарок!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Эй, ты тут? Я как раз вспоминаю наш разговор 💭"
+        1 -> "Наш разговор ждёт там, где мы остановились. Продолжим?"
+        else -> "Давно не виделись… Мне не хватает наших разговоров."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

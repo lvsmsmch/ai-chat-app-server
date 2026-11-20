@@ -14,6 +14,12 @@ internal object TrTrPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount ücretsiz mesaj. Hediyenizi almak için dokunun!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Hey, orada mısın? Az önce sohbetimizi düşünüyordum 💭"
+        1 -> "Sohbetimiz kaldığımız yerde seni bekliyor. Devam edelim mi?"
+        else -> "Epey oldu… Seninle konuşmayı özledim."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

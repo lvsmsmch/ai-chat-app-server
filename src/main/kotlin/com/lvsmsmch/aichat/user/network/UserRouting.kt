@@ -359,6 +359,36 @@ fun Route.configureUserRouting(
             call.respondSuccess(data = userRepository.getLimits(userId))
         }
 
+        /**
+         * [DEBUG] Прислать себе напоминание «вернись в чат» прямо сейчас, без
+         * ожидания и без отметки в базе: проверить вид пуша и переход в чат.
+         * step — ступень (0 — день, 1 — три дня, 2 — неделя).
+         */
+        post("/{userId}/debug-reengage-push") {
+            if (!call.debugAccessAllowed()) {
+                throw ForbiddenException(errorMessage = "debug endpoints disabled")
+            }
+            val sessionDbo = sessionRepository.verifyToken(call)
+            val userId = call.parameters["userId"]
+                ?: throw BadRequestException("Missing userId parameter")
+            if (userId != sessionDbo.userId) {
+                throw ForbiddenException(errorMessage = "Only for yourself")
+            }
+            val step = call.request.queryParameters["step"]?.toIntOrNull()?.coerceIn(0, 2) ?: 0
+            val user = userRepository.getUserById(userId) ?: throw BadRequestException("No user")
+            val token = user.fcmToken ?: throw BadRequestException("No push token")
+            val chat = userRepository.findLastDirectChat(userId) ?: throw BadRequestException("No direct chats")
+            val ok = com.lvsmsmch.aichat.utils.FcmSender.send(
+                token = token,
+                title = chat.characterName,
+                body = com.lvsmsmch.aichat.notification.pushStrings(user.uiLanguage).reengageBody(step),
+                route = "chat:${chat.chatId}:${chat.characterId}",
+                imageUrl = chat.picUrl,
+            )
+            if (!ok) throw BadRequestException("FCM refused")
+            call.respondSuccess()
+        }
+
         /** [DEBUG] Текущие оверрайды моделей (текст/картинки). */
         get("/{userId}/debug-models") {
             if (!call.debugAccessAllowed()) {

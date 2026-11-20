@@ -370,6 +370,75 @@ class UserRepository {
             .map { it.toUserDbo() }
     }
 
+    /** Кандидат на напоминание «вернись в чат» (только нужные поля). */
+    class ReengageCandidate(
+        val id: String,
+        val fcmToken: String,
+        val uiLanguage: String,
+        val lastActiveAt: String,
+        val stage: Int,
+        val lastReengagePushAt: String?,
+        val lastLimitPushAt: String?,
+        val lastWinbackPushAt: String?,
+    )
+
+    /** Писали хоть раз, есть токен, последнее сообщение — между [activeAfterIso] и [activeBeforeIso]. */
+    suspend fun findReengageCandidates(activeAfterIso: String, activeBeforeIso: String): List<ReengageCandidate> = dbQuery {
+        Tables.Users.selectAll()
+            .where {
+                Tables.Users.fcmToken.isNotNull() and
+                    (Tables.Users.totalMessagesCount greater 0) and
+                    (Tables.Users.lastActiveAt greater activeAfterIso) and
+                    (Tables.Users.lastActiveAt less activeBeforeIso)
+            }
+            .map {
+                ReengageCandidate(
+                    id = it[Tables.Users.id],
+                    fcmToken = it[Tables.Users.fcmToken]!!,
+                    uiLanguage = it[Tables.Users.uiLanguage],
+                    lastActiveAt = it[Tables.Users.lastActiveAt],
+                    stage = it[Tables.Users.reengagePushStage],
+                    lastReengagePushAt = it[Tables.Users.lastReengagePushAt],
+                    lastLimitPushAt = it[Tables.Users.lastLimitPushAt],
+                    lastWinbackPushAt = it[Tables.Users.lastWinbackPushAt],
+                )
+            }
+    }
+
+    /** Последний живой чат один на один: с кем он и как его открыть. */
+    class LastDirectChat(val chatId: String, val characterId: String, val characterName: String, val picUrl: String?)
+
+    suspend fun findLastDirectChat(userId: String): LastDirectChat? = dbQuery {
+        val chat = Tables.Chats.selectAll()
+            .where {
+                (Tables.Chats.userId eq userId) and
+                    (Tables.Chats.isDeleted eq false) and
+                    (Tables.Chats.type eq "DIRECT")
+            }
+            .orderBy(Tables.Chats.lastModifiedAt, org.jetbrains.exposed.sql.SortOrder.DESC)
+            .limit(1)
+            .firstOrNull() ?: return@dbQuery null
+        val characterId = com.lvsmsmch.aichat.db.Db.json
+            .decodeFromString<List<String>>(chat[Tables.Chats.characterIds])
+            .firstOrNull() ?: return@dbQuery null
+        val character = Tables.Characters.selectAll()
+            .where { Tables.Characters.id eq characterId }
+            .firstOrNull() ?: return@dbQuery null
+        LastDirectChat(
+            chatId = chat[Tables.Chats.id],
+            characterId = characterId,
+            characterName = character[Tables.Characters.name],
+            picUrl = character[Tables.Characters.picUrlThumbnail] ?: character[Tables.Characters.picUrl],
+        )
+    }
+
+    suspend fun markReengagePushSent(userId: String, newStage: Int) {
+        updateById(userId) {
+            it[Tables.Users.reengagePushStage] = newStage
+            it[Tables.Users.lastReengagePushAt] = UtcTimestamp.now().toString()
+        }
+    }
+
     /** Винбэк-подарок: +[extra] сообщений и отметка отправки пуша. */
     suspend fun grantWinbackGift(userId: String, extra: Int) {
         updateById(userId) {

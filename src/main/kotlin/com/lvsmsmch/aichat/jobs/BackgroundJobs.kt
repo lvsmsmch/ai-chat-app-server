@@ -161,6 +161,10 @@ class BackgroundJobs(
                 databaseScope = scope,
                 userRepository = userRepository,
             ),
+            configureReengagePushUpdater(
+                databaseScope = scope,
+                userRepository = userRepository,
+            ),
             fillDefaultSuggestions(
                 databaseScope = scope,
                 searchSuggestionsRepository = searchSuggestionsRepository,

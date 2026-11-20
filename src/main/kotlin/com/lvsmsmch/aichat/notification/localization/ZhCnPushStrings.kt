@@ -14,6 +14,12 @@ internal object ZhCnPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount 条免费消息。点击领取你的礼物！"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "嘿，你在吗？我刚刚还在想我们的聊天 💭"
+        1 -> "我们的对话还停在上次的地方，继续聊吗？"
+        else -> "好久不见……我想念和你聊天的时光。"
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000}百万" else "$value"
 }

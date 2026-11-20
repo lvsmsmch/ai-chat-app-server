@@ -57,6 +57,12 @@ object Tables {
         val limitPushStage = integer("limit_push_stage")
         val lastLimitPushAt = text("last_limit_push_at").nullable()
         val lastWinbackPushAt = text("last_winback_push_at").nullable()
+        /**
+         * Напоминания «вернись в чат»: сколько уже ушло в ТЕКУЩЕЙ паузе. Пауза
+         * новая, если человек писал после [lastReengagePushAt].
+         */
+        val reengagePushStage = integer("reengage_push_stage").default(0)
+        val lastReengagePushAt = text("last_reengage_push_at").nullable()
         val color = text("color")
         val trialUsed = bool("trial_used")
         /**

@@ -14,6 +14,12 @@ internal object ArPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount رسالة مجانية. اضغط للحصول على هديتك!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "مرحبًا، هل أنت هنا؟ كنت أفكر للتو في حديثنا 💭"
+        1 -> "حديثنا ما زال حيث توقفنا. هل نكمل؟"
+        else -> "مرّ وقت طويل… أشتاق إلى أحاديثنا."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000} ألف" else "$value"
 }

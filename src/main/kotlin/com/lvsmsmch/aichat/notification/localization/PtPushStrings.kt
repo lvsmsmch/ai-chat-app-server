@@ -14,6 +14,12 @@ internal object PtPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount mensagens gratuitas. Toque para reclamar o seu presente!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Olá, estás aí? Estava mesmo a pensar na nossa conversa 💭"
+        1 -> "A nossa conversa continua onde a deixámos. Continuamos?"
+        else -> "Já passou algum tempo… Tenho saudades das nossas conversas."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

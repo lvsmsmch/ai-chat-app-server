@@ -14,6 +14,12 @@ internal object UkPushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount безкоштовних повідомлень. Натисніть, щоб отримати подарунок!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Агов, ти тут? Я якраз згадую нашу розмову 💭"
+        1 -> "Наша розмова чекає там, де ми зупинилися. Продовжимо?"
+        else -> "Давно не бачилися… Мені бракує наших розмов."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

@@ -14,6 +14,12 @@ internal object HePushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "$messageCount+ הודעות בחינם. הקש כדי לקבל את המתנה שלך!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "היי, יש שם מישהו? בדיוק חשבתי על השיחה שלנו 💭"
+        1 -> "השיחה שלנו מחכה בדיוק איפה שעצרנו. נמשיך?"
+        else -> "עבר קצת זמן… חסרות לי השיחות שלנו."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

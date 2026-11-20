@@ -14,6 +14,12 @@ internal object Es419PushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount mensajes gratis. ¡Toca para reclamar tu regalo!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Oye, ¿estás ahí? Justo estaba pensando en nuestra conversación 💭"
+        1 -> "Nuestra conversación sigue donde la dejamos. ¿Seguimos?"
+        else -> "Ha pasado un tiempo… Extraño nuestras charlas."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000},000" else "$value"
 }

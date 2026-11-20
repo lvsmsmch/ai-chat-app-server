@@ -13,9 +13,13 @@ import kotlin.coroutines.cancellation.CancellationException
  * но не заходили [WINBACK_INACTIVE_DAYS] дней, дарим [WINBACK_GIFT_MESSAGES]
  * экстра-сообщений и шлём пуш. Не чаще раза в [WINBACK_COOLDOWN_DAYS] дней.
  * Проверка раз в 6 часов.
+ *
+ * 20.11: порог — хоть одно сообщение (больше половины ушедших писали 1–5 и
+ * винбэка не видели), а срок — 14 дней: первую неделю паузы теперь ведут
+ * напоминания от персонажа ([REENGAGE_STEPS_DAYS]).
  */
-const val WINBACK_MIN_MESSAGES = 5
-const val WINBACK_INACTIVE_DAYS = 7L
+const val WINBACK_MIN_MESSAGES = 0
+const val WINBACK_INACTIVE_DAYS = 14L
 const val WINBACK_COOLDOWN_DAYS = 30L
 const val WINBACK_GIFT_MESSAGES = 100
 

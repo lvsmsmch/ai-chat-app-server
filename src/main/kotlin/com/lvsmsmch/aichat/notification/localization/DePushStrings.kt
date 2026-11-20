@@ -14,6 +14,12 @@ internal object DePushStrings : PushStringTable {
     override fun winbackBody(messageCount: Int) =
         "+$messageCount kostenlose Nachrichten. Tippe, um dein Geschenk zu beanspruchen!"
 
+    override fun reengageBody(step: Int) = when (step) {
+        0 -> "Hey, bist du da? Ich musste gerade an unser Gespräch denken 💭"
+        1 -> "Unser Chat wartet genau da, wo wir aufgehört haben. Machen wir weiter?"
+        else -> "Ist schon eine Weile her… Ich vermisse unsere Gespräche."
+    }
+
     private fun formatMilestone(value: Int): String =
         if (value >= 1_000 && value % 1_000 == 0) "${value / 1_000} Tsd." else "$value"
 }
