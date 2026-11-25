@@ -1,4 +1,4 @@
-/* Luma — сайт в дизайне приложения «Афиша» (ai-chat-app-kmp: theme/Neon.kt,
+/* Lunivo — сайт в дизайне приложения «Афиша» (ai-chat-app-kmp: theme/Neon.kt,
    объект Poster): тёплый чёрный #0B0A09, тёплый белый #F3EEE5, акцент
    #FF5A36, плакатный Big Shoulders Display в заголовках, Hanken Grotesk в
    тексте (свои файлы, без запросов к Google). Главная кнопка — тёплая белая
@@ -42,7 +42,7 @@ a { color: var(--accent); text-underline-offset: 3px; }
 img { display: block; max-width: 100%; height: auto; }
 ::selection { background: var(--accent); color: var(--on-ink); }
 
-/* ---- Знак: «LUMA» плакатом и оранжевая точка, как в приложении ---- */
+/* ---- Знак: «LUNIVO» плакатом и оранжевая точка, как в приложении ---- */
 .brand {
   display: inline-flex; align-items: flex-end; gap: 3px;
   color: var(--text); text-decoration: none;
@@ -169,7 +169,7 @@ img { display: block; max-width: 100%; height: auto; }
   font-weight: 500; font-size: 14px; line-height: 1.4; color: var(--soft);
 }
 
-/* Luma Plus: карточка с артом пейвола справа, как баннер в профиле */
+/* Lunivo Plus: карточка с артом пейвола справа, как баннер в профиле */
 .plus {
   position: relative; overflow: hidden;
   display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; align-items: center;
